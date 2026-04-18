@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Promos | Tribe of 5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body data-page="admin-promos">
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="../index.html">TRIBE<span>OF5</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./dashboard.html">Dashboard</a></li>
+        <li><a href="./products.html">Products</a></li>
+        <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./promos.html" class="active">Promos</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="admin-header">
+      <h1 class="dashboard-title">Promo Codes</h1>
+      <button class="btn-primary" onclick="alert('Create promo feature coming soon')">+ Create Promo</button>
+    </div>
+
+    <section data-section="promos">
+      <table class="table-wrapper">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Discount</th>
+            <th>Valid Until</th>
+            <th>Usage</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="5" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-bottom"><p>&copy; 2025 Tribe of 5 Admin Panel.</p></div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/cart.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/neural-bg.js"></script>
+
+  <script>
+    document.getElementById('nav-logout-btn').addEventListener('click', () => {
+      clearAuth();
+      showToast('Logged out');
+      window.location.href = '../login.html';
+    });
+  </script>
+</body>
+</html>
