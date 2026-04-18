@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Home | E-COM</title>
   <link rel="icon" type="image/png" href="./images/E_Commerce_Logo.png">
+  <link rel="shortcut icon" type="image/png" href="./images/E_Commerce_Logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -17,7 +18,10 @@
 
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a class="nav-logo" href="./index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <a class="nav-logo" href="./index.html">
+        <img src="./images/E_Commerce_Logo.png" alt="E-COM" class="nav-logo-img" onerror="this.style.display='none'">
+        <span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span>
+      </a>
       <ul class="nav-links" id="nav-links">
         <li><a href="./index.html" class="active">Home</a></li>
         <li><a href="./shop.html">Shop</a></li>
@@ -50,17 +54,50 @@
     <div class="home-layout">
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-          <h3>Categories</h3>
+          <h3><i class="fas fa-sliders-h" style="margin-right:0.5rem;font-size:0.85rem;"></i>Browse &amp; Filter</h3>
           <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">
             <i class="fas fa-times"></i>
           </button>
         </div>
-        
-        <div class="categories-container" id="categories-container">
-          <div class="loading-spinner">
-            <i class="fas fa-spinner"></i>
+
+        <!-- Categories -->
+        <div class="filter-section">
+          <p class="filter-section-title"><i class="fas fa-tag"></i> Categories</p>
+          <div class="categories-container" id="categories-container">
+            <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
           </div>
         </div>
+
+        <!-- Price Filter -->
+        <div class="filter-section">
+          <p class="filter-section-title"><i class="fas fa-coins"></i> Price Range (Rs)</p>
+          <div class="price-range-inputs">
+            <input type="number" class="price-input" id="price-min" placeholder="Min" min="0">
+            <span class="price-separator">—</span>
+            <input type="number" class="price-input" id="price-max" placeholder="Max" min="0">
+          </div>
+          <button class="apply-filter-btn" id="apply-price-filter">
+            <i class="fas fa-filter"></i> Apply
+          </button>
+        </div>
+
+        <!-- Size Filter -->
+        <div class="filter-section" style="padding-bottom:1rem;">
+          <p class="filter-section-title"><i class="fas fa-ruler"></i> Sizes</p>
+          <div class="size-chips" id="size-chips">
+            <span class="size-chip" data-size="XS">XS</span>
+            <span class="size-chip" data-size="S">S</span>
+            <span class="size-chip" data-size="M">M</span>
+            <span class="size-chip" data-size="L">L</span>
+            <span class="size-chip" data-size="XL">XL</span>
+            <span class="size-chip" data-size="XXL">XXL</span>
+          </div>
+        </div>
+
+        <!-- Clear -->
+        <span class="clear-filters" id="clear-filters">
+          <i class="fas fa-times-circle"></i> Clear all filters
+        </span>
 
         <div class="sidebar-footer">
           <div class="user-profile-section" id="user-profile-section">

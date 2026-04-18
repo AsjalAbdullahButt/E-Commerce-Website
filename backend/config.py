@@ -1,14 +1,22 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 class Settings(BaseSettings):
     mongodb_uri: str
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 10080
+    jwt_expire_minutes: int = 1440          # 24 h  (was 10080 = 7 days — too long)
+    jwt_refresh_expire_minutes: int = 10080 # 7 days for refresh
     frontend_url: str = "http://localhost:5500"
-    allowed_origins: str = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:3000"
+    allowed_origins: str = "http://localhost:5500,http://127.0.0.1:5500"
+    docs_enabled: bool = True               # Set False in production
+
+    # Rate limit overrides (requests/minute)
+    rate_login: str = "5/minute"
+    rate_register: str = "3/minute"
+    rate_order: str = "10/minute"
+    rate_general: str = "60/minute"
 
     class Config:
         env_file = str(Path(__file__).parent.parent / ".env")
