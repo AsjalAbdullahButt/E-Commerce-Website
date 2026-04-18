@@ -30,6 +30,8 @@ class OrderCreate(BaseModel):
     items: List[OrderItem]
     shipping_address: ShippingAddress
     promo_code: Optional[str] = None
+    payment_method: Optional[str] = "cod"  # cod, jazzcash, easypaisa
+    payment_reference: Optional[str] = None  # Transaction ID for mobile payments
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus

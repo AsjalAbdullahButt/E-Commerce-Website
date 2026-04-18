@@ -3,6 +3,11 @@ let currentPage = 1;
 
 async function loadProducts() {
   try {
+    // Sync wishlist from backend on initial load
+    if (isLoggedIn()) {
+      await syncWishlistFromServer();
+    }
+
     const search = document.querySelector('[data-search]')?.value || '';
     const category = document.querySelector('[data-category]')?.value || '';
     const sort = document.querySelector('[data-sort]')?.value || 'newest';
@@ -93,6 +98,30 @@ async function quickAddToCart(productId, buttonEl) {
     });
   } catch (err) {
     showToast('Failed to add to cart', 'error');
+  }
+}
+
+async function syncWishlistFromServer() {
+  try {
+    const wishlist = await api.get('/wishlist', true);
+    
+    // Clear old wishlist keys
+    Object.keys(localStorage)
+      .filter(key => key.startsWith('wishlist_'))
+      .forEach(key => localStorage.removeItem(key));
+    
+    // Add items from server
+    if (Array.isArray(wishlist)) {
+      wishlist.forEach(item => {
+        const productId = item.product_id || item.id;
+        if (productId) {
+          localStorage.setItem(`wishlist_${productId}`, '1');
+        }
+      });
+    }
+  } catch (err) {
+    // Fail silently - wishlist sync is not critical
+    console.log('Wishlist sync skipped');
   }
 }
 

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from database import users_col
 from models.user import UserCreate, UserLogin, UserOut, UserUpdate
 from utils.helpers import hash_password, verify_password, create_access_token
 from middleware.auth_middleware import get_current_user
+from utils.limiter import limiter
 from datetime import datetime
 from bson import ObjectId
 
@@ -19,7 +20,8 @@ def serialize_user(u):
     }
 
 @router.post("/register")
-async def register(body: UserCreate):
+@limiter.limit("3/minute")
+async def register(request: Request, body: UserCreate):
     """Register a new user"""
     existing = await users_col.find_one({"email": body.email})
     if existing:
@@ -42,7 +44,8 @@ async def register(body: UserCreate):
     }
 
 @router.post("/login")
-async def login(body: UserLogin):
+@limiter.limit("5/minute")
+async def login(request: Request, body: UserLogin):
     """Login user"""
     user = await users_col.find_one({"email": body.email})
     if not user or not verify_password(body.password, user["password"]):

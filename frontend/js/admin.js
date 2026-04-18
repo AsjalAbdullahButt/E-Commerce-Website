@@ -271,11 +271,96 @@ async function updateRiderOrder(orderId, status) {
   }
 }
 
+// === IMAGE URL PREVIEW FUNCTIONS ===
+function addImageRow() {
+  const input = document.getElementById('image-url-input');
+  const url = input.value.trim();
+
+  if (!url) {
+    showToast('Please enter an image URL', 'warning');
+    return;
+  }
+
+  // Validate URL format
+  try {
+    new URL(url);
+  } catch (e) {
+    showToast('Invalid URL format', 'error');
+    return;
+  }
+
+  const urls = getAdminImageUrls();
+  if (urls.includes(url)) {
+    showToast('URL already added', 'warning');
+    return;
+  }
+
+  urls.push(url);
+  setAdminImageUrls(urls);
+  input.value = '';
+  previewAdminImages();
+}
+
+function removeImageRow(url) {
+  const urls = getAdminImageUrls();
+  const index = urls.indexOf(url);
+  if (index > -1) {
+    urls.splice(index, 1);
+    setAdminImageUrls(urls);
+    previewAdminImages();
+  }
+}
+
+function previewAdminImages() {
+  const urls = getAdminImageUrls();
+  const container = document.getElementById('image-urls-container');
+  const grid = document.getElementById('image-preview-grid');
+
+  // Update URL list
+  if (container) {
+    container.innerHTML = urls.map(url => `
+      <div class="image-url-item">
+        <input type="text" value="${url}" readonly>
+        <button class="remove-url-btn" onclick="removeImageRow('${url.replace(/'/g, "\\'")}')" 
+                title="Remove">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `).join('');
+  }
+
+  // Update preview grid
+  if (grid) {
+    grid.innerHTML = urls.map(url => `
+      <div class="image-preview-item loading" data-url="${url}">
+        <img src="${url}" alt="Preview" onload="this.parentElement.classList.remove('loading')" 
+             onerror="this.parentElement.innerHTML='<i class=\"fas fa-exclamation-circle\"></i>'">
+        <button class="image-preview-remove" onclick="removeImageRow('${url.replace(/'/g, "\\'")}')" 
+                title="Remove">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `).join('');
+  }
+}
+
+function getAdminImageUrls() {
+  const stored = localStorage.getItem('ecom_admin_images');
+  return stored ? JSON.parse(stored) : [];
+}
+
+function setAdminImageUrls(urls) {
+  localStorage.setItem('ecom_admin_images', JSON.stringify(urls));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
   
   if (page === 'admin-dashboard') loadAdminDashboard();
-  else if (page === 'admin-products') loadProducts();
+  else if (page === 'admin-products') {
+    loadProducts();
+    previewAdminImages();
+  }
   else if (page === 'admin-orders') loadOrders();
   else if (page === 'rider-dashboard') loadRiderDashboard();
 });

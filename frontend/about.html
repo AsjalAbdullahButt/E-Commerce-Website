@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About | Tribe of 5</title>
+  <title>About Us | E-COM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -16,7 +16,7 @@
 
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a class="nav-logo" href="./index.html">TRIBE<span>OF5</span></a>
+      <a class="nav-logo" href="./index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="./index.html">Home</a></li>
         <li><a href="./shop.html">Shop</a></li>
@@ -31,6 +31,10 @@
           <i class="fas fa-shopping-bag"></i>
           <span class="cart-badge" id="cart-badge">0</span>
         </button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
         <button class="hamburger" id="hamburger" aria-label="Menu">
           <span></span><span></span><span></span>
         </button>
@@ -43,36 +47,36 @@
 
   <main>
     <section class="page-header">
-      <h1>About Tribe of 5</h1>
-      <p>The story behind our premium T-shirts</p>
+      <h1>About E-Commerce</h1>
+      <p>The story behind our premium products</p>
     </section>
 
     <section class="content-section">
       <h2>Our Mission</h2>
       <p>
-        Tribe of 5 is a premium Pakistani T-shirt brand dedicated to crafting the perfect drop-shoulder tee. 
-        We believe in quality, comfort, and style that speaks to the bold and the unapologetic. Every piece 
-        is designed with intention and crafted with pride.
+        E-Commerce is your one-stop shop for everything you need, dedicated to delivering quality products and exceptional service. 
+        We believe in excellence, affordability, and customer satisfaction that speaks to everyone. Every transaction 
+        is handled with care and pride.
       </p>
     </section>
 
     <section class="content-section">
       <h2>Our Craftsmanship</h2>
       <p>
-        We source the finest premium cotton, ensuring every shirt is soft, breathable, and built to last. 
-        Our drop-shoulder design offers that perfect balance of oversized comfort and urban edge. Made in Pakistan, 
-        we support local artistry and maintain the highest quality standards.
+        We source the finest materials and products, ensuring quality, durability, and customer satisfaction. 
+        Our carefully curated selection offers the perfect balance of quality and value. Based in Pakistan, 
+        we support local talent and maintain the highest quality standards.
       </p>
     </section>
 
     <section class="content-section">
       <h2>Our Values</h2>
       <ul>
-        <li><strong>Quality:</strong> Premium materials, meticulous craftsmanship</li>
-        <li><strong>Comfort:</strong> Designed for everyday wear and maximum comfort</li>
-        <li><strong>Style:</strong> Bold, contemporary, and timeless designs</li>
-        <li><strong>Sustainability:</strong> Responsible production and packaging</li>
-        <li><strong>Community:</strong> Supporting local talent and Pakistani heritage</li>
+        <li><strong>Quality:</strong> Premium materials and products, carefully sourced</li>
+        <li><strong>Affordability:</strong> Great prices without compromising quality</li>
+        <li><strong>Variety:</strong> Diverse selection to suit every need</li>
+        <li><strong>Sustainability:</strong> Responsible production and eco-friendly practices</li>
+        <li><strong>Community:</strong> Supporting local businesses and Pakistan's growth</li>
       </ul>
     </section>
   </main>
@@ -80,8 +84,8 @@
   <footer class="footer">
     <div class="footer-inner">
       <div class="footer-brand">
-        <p class="footer-logo">TRIBE<span>OF5</span></p>
-        <p>Premium drop-shoulder T-shirts. Crafted for the bold.</p>
+        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
+        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
       </div>
       <div class="footer-col">
         <h4>Shop</h4>
@@ -105,7 +109,7 @@
         </div>
       </div>
     </div>
-    <div class="footer-bottom"><p>&copy; 2025 Tribe of 5. All rights reserved.</p></div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
   </footer>
 
   <script src="./js/config.js"></script>
@@ -113,5 +117,15 @@
   <script src="./js/auth.js"></script>
   <script src="./js/cart.js"></script>
   <script src="./js/neural-bg.js"></script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
 </body>
 </html>

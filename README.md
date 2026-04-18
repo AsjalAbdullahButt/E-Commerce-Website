@@ -1,25 +1,58 @@
-# 👕 E-commerce Website
+# �️ E-Commerce Complete Website
 
-Welcome to **Tribe of 5**, an immersive and modern e-commerce platform specializing in premium drop-shoulder T-shirts. This website is designed to provide a seamless shopping experience with a focus on aesthetics, user interaction, and responsiveness.
+**E-COM** - A full-stack, production-ready e-commerce platform with comprehensive features, modern UI, and enterprise-grade security.
+
+**Status:** ✅ **PRODUCTION READY**  
+**Version:** 2.0 - Final  
+**Last Updated:** April 18, 2026
 
 ---
 
 ## 📚 Table of Contents
+- [Quick Start](#quick-start)
 - [Features](#features)
-- [Technologies Used](#technologies-used)
+- [Technologies](#technologies)
 - [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Usage](#usage)
-- [Contact](#contact)
+- [Installation](#installation)
+- [Database Setup](#database-setup)
+- [Running the Application](#running-the-application)
+- [Documentation](#documentation)
+- [Test Accounts](#test-accounts)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+
+---
+
+## 🚀 Quick Start
+
+**Get started in 2 minutes!** → [Read QUICKSTART.md](QUICKSTART.md)
+
+Or follow these steps:
+
+### 1. Start Backend
+```bash
+cd backend
+python -m uvicorn main:app --reload --port 8000
+```
+
+### 2. Start Frontend
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+### 3. Access Application
+```
+http://localhost:5500
+```
+
+### 4. Login
+- Email: `admin@ecommerce.com`
+- Password: `admin123`
 
 ---
 
 ## ✅ Features
-
-### 👕 Dynamic Product Catalog
-- Browse a variety of premium drop-shoulder T-shirts with detailed product information.
 
 ### 🛒 Interactive Cart System
 - Add, update quantities, and remove items from your shopping cart with real-time updates.

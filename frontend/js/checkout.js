@@ -8,6 +8,7 @@ async function initializeCheckout() {
 
   displayOrderSummary(cart);
   setupPromoCode();
+  initPaymentToggle();
 }
 
 function displayOrderSummary(cart) {
@@ -147,7 +148,9 @@ async function placeOrder() {
         city,
         postal_code: postal
       },
-      promo_code: appliedPromo?.code || null
+      promo_code: appliedPromo?.code || null,
+      payment_method: getPaymentData().method,
+      payment_reference: getPaymentData().reference
     }, true);
 
     clearCart();
@@ -160,6 +163,53 @@ async function placeOrder() {
   } catch (err) {
     showToast(err.message || 'Failed to place order', 'error');
   }
+}
+
+// Payment method toggle and data collection
+function initPaymentToggle() {
+  const options = document.querySelectorAll('.payment-option');
+  
+  options.forEach(option => {
+    option.addEventListener('change', (e) => {
+      if (e.target.type === 'radio') {
+        // Update active styling
+        options.forEach(o => o.classList.remove('active'));
+        option.classList.add('active');
+
+        // Show/hide wallet fields
+        document.getElementById('jazzcash-fields').style.display = 'none';
+        document.getElementById('easypaisa-fields').style.display = 'none';
+
+        const method = e.target.value;
+        if (method === 'jazzcash') {
+          document.getElementById('jazzcash-fields').style.display = 'block';
+        } else if (method === 'easypaisa') {
+          document.getElementById('easypaisa-fields').style.display = 'block';
+        }
+      }
+    });
+  });
+}
+
+function getPaymentData() {
+  const selected = document.querySelector('input[name="payment_method"]:checked');
+  const method = selected?.value || 'cod';
+  
+  let reference = null;
+
+  if (method === 'jazzcash') {
+    reference = document.getElementById('jazzcash-number')?.value || '';
+    if (reference && !reference.match(/^\d{3,4}-\d{7}$/)) {
+      reference = reference.replace(/[^\d]/g, '').slice(0, 11);
+    }
+  } else if (method === 'easypaisa') {
+    reference = document.getElementById('easypaisa-number')?.value || '';
+    if (reference && !reference.match(/^\d{3,4}-\d{7}$/)) {
+      reference = reference.replace(/[^\d]/g, '').slice(0, 11);
+    }
+  }
+
+  return { method, reference };
 }
 
 document.addEventListener('DOMContentLoaded', initializeCheckout);

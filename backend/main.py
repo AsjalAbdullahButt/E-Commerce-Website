@@ -1,27 +1,41 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from config import settings
+from database import client
+from utils.limiter import limiter
 from routes import auth, products, orders, reviews, wishlist, promos, users, rider
 
 app = FastAPI(
-    title="Tribe of 5 API",
-    description="Premium Pakistani E-Commerce Platform",
+    title="E-Commerce API",
+    description="Full-Stack E-Commerce Platform",
     version="1.0.0"
 )
 
+# Rate Limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS Configuration
+origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.frontend_url,
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "http://localhost:3000"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Startup event - MongoDB connection check
+@app.on_event("startup")
+async def startup_db_check():
+    try:
+        await client.admin.command('ping')
+        print("✅ MongoDB Atlas connected successfully")
+    except Exception as e:
+        print(f"❌ MongoDB connection FAILED: {e}")
+        raise RuntimeError(f"Cannot connect to MongoDB. Check MONGODB_URI in .env — {e}")
 
 # Routes
 app.include_router(auth.router,     prefix="/auth",     tags=["Auth"])
@@ -38,7 +52,7 @@ async def root():
     """Health check"""
     return {
         "status": "ok",
-        "message": "Tribe of 5 API running",
+        "message": "E-Commerce API running",
         "docs": "http://localhost:8000/docs"
     }
 

@@ -3,7 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rider Dashboard | Tribe of 5</title>
+  <title>Rider Dashboard | E-COM</title>
+  
+  <!-- AUTH GUARD — Runs FIRST before page renders -->
+  <script>
+    (function() {
+      const token = localStorage.getItem('ecom_token');
+      const user = JSON.parse(localStorage.getItem('ecom_user') || 'null');
+      if (!token || !user) { window.location.replace('../login.html'); return; }
+      const isRiderPage = true;
+      if (isRiderPage && !['admin','rider'].includes(user.role)) { window.location.replace('../index.html'); return; }
+    })();
+  </script>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -16,12 +28,16 @@
 
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a class="nav-logo" href="../index.html">TRIBE<span>OF5</span></a>
+      <a class="nav-logo" href="../index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="./dashboard.html" class="active">Deliveries</a></li>
       </ul>
       <div class="nav-actions">
         <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
         <button class="hamburger" id="hamburger" aria-label="Menu">
           <span></span><span></span><span></span>
         </button>
@@ -36,7 +52,7 @@
   </main>
 
   <footer class="footer">
-    <div class="footer-bottom"><p>&copy; 2025 Tribe of 5 Rider Portal.</p></div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce Rider Portal.</p></div>
   </footer>
 
   <script src="../js/config.js"></script>
@@ -53,5 +69,15 @@
       window.location.href = '../login.html';
     });
   </script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
 </body>
 </html>

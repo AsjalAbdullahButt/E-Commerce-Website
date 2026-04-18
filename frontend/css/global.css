@@ -1,5 +1,5 @@
 /* ===========================
-   TRIBE OF 5 — GLOBAL CSS
+   E-COM — GLOBAL CSS
    =========================== */
 
 /* === GOOGLE FONTS (already linked in HTML) ===
@@ -8,7 +8,7 @@
    JetBrains Mono — prices, codes
 */
 
-/* === ROOT VARIABLES === */
+/* === ROOT VARIABLES (DARK MODE — DEFAULT) === */
 :root {
   /* Backgrounds */
   --bg-base:         #0a0a0a;
@@ -62,6 +62,37 @@
   --nav-height: 70px;
 }
 
+/* === LIGHT MODE THEME === */
+[data-theme="light"] {
+  --bg-base:        #F5F4F0;
+  --bg-surface:     #FFFFFF;
+  --bg-card:        #EEEDE8;
+  --bg-card-hover:  #E5E4DE;
+  --bg-input:       #FFFFFF;
+  --text-primary:   #1A1A1A;
+  --text-secondary: #555555;
+  --text-muted:     #999999;
+  --border:         #DDDCD6;
+  --border-active:  rgba(160,120,0,0.5);
+  --gold:           #A07800;
+  --gold-dim:       #7A5C00;
+  --gold-glow:      rgba(160,120,0,0.10);
+  --gold-border:    rgba(160,120,0,0.30);
+  --shadow-sm:      0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md:      0 4px 20px rgba(0,0,0,0.10);
+  --shadow-lg:      0 8px 40px rgba(0,0,0,0.14);
+  --shadow-gold:    0 0 20px rgba(160,120,0,0.12);
+}
+
+[data-theme="light"] .navbar {
+  background: rgba(245,244,240,0.92);
+}
+
+[data-theme="light"] #neural-bg {
+  opacity: 0.04;
+  filter: invert(1);
+}
+
 /* === RESET === */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -69,8 +100,19 @@
   padding: 0;
 }
 
+/* === SMOOTH THEME TRANSITIONS === */
 html {
   scroll-behavior: smooth;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+*, *::before, *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* EXCEPTION: disable transition on elements that shouldn't animate theme change */
+.fly-dot, canvas, [class*="skeleton"] {
+  transition: none !important;
 }
 
 body {
@@ -139,11 +181,39 @@ button {
 
 .nav-logo {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 700;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  text-decoration: none;
+}
+
+.logo-e {
+  color: var(--gold);
+  font-style: italic;
+  text-shadow: 0 0 14px rgba(255, 215, 0, 0.5);
+}
+
+.logo-dash {
+  color: var(--text-muted);
+  font-weight: 300;
+  margin: 0 1px;
+}
+
+.logo-com {
   color: var(--text-primary);
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.nav-logo:hover .logo-e {
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+}
+
+.nav-logo:hover .logo-com {
+  color: var(--gold);
 }
 
 .nav-logo span {
@@ -197,6 +267,7 @@ button {
 .nav-icon:hover {
   color: var(--gold);
   background: var(--gold-glow);
+  box-shadow: 0 0 10px rgba(255,215,0,0.18);
 }
 
 .cart-icon-btn {
@@ -217,6 +288,13 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 0 8px rgba(255,215,0,0.60);
+  animation: badge-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(255,215,0,0.50); }
+  50%       { box-shadow: 0 0 14px rgba(255,215,0,0.80); }
 }
 
 .hamburger {
@@ -420,20 +498,52 @@ button {
   justify-content: center;
   background: var(--gold);
   color: #000;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.95rem;
   padding: 0.75rem 1.75rem;
   border-radius: var(--radius-pill);
   border: none;
   cursor: pointer;
-  transition: var(--transition);
-  box-shadow: 0 0 16px rgba(255,215,0,0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow:
+    0 0 10px rgba(255,215,0,0.20),
+    0 0 20px rgba(255,215,0,0.10),
+    0 2px 8px rgba(0,0,0,0.30);
+  position: relative;
+  overflow: hidden;
+  letter-spacing: 0.02em;
+}
+
+/* Shine sweep on hover */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s ease;
+}
+
+.btn-primary:hover::after {
+  left: 130%;
 }
 
 .btn-primary:hover {
   background: #FFE033;
   transform: translateY(-2px);
-  box-shadow: 0 0 24px rgba(255,215,0,0.4);
+  box-shadow:
+    0 0 16px rgba(255,215,0,0.50),
+    0 0 32px rgba(255,215,0,0.25),
+    0 0 48px rgba(255,215,0,0.10),
+    0 6px 20px rgba(0,0,0,0.30);
+}
+
+.btn-primary:active {
+  transform: translateY(0px);
+  box-shadow:
+    0 0 8px rgba(255,215,0,0.40),
+    0 2px 8px rgba(0,0,0,0.30);
 }
 
 .btn-outline {
@@ -442,17 +552,27 @@ button {
   justify-content: center;
   background: transparent;
   color: var(--gold);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.95rem;
   padding: 0.7rem 1.6rem;
   border-radius: var(--radius-pill);
   border: 1px solid var(--gold-border);
-  transition: var(--transition);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 0 6px rgba(255,215,0,0.08);
+  cursor: pointer;
 }
 
 .btn-outline:hover {
   background: var(--gold-glow);
   border-color: var(--gold);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 12px rgba(255,215,0,0.30),
+    0 0 24px rgba(255,215,0,0.12);
+}
+
+.btn-outline:active {
+  transform: translateY(0);
 }
 
 /* === TOAST NOTIFICATIONS === */
@@ -521,6 +641,39 @@ button {
     transform: translate(var(--dx), var(--dy)) scale(0.2);
     opacity: 0;
   }
+}
+
+/* === WHATSAPP FLOATING BUTTON === */
+.whatsapp-float {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 58px;
+  height: 58px;
+  background: #25D366;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.6rem;
+  text-decoration: none;
+  z-index: 998;
+  box-shadow: 0 4px 15px rgba(37,211,102,0.45);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: wa-pulse 2.5s ease-in-out infinite;
+}
+
+.whatsapp-float:hover {
+  transform: scale(1.12);
+  box-shadow: 0 6px 22px rgba(37,211,102,0.65);
+  animation: none;
+  color: #fff;
+}
+
+@keyframes wa-pulse {
+  0%, 100% { box-shadow: 0 4px 15px rgba(37,211,102,0.45), 0 0 0 0 rgba(37,211,102,0.4); }
+  60%       { box-shadow: 0 4px 15px rgba(37,211,102,0.45), 0 0 0 14px rgba(37,211,102,0); }
 }
 
 /* === FOOTER === */

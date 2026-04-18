@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Tracking | Tribe of 5</title>
+  <title>Track Order | E-COM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -16,7 +16,7 @@
 
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a class="nav-logo" href="./index.html">TRIBE<span>OF5</span></a>
+      <a class="nav-logo" href="./index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="./index.html">Home</a></li>
         <li><a href="./shop.html">Shop</a></li>
@@ -30,6 +30,10 @@
         <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">
           <i class="fas fa-shopping-bag"></i>
           <span class="cart-badge" id="cart-badge">0</span>
+        </button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
         </button>
         <button class="hamburger" id="hamburger" aria-label="Menu">
           <span></span><span></span><span></span>
@@ -58,8 +62,8 @@
   <footer class="footer">
     <div class="footer-inner">
       <div class="footer-brand">
-        <p class="footer-logo">TRIBE<span>OF5</span></p>
-        <p>Premium drop-shoulder T-shirts. Crafted for the bold.</p>
+        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
+        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
       </div>
       <div class="footer-col">
         <h4>Shop</h4>
@@ -83,7 +87,7 @@
         </div>
       </div>
     </div>
-    <div class="footer-bottom"><p>&copy; 2025 Tribe of 5. All rights reserved.</p></div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
   </footer>
 
   <script src="./js/config.js"></script>
@@ -92,5 +96,15 @@
   <script src="./js/cart.js"></script>
   <script src="./js/tracking.js"></script>
   <script src="./js/neural-bg.js"></script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
 </body>
 </html>

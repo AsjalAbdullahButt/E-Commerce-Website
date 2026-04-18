@@ -1,8 +1,35 @@
 // === AUTH.JS ===
 // Single source for all authentication logic
 
-const TOKEN_KEY = 'tribe_token';
-const USER_KEY  = 'tribe_user';
+// ─── THEME SYSTEM (runs before DOM loads to prevent flash) ───
+(function initTheme() {
+  const saved = localStorage.getItem('ecom_theme') || 'dark'; // dark = default
+  document.documentElement.setAttribute('data-theme', saved);
+  // Sync icon once DOM is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.className = saved === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+  });
+})();
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('ecom_theme', next);
+  const icon = document.getElementById('theme-icon');
+  if (icon) {
+    icon.className = next === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+    // Brief spin animation
+    icon.style.transform = 'rotate(360deg)';
+    icon.style.transition = 'transform 0.4s ease';
+    setTimeout(() => { icon.style.transform = ''; icon.style.transition = ''; }, 400);
+  }
+}
+
+const TOKEN_KEY = 'ecom_token';
+const USER_KEY  = 'ecom_user';
 
 function getToken()  {
   return localStorage.getItem(TOKEN_KEY);
@@ -96,4 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
       navLinks.classList.toggle('open');
     });
   }
+
+  // Theme toggle button
+  const themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 });

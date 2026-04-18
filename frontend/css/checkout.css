@@ -204,6 +204,121 @@ textarea {
   background: var(--gold-glow);
 }
 
+/* === PAYMENT METHOD STYLES === */
+.section-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.payment-option:hover {
+  border-color: var(--gold);
+  background: var(--bg-card);
+}
+
+.payment-option input[type="radio"] {
+  cursor: pointer;
+  margin: 0;
+}
+
+.payment-option.active {
+  border-color: var(--gold);
+  background: var(--gold-glow);
+}
+
+.pay-icon {
+  font-size: 1.5rem;
+  color: var(--gold);
+  width: 40px;
+  text-align: center;
+}
+
+.pay-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.25rem;
+}
+
+.pay-info strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pay-info small {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.pay-check {
+  font-size: 1.2rem;
+  color: var(--gold);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.payment-option.active .pay-check {
+  opacity: 1;
+}
+
+.mobile-wallet-fields {
+  background: var(--bg-input);
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--gold);
+  margin-bottom: 1rem;
+}
+
+.wallet-instruction {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.wallet-instruction i {
+  color: var(--gold);
+  font-size: 1rem;
+}
+
+.wallet-instruction strong {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.mobile-wallet-fields .form-group {
+  margin-bottom: 1rem;
+}
+
+.mobile-wallet-fields small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 .checkout-btn {
   padding: 1rem;
   background: var(--gold);

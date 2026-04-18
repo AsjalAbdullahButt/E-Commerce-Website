@@ -1,12 +1,23 @@
 // === PRODUCT.JS ===
 async function loadProduct() {
-  try {
-    const id = new URLSearchParams(window.location.search).get('id');
-    if (!id) {
-      showToast('Product not found', 'error');
-      return;
+  const id = new URLSearchParams(window.location.search).get('id');
+  
+  // NULL ID GUARD — Show friendly error page
+  if (!id) {
+    const main = document.querySelector('main');
+    if (main) {
+      main.innerHTML = `
+        <div style="text-align:center;padding:6rem 2rem;">
+          <i class="fas fa-box-open" style="font-size:3rem;opacity:0.3;color:var(--gold)"></i>
+          <h2 style="margin-top:1rem;">Product Not Found</h2>
+          <p style="color:var(--text-secondary);margin:0.5rem 0 2rem;">No product ID was provided.</p>
+          <a href="./shop.html" class="btn-primary">Browse Shop</a>
+        </div>`;
     }
+    return; // Stop all further execution
+  }
 
+  try {
     const product = await api.get(`/products/${id}`);
 
     // Update main image

@@ -152,7 +152,7 @@ async function saveProfile() {
     await api.patch('/auth/me', { name, phone, address }, true);
     const user = getUser();
     Object.assign(user, { name, phone, address });
-    localStorage.setItem('tribe_user', JSON.stringify(user));
+    localStorage.setItem('ecom_user', JSON.stringify(user));
     showToast('Profile updated successfully!');
     location.reload();
   } catch (err) {

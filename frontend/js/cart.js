@@ -1,7 +1,7 @@
 // === CART.JS ===
 // Single source for all cart logic
 
-const CART_KEY = 'tribe_cart';
+const CART_KEY = 'ecom_cart';
 
 function getCart() {
   return JSON.parse(localStorage.getItem(CART_KEY)) || [];
@@ -143,17 +143,15 @@ function closeCartDrawer() {
 function addToCartWithAnimation(buttonEl, product) {
   addToCart(product);
 
+  // NULL CHECK: Only animate if badge exists
+  const badgeEl = document.querySelector('.cart-badge');
+  if (!badgeEl) return;
+
   const dot = document.createElement('div');
   dot.className = 'fly-dot';
 
   const btnRect   = buttonEl.getBoundingClientRect();
-  const badgeEl   = document.querySelector('.cart-badge');
-  const badgeRect = badgeEl ? badgeEl.getBoundingClientRect() : {
-    left: window.innerWidth - 40,
-    top: 20,
-    width: 20,
-    height: 20
-  };
+  const badgeRect = badgeEl.getBoundingClientRect();
 
   dot.style.cssText = `
     left:${btnRect.left + btnRect.width/2}px;
@@ -164,23 +162,6 @@ function addToCartWithAnimation(buttonEl, product) {
 
   document.body.appendChild(dot);
   dot.addEventListener('animationend', () => dot.remove(), { once: true });
-}
-
-function showToast(message, type = 'success') {
-  let toast = document.getElementById('toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'toast';
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.className = `toast toast-${type} show`;
-
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.classList.remove('show');
-  }, 3000);
 }
 
 // Initialize on page load
