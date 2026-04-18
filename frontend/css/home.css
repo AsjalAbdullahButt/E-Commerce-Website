@@ -180,8 +180,10 @@ main {
   }
   
   .sidebar {
+    position: fixed !important;
     transform: translateX(0) !important;
     width: 280px;
+    left: 0;
   }
   
   .main-content {
@@ -189,6 +191,14 @@ main {
   }
   
   .sidebar-toggle {
+    display: none !important;
+  }
+  
+  .sidebar-close {
+    display: block !important;
+  }
+  
+  .sidebar-overlay {
     display: none !important;
   }
 }
@@ -235,7 +245,15 @@ main {
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.sidebar-close:hover {
+  color: var(--gold);
+  transform: rotate(90deg);
 }
 
 .categories-container {
@@ -437,6 +455,165 @@ main {
 
 .sidebar-toggle:active {
   transform: translateY(-1px);
+}
+
+/* Hide any unwanted text in filter section */
+.filter-section::before {
+  content: none !important;
+  display: none !important;
+}
+
+.sidebar-header::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* === FILTER SECTION ENHANCED STYLING === */
+.filter-section {
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-section-title i {
+  color: var(--gold);
+  font-size: 0.9rem;
+}
+
+/* Price Range Inputs */
+.price-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.price-input {
+  flex: 1;
+  padding: 0.65rem 0.8rem;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+  transition: var(--transition);
+}
+
+.price-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+}
+
+.price-input::placeholder {
+  color: var(--text-muted);
+}
+
+.price-separator {
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 0 0.2rem;
+}
+
+/* Apply Filter Button */
+.apply-filter-btn {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(135deg, var(--gold), #FFE033);
+  color: #000;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.2);
+}
+
+.apply-filter-btn:hover {
+  background: linear-gradient(135deg, #FFE033, #FFFF66);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+}
+
+.apply-filter-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(255, 215, 0, 0.2);
+}
+
+/* Size Chips */
+.size-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.size-chip {
+  padding: 0.65rem 0.5rem;
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+}
+
+.size-chip:hover {
+  border-color: var(--gold);
+  background: rgba(255, 215, 0, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.15);
+}
+
+.size-chip.active {
+  background: var(--gold);
+  color: #000;
+  border-color: var(--gold);
+  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.3);
+  transform: scale(1.05);
+}
+
+/* Clear Filters */
+.clear-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  padding: 0.5rem 0;
+  margin-top: 1rem;
+}
+
+.clear-filters:hover {
+  color: var(--gold);
+}
+
+.clear-filters i {
+  font-size: 0.8rem;
 }
 
 /* === RESPONSIVE DESIGN === */
