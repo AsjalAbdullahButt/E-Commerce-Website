@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Home | E-COM</title>
+  <link rel="icon" type="image/png" href="./images/E_Commerce_Logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -46,14 +47,56 @@
   <aside class="cart-drawer" id="cart-drawer"></aside>
 
   <main>
-    <section class="hero">
-      <h1>E-<span style="color:var(--gold)">COM</span></h1>
-      <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
-      <div class="hero-buttons">
-        <a href="./shop.html" class="btn-primary">Shop Now</a>
-        <a href="./about.html" class="btn-outline">Our Story</a>
+    <div class="home-layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h3>Categories</h3>
+          <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="categories-container" id="categories-container">
+          <div class="loading-spinner">
+            <i class="fas fa-spinner"></i>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="user-profile-section" id="user-profile-section">
+            <div class="user-profile-header">
+              <i class="fas fa-user-circle"></i>
+              <div class="user-info">
+                <p class="user-name">Guest User</p>
+                <p class="user-email"></p>
+              </div>
+            </div>
+            <button class="user-profile-btn" id="user-profile-btn">
+              <i class="fas fa-edit"></i> Edit Profile
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+      <div class="main-content">
+        <section class="hero">
+          <div class="hero-logo">
+            <img src="./images/E_Commerce_Logo.png" alt="E-COM Logo" class="logo-image">
+          </div>
+          <h1>E-<span style="color:var(--gold)">COM</span></h1>
+          <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
+          <div class="hero-buttons">
+            <a href="./shop.html" class="btn-primary">Shop Now</a>
+            <a href="./about.html" class="btn-outline">Our Story</a>
+          </div>
+          <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open sidebar">
+            <i class="fas fa-bars"></i> Categories
+          </button>
+        </section>
       </div>
-    </section>
+    </div>
 
     <section class="featured-section">
       <h2 class="section-title">Featured Products</h2>

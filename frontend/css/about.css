@@ -102,13 +102,44 @@ textarea {
   border: none;
   border-radius: var(--radius-pill);
   font-weight: 700;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
   cursor: pointer;
   transition: var(--transition);
   width: 100%;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
 }
 
 .submit-btn:hover {
   background: #FFE033;
+  box-shadow: 0 6px 25px rgba(255, 215, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+.submit-btn:hover::before {
+  width: 300px;
+  height: 300px;
 }
 
 @media (max-width: 768px) {

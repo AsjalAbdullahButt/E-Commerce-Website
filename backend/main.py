@@ -30,9 +30,27 @@ app.add_middleware(
 # Startup event - MongoDB connection check
 @app.on_event("startup")
 async def startup_db_check():
+    # Display E-Commerce banner
+    banner = """
+    ╔════════════════════════════════════╗
+    ║   🛍️  E-COMMERCE API  🛍️          ║
+    ╠════════════════════════════════════╣
+    ║  📊 Connecting to Database...     ║
+    ╚════════════════════════════════════╝
+    """
+    print(banner)
+    
     try:
         await client.admin.command('ping')
-        print("✅ MongoDB Atlas connected successfully")
+        success_msg = """
+    ╔════════════════════════════════════╗
+    ║  ✅ Database Connected            ║
+    ║  🚀 Server Ready!                  ║    ╠════════════════════════════════════╣
+    ║  🔌 Backend: 127.0.0.1:8000       ║
+    ║  🌐 Frontend: 127.0.0.1:5500      ║    ║  📝 Docs: 127.0.0.1:8000/docs     ║
+    ╚════════════════════════════════════╝
+        """
+        print(success_msg)
     except Exception as e:
         print(f"❌ MongoDB connection FAILED: {e}")
         raise RuntimeError(f"Cannot connect to MongoDB. Check MONGODB_URI in .env — {e}")
@@ -53,7 +71,7 @@ async def root():
     return {
         "status": "ok",
         "message": "E-Commerce API running",
-        "docs": "http://localhost:8000/docs"
+        "docs": "http://127.0.0.1:8000/docs"
     }
 
 if __name__ == "__main__":
