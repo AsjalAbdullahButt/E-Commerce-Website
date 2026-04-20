@@ -4,11 +4,11 @@ from datetime import datetime, timedelta
 from config import settings
 import re
 
-pwd_context = CryptContext(schemes=["bcrypt"], rounds=12, deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__rounds=12, deprecated="auto")
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt (12 salt rounds)"""
-    return pwd_context.hash(password, rounds=12)
+    return pwd_context.hash(password)
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a plain password against hashed version using constant-time comparison"""

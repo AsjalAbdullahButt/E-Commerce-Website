@@ -1,15 +1,16 @@
 <div align="center">
 
-<img src="images/E_Commerce_Logo.png" alt="E-COM Logo" width="100"/>
-
 # 🛍️ E-COM — Full-Stack E-Commerce Platform
 
 **Production-grade e-commerce built with FastAPI + MongoDB + Vanilla JS**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776ab?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb&logoColor=white)](https://mongodb.com)
-[![License](https://img.shields.io/badge/License-MIT-gold)](LICENSE)
+### Tech Stack
+![Python](https://img.shields.io/badge/Python-3.13-3776ab?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34C26?logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
 
 </div>
 
@@ -26,74 +27,6 @@
 | 🛡️ **Security** | Rate limiting on every route, server-side price validation, security headers, TrustedHost middleware |
 | 🎨 **Frontend** | Dark/light theme, neural-network animated background, sidebar with categories + filters, responsive design |
 | ⚙️ **Admin** | Product CRUD, order management, promo management, user list |
-
----
-
-## 🛠️ Tech Stack
-
-**Backend**
-- 🐍 Python 3.11 + FastAPI
-- 🍃 MongoDB Atlas (Motor async driver)
-- 🔑 JWT authentication (python-jose)
-- 🔒 bcrypt password hashing (passlib)
-- 🚦 SlowAPI rate limiting
-
-**Frontend**
-- 📄 HTML5 / CSS3 / Vanilla JavaScript (ES6+)
-- 🎨 Font Awesome 6 icons
-- 🖋️ Playfair Display + DM Sans + JetBrains Mono fonts
-
----
-
-## 📁 Project Structure
-
-```
-E-Commerce-Website/
-├── 📂 backend/
-│   ├── main.py                  # FastAPI app, middleware, routes
-│   ├── config.py                # Pydantic settings (reads .env)
-│   ├── database.py              # MongoDB Motor client + collections
-│   ├── requirements.txt
-│   ├── middleware/
-│   │   └── auth_middleware.py   # JWT verification, role guards
-│   ├── models/                  # Pydantic request/response models
-│   │   ├── user.py
-│   │   ├── product.py
-│   │   ├── order.py
-│   │   ├── review.py
-│   │   └── promo.py
-│   ├── routes/                  # One file per resource
-│   │   ├── auth.py
-│   │   ├── products.py
-│   │   ├── orders.py
-│   │   ├── reviews.py
-│   │   ├── wishlist.py
-│   │   ├── promos.py
-│   │   ├── users.py
-│   │   └── rider.py
-│   ├── utils/
-│   │   ├── helpers.py           # bcrypt + JWT helpers
-│   │   └── limiter.py           # SlowAPI limiter instance
-│   └── seed/
-│       └── seed_db.py           # Sample data seeder
-├── 📂 frontend/
-│   ├── index.html               # Home page
-│   ├── shop.html
-│   ├── product.html
-│   ├── checkout.html
-│   ├── login.html / register.html
-│   ├── profile.html
-│   ├── tracking.html
-│   ├── about.html / contact.html
-│   ├── 📂 admin/                # Admin dashboard pages
-│   ├── 📂 rider/                # Rider dashboard
-│   ├── 📂 css/                  # Per-page + global stylesheets
-│   ├── 📂 js/                   # Per-page + shared scripts
-│   └── 📂 images/               # Logo and assets
-├── 📂 images/                   # Root-level assets
-├── .env.example                 # Environment variable template
-└── README.md
-```
 
 ---
 
@@ -251,19 +184,3 @@ After running the seeder (`python seed/seed_db.py`):
 3. Commit changes: `git commit -m "feat: add your feature"`
 4. Push: `git push origin feature/your-feature`
 5. Open a Pull Request
-
----
-
-## 📬 Contact
-
-**Asjal Abdullah Butt**
-- 🐙 GitHub: [@AsjalAbdullahButt](https://github.com/AsjalAbdullahButt)
-- 📧 Email: [asjal.abdullah.butt.19@gmail.com](mailto:asjal.abdullah.butt.19@gmail.com)
-
----
-
-<div align="center">
-
-Made with ❤️ and ☕ · MIT License
-
-</div>

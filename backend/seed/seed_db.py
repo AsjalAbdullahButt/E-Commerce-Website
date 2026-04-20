@@ -13,7 +13,7 @@ from bson import ObjectId
 
 load_dotenv()
 
-pwd = CryptContext(schemes=["bcrypt"], rounds=12)
+pwd = CryptContext(schemes=["bcrypt"], bcrypt__rounds=12)
 
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DATABASE_NAME", "E_Commerce")

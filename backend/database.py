@@ -3,7 +3,7 @@ from config import settings
 
 # MongoDB Client
 client = AsyncIOMotorClient(settings.mongodb_uri)
-db = client.E_Commerce
+db = client[settings.database_name]
 
 # Collections
 users_col      = db["users"]

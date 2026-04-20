@@ -4,6 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     mongodb_uri: str
+    database_name: str = "E_Commerce"
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 15            # 15 minutes for access token
