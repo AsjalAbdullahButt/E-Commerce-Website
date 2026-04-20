@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from config import settings
 from database import client
 from utils.limiter import limiter
-from routes import auth, products, orders, reviews, wishlist, promos, users, rider
+from routes import auth, products, orders, reviews, wishlist, promos, users, rider, admin
 import time
 
 app = FastAPI(
@@ -75,6 +75,7 @@ app.include_router(wishlist.router, prefix="/wishlist", tags=["Wishlist"])
 app.include_router(promos.router,   prefix="/promos",   tags=["Promos"])
 app.include_router(users.router,    prefix="/users",    tags=["Users"])
 app.include_router(rider.router,    prefix="/rider",    tags=["Rider"])
+app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
 
 @app.get("/", tags=["Health"])
 async def root():

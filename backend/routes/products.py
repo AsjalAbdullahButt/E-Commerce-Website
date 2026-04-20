@@ -14,6 +14,13 @@ def serialize(p: dict) -> dict:
     result["id"] = str(result.pop("_id"))
     return result
 
+@router.get("/categories")
+@limiter.limit("60/minute")
+async def get_categories(request: Request):
+    """Get unique product categories (public, no auth required)"""
+    categories = await products_col.find({}).distinct("category")
+    return {"categories": sorted(categories) if categories else []}
+
 @router.get("")
 @limiter.limit("60/minute")
 async def list_products(

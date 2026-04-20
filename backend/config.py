@@ -6,8 +6,8 @@ class Settings(BaseSettings):
     mongodb_uri: str
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 1440          # 24 h  (was 10080 = 7 days — too long)
-    jwt_refresh_expire_minutes: int = 10080 # 7 days for refresh
+    jwt_expire_minutes: int = 15            # 15 minutes for access token
+    jwt_refresh_expire_minutes: int = 10080 # 7 days for refresh token
     frontend_url: str = "http://localhost:5500"
     allowed_origins: str = "http://localhost:5500,http://127.0.0.1:5500"
     docs_enabled: bool = True               # Set False in production

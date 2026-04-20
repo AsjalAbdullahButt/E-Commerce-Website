@@ -32,11 +32,11 @@ const TOKEN_KEY = 'ecom_token';
 const USER_KEY  = 'ecom_user';
 
 function getToken()  {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 function getUser() {
-  const u = localStorage.getItem(USER_KEY);
+  const u = sessionStorage.getItem(USER_KEY);
   return u ? JSON.parse(u) : null;
 }
 
@@ -45,8 +45,8 @@ function isLoggedIn() {
 }
 
 function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
 }
 
 function requireAuth(allowedRoles = []) {
@@ -64,8 +64,8 @@ function requireAuth(allowedRoles = []) {
 
 async function login(email, password) {
   const data = await api.post('/auth/login', { email, password });
-  localStorage.setItem(TOKEN_KEY, data.access_token);
-  localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  sessionStorage.setItem(TOKEN_KEY, data.access_token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
   return data.user;
 }
 
@@ -76,14 +76,21 @@ async function register(name, email, password, phone) {
     password,
     phone
   });
-  localStorage.setItem(TOKEN_KEY, data.access_token);
-  localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+  sessionStorage.setItem(TOKEN_KEY, data.access_token);
+  sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
   return data.user;
 }
 
-function logout() {
+async function logout() {
+  try {
+    // Call logout endpoint to clear server-side refresh token
+    await api.post('/auth/logout', {}, true);
+  } catch (err) {
+    console.error('Logout API call failed:', err);
+  }
+  // Clear local session regardless of API response
   clearAuth();
-  window.location.href = './login.html';
+  window.location.href = './index.html';
 }
 
 function redirectAfterLogin(role) {

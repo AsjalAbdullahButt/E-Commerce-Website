@@ -1,285 +1,259 @@
+"""
+Seed script for E-Commerce database
+Inserts: 20 products (12 clothing + 8 accessories), 3 users, 3 sample orders
+"""
+
 import asyncio
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from datetime import datetime
+from bson import ObjectId
 
 load_dotenv()
 
-pwd = CryptContext(schemes=["bcrypt"])
-client = AsyncIOMotorClient(os.getenv("MONGODB_URI"))
-db = client.E_Commerce
+pwd = CryptContext(schemes=["bcrypt"], rounds=12)
 
-# ═══════════════════════════════════════════════════════════
-# GENERAL E-COMMERCE PRODUCTS (6 categories, 12 products)
-# ═══════════════════════════════════════════════════════════
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+DB_NAME = os.getenv("DATABASE_NAME", "E_Commerce")
+
+client = AsyncIOMotorClient(MONGODB_URI)
+db = client[DB_NAME]
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PRODUCTS: 20 Items (12 Clothing + 8 Accessories) - All prices in PKR
+# ═════════════════════════════════════════════════════════════════════════════
+
 PRODUCTS = [
-    # ━━━━━ CLOTHING (2 products) ━━━━━
-    {
-        "name": "Premium Cotton Oversized Tee",
-        "price": 1499,
-        "category": "clothing",
-        "subcategory": "t-shirts",
-        "brand": "E-COM Originals",
-        "description": "Ultra-soft 100% cotton oversized t-shirt. Perfect for everyday wear. Premium quality, comfortable fit.",
-        "images": ["https://via.placeholder.com/600x600/1a1a1a/FFD700?text=Tee"],
-        "sizes": ["S", "M", "L", "XL", "XXL"],
-        "colors": [{"name": "Black", "hex": "#1a1a1a"}, {"name": "White", "hex": "#ffffff"}],
-        "stock": 50,
-        "tags": ["cotton", "oversized", "casual"],
-        "rating": 4.5,
-        "review_count": 12,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Slim Fit Chinos",
-        "price": 2499,
-        "category": "clothing",
-        "subcategory": "pants",
-        "brand": "E-COM Originals",
-        "description": "Comfortable slim-fit chinos for office and casual wear. Premium cotton blend.",
-        "images": ["https://via.placeholder.com/600x600/2a2a2a/FFD700?text=Chinos"],
-        "sizes": ["28", "30", "32", "34", "36"],
-        "colors": [{"name": "Khaki", "hex": "#c3a882"}, {"name": "Navy", "hex": "#1a2a4a"}],
-        "stock": 30,
-        "tags": ["slim", "office", "casual"],
-        "rating": 4.2,
-        "review_count": 8,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
+    # ━━━━━ CLOTHING (12 items) ━━━━━
+    {"name": "Classic White T-Shirt", "price": 1200, "category": "clothing", "description": "Premium 100% cotton classic white t-shirt.", "images": ["https://via.placeholder.com/600x600/ffffff/000000?text=WhiteTee"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Oversized Black Hoodie", "price": 3500, "category": "clothing", "description": "Comfortable oversized hoodie in premium fabric.", "images": ["https://via.placeholder.com/600x600/1a1a1a/ffffff?text=Hoodie"], "sizes": ["M", "L", "XL", "XXL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 75, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Slim Fit Jeans", "price": 4200, "category": "clothing", "description": "Classic slim fit jeans with premium denim.", "images": ["https://via.placeholder.com/600x600/1a3a7a/ffffff?text=Jeans"], "sizes": ["30", "32", "34", "36"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 80, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Striped Polo Shirt", "price": 1800, "category": "clothing", "description": "Classic striped polo shirt for casual and formal occasions.", "images": ["https://via.placeholder.com/600x600/1a2a4a/ffffff?text=Polo"], "sizes": ["S", "M", "L"], "colors": [{"name": "Navy", "hex": "#001a4d"}, {"name": "White", "hex": "#ffffff"}], "stock": 60, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Graphic Tee - Urban", "price": 1500, "category": "clothing", "description": "Urban style graphic t-shirt with unique design.", "images": ["https://via.placeholder.com/600x600/2a2a2a/ffff00?text=GraphicTee"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Grey", "hex": "#808080"}], "stock": 90, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Cargo Pants", "price": 3800, "category": "clothing", "description": "Durable cargo pants with multiple pockets for functionality.", "images": ["https://via.placeholder.com/600x600/8b8b5a/ffffff?text=Cargo"], "sizes": ["30", "32", "34"], "colors": [{"name": "Khaki", "hex": "#c3b091"}, {"name": "Black", "hex": "#000000"}], "stock": 50, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Denim Jacket", "price": 5500, "category": "clothing", "description": "Premium denim jacket perfect for layering in any season.", "images": ["https://via.placeholder.com/600x600/1a3a7a/ffffff?text=DenimJacket"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 40, "rating": 4.8, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Tracksuit Set", "price": 4800, "category": "clothing", "description": "Comfortable matching tracksuit for casual and active wear.", "images": ["https://via.placeholder.com/600x600/1a1a1a/ffffff?text=Tracksuit"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 55, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Linen Summer Shirt", "price": 2200, "category": "clothing", "description": "Breathable linen shirt perfect for summer. Cool and comfortable.", "images": ["https://via.placeholder.com/600x600/f5f5dc/000000?text=Linen"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Beige", "hex": "#f5f5dc"}], "stock": 70, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Printed Shorts", "price": 1600, "category": "clothing", "description": "Colorful printed shorts for casual summer wear.", "images": ["https://via.placeholder.com/600x600/4a7c59/ffffff?text=Shorts"], "sizes": ["S", "M", "L"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Green", "hex": "#008000"}], "stock": 85, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Zip-up Sweatshirt", "price": 3200, "category": "clothing", "description": "Cozy zip-up sweatshirt for layering. Perfect for all seasons.", "images": ["https://via.placeholder.com/600x600/808080/ffffff?text=Sweatshirt"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Grey", "hex": "#808080"}, {"name": "Black", "hex": "#000000"}], "stock": 65, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Plain Crew Neck Sweatshirt", "price": 2800, "category": "clothing", "description": "Classic crew neck sweatshirt in premium fabric. Timeless style.", "images": ["https://via.placeholder.com/600x600/ffffff/000000?text=CrewNeck"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 95, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
     
-    # ━━━━━ ELECTRONICS (2 products) ━━━━━
-    {
-        "name": "Wireless Bluetooth Earbuds",
-        "price": 3999,
-        "category": "electronics",
-        "subcategory": "audio",
-        "brand": "SoundPro",
-        "description": "True wireless earbuds with 24hr battery life and active noise cancellation. Premium sound quality.",
-        "images": ["https://via.placeholder.com/600x600/111111/FFD700?text=Earbuds"],
-        "sizes": [],
-        "colors": [{"name": "Black", "hex": "#111111"}, {"name": "White", "hex": "#f5f5f5"}],
-        "stock": 20,
-        "tags": ["wireless", "audio", "earbuds"],
-        "rating": 4.7,
-        "review_count": 35,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Fast Charging Power Bank 20000mAh",
-        "price": 2999,
-        "category": "electronics",
-        "subcategory": "accessories",
-        "brand": "ChargeMate",
-        "description": "20000mAh capacity, 65W fast charging, dual USB-C ports. Perfect for travel.",
-        "images": ["https://via.placeholder.com/600x600/1a1a2a/FFD700?text=PowerBank"],
-        "sizes": [],
-        "colors": [{"name": "Black", "hex": "#1a1a1a"}],
-        "stock": 15,
-        "tags": ["charging", "powerbank", "travel"],
-        "rating": 4.4,
-        "review_count": 22,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    
-    # ━━━━━ BOOKS (2 products) ━━━━━
-    {
-        "name": "Atomic Habits — James Clear",
-        "price": 899,
-        "category": "books",
-        "subcategory": "self-help",
-        "brand": "Penguin",
-        "description": "The #1 New York Times bestseller. Transform your life with tiny changes. Read about building better habits.",
-        "images": ["https://via.placeholder.com/600x600/0a0a1a/FFD700?text=AtomicHabits"],
-        "sizes": [],
-        "colors": [],
-        "stock": 100,
-        "tags": ["habits", "self-help", "bestseller"],
-        "rating": 4.9,
-        "review_count": 88,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Deep Work — Cal Newport",
-        "price": 799,
-        "category": "books",
-        "subcategory": "productivity",
-        "brand": "Grand Central",
-        "description": "Rules for focused success in a distracted world. Master the art of deep work.",
-        "images": ["https://via.placeholder.com/600x600/1a0a0a/FFD700?text=DeepWork"],
-        "sizes": [],
-        "colors": [],
-        "stock": 75,
-        "tags": ["focus", "productivity", "career"],
-        "rating": 4.8,
-        "review_count": 54,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    
-    # ━━━━━ HOME & LIVING (2 products) ━━━━━
-    {
-        "name": "Aromatherapy Diffuser",
-        "price": 1799,
-        "category": "home",
-        "subcategory": "decor",
-        "brand": "ZenHome",
-        "description": "Ultrasonic essential oil diffuser with 7-color LED light. Create a relaxing atmosphere.",
-        "images": ["https://via.placeholder.com/600x600/1a1510/FFD700?text=Diffuser"],
-        "sizes": [],
-        "colors": [{"name": "White", "hex": "#f5f5f5"}],
-        "stock": 25,
-        "tags": ["aromatherapy", "home", "relaxation"],
-        "rating": 4.3,
-        "review_count": 19,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Ceramic Coffee Mug Set (4 pcs)",
-        "price": 1299,
-        "category": "home",
-        "subcategory": "kitchen",
-        "brand": "CeramicArt",
-        "description": "Handcrafted ceramic mugs, dishwasher safe, 350ml each. Perfect for coffee lovers.",
-        "images": ["https://via.placeholder.com/600x600/201a10/FFD700?text=MugSet"],
-        "sizes": [],
-        "colors": [{"name": "Terracotta", "hex": "#c06040"}],
-        "stock": 40,
-        "tags": ["mug", "kitchen", "coffee"],
-        "rating": 4.6,
-        "review_count": 31,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    
-    # ━━━━━ SPORTS & FITNESS (2 products) ━━━━━
-    {
-        "name": "Resistance Bands Set (5 levels)",
-        "price": 999,
-        "category": "sports",
-        "subcategory": "fitness",
-        "brand": "FitPro",
-        "description": "5-pack latex resistance bands for home gym workout. Different resistance levels.",
-        "images": ["https://via.placeholder.com/600x600/0a1a0a/FFD700?text=ResistanceBands"],
-        "sizes": [],
-        "colors": [],
-        "stock": 60,
-        "tags": ["fitness", "gym", "resistance"],
-        "rating": 4.5,
-        "review_count": 47,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Yoga Mat Non-Slip 6mm",
-        "price": 1599,
-        "category": "sports",
-        "subcategory": "yoga",
-        "brand": "FlexZone",
-        "description": "Eco-friendly TPE yoga mat with alignment lines, 183x61cm. Non-slip surface for safety.",
-        "images": ["https://via.placeholder.com/600x600/0a180a/FFD700?text=YogaMat"],
-        "sizes": [],
-        "colors": [{"name": "Purple", "hex": "#6b21a8"}, {"name": "Teal", "hex": "#0d9488"}],
-        "stock": 35,
-        "tags": ["yoga", "fitness", "mat"],
-        "rating": 4.4,
-        "review_count": 28,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    
-    # ━━━━━ BEAUTY & GROOMING (2 products) ━━━━━
-    {
-        "name": "Vitamin C Face Serum 30ml",
-        "price": 1199,
-        "category": "beauty",
-        "subcategory": "skincare",
-        "brand": "GlowLab",
-        "description": "Brightening 20% Vitamin C serum with hyaluronic acid. Boost your skin radiance.",
-        "images": ["https://via.placeholder.com/600x600/1a0f0a/FFD700?text=VitCSerum"],
-        "sizes": [],
-        "colors": [],
-        "stock": 45,
-        "tags": ["skincare", "vitamin-c", "brightening"],
-        "rating": 4.7,
-        "review_count": 63,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
-    {
-        "name": "Beard Grooming Kit",
-        "price": 1899,
-        "category": "beauty",
-        "subcategory": "grooming",
-        "brand": "ManCraft",
-        "description": "Complete beard kit: oil, balm, comb, and scissors. Gift-ready box included.",
-        "images": ["https://via.placeholder.com/600x600/10100a/FFD700?text=BeardKit"],
-        "sizes": [],
-        "colors": [],
-        "stock": 20,
-        "tags": ["beard", "grooming", "gift"],
-        "rating": 4.6,
-        "review_count": 41,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    },
+    # ━━━━━ ACCESSORIES (8 items) ━━━━━
+    {"name": "Leather Belt", "price": 900, "category": "accessories", "description": "Premium leather belt with classic buckle design.", "images": ["https://via.placeholder.com/600x600/8b6914/ffffff?text=Belt"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 120, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Canvas Backpack", "price": 2500, "category": "accessories", "description": "Durable canvas backpack with multiple compartments.", "images": ["https://via.placeholder.com/600x600/3a3a3a/ffffff?text=Backpack"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 45, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Baseball Cap", "price": 800, "category": "accessories", "description": "Classic baseball cap in premium material.", "images": ["https://via.placeholder.com/600x600/1a1a1a/ffffff?text=Cap"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 150, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Aviator Sunglasses", "price": 1200, "category": "accessories", "description": "Classic aviator style sunglasses with UV protection.", "images": ["https://via.placeholder.com/600x600/2a2a2a/ffffff?text=Sunglasses"], "sizes": [], "colors": [{"name": "Gold", "hex": "#ffd700"}, {"name": "Silver", "hex": "#c0c0c0"}], "stock": 60, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Leather Wallet", "price": 1500, "category": "accessories", "description": "Slim leather wallet with card slots and coin compartment.", "images": ["https://via.placeholder.com/600x600/8b4513/ffffff?text=Wallet"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Woven Bracelet Set", "price": 600, "category": "accessories", "description": "Set of colorful woven bracelets for casual wear.", "images": ["https://via.placeholder.com/600x600/ff69b4/ffffff?text=Bracelets"], "sizes": [], "colors": [{"name": "Multi", "hex": "#ff69b4"}], "stock": 200, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Knit Beanie", "price": 700, "category": "accessories", "description": "Warm and cozy knit beanie for winter.", "images": ["https://via.placeholder.com/600x600/4a4a4a/ffffff?text=Beanie"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}, {"name": "Red", "hex": "#ff0000"}], "stock": 110, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Canvas Tote Bag", "price": 950, "category": "accessories", "description": "Large canvas tote bag for shopping and daily use.", "images": ["https://via.placeholder.com/600x600/e8d4b8/000000?text=Tote"], "sizes": [], "colors": [{"name": "Natural", "hex": "#e8d4b8"}, {"name": "Black", "hex": "#000000"}], "stock": 130, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
 ]
 
 async def seed():
-    print("🔧 Clearing existing data...")
-    await db.products.delete_many({})
-    await db.users.delete_many({"role": "admin"})
-    await db.users.delete_many({"role": "rider"})
-    await db.users.delete_many({"email": "customer@ecommerce.com"})
+    try:
+        print("\n" + "="*70)
+        print("🌱 SEEDING E-COMMERCE DATABASE")
+        print("="*70)
+        
+        await client.admin.command("ping")
+        print("✅ MongoDB connected successfully\n")
+        
+        # ──────────────────────────────────────────────────────────────────────
+        # PRODUCTS
+        # ──────────────────────────────────────────────────────────────────────
+        print("📦 Processing products...")
+        existing_products = await db.products.count_documents({})
+        if existing_products > 0:
+            print(f"   ⚠️  Found {existing_products} existing products. Clearing...")
+            await db.products.delete_many({})
+        
+        result = await db.products.insert_many(PRODUCTS)
+        print(f"✅ Inserted {len(PRODUCTS)} products\n")
+        
+        # ──────────────────────────────────────────────────────────────────────
+        # USERS  
+        # ──────────────────────────────────────────────────────────────────────
+        print("👥 Processing users...")
+        
+        users_data = [
+            {"name": "Admin User", "email": "admin@ecommerce.com", "password": pwd.hash("Admin@123"), "role": "admin", "phone": "03001234567"},
+            {"name": "Customer One", "email": "customer1@test.com", "password": pwd.hash("Test@123"), "role": "customer", "phone": "03101234567"},
+            {"name": "Customer Two", "email": "customer2@test.com", "password": pwd.hash("Test@123"), "role": "customer", "phone": "03201234567"},
+        ]
+        
+        for user_data in users_data:
+            existing = await db.users.find_one({"email": user_data["email"]})
+            if existing:
+                print(f"   ⚠️  User {user_data['email']} exists. Skipping...")
+            else:
+                user_data["is_active"] = True
+                user_data["created_at"] = datetime.utcnow().isoformat()
+                await db.users.insert_one(user_data)
+                print(f"✅ Created {user_data['role']}: {user_data['email']}")
+        
+        # ──────────────────────────────────────────────────────────────────────
+        # SAMPLE ORDERS
+        # ──────────────────────────────────────────────────────────────────────
+        print("\n📋 Processing sample orders...")
+        
+        customer1 = await db.users.find_one({"email": "customer1@test.com"})
+        customer2 = await db.users.find_one({"email": "customer2@test.com"})
+        white_tee = await db.products.find_one({"name": "Classic White T-Shirt"})
+        black_hoodie = await db.products.find_one({"name": "Oversized Black Hoodie"})
+        backpack = await db.products.find_one({"name": "Canvas Backpack"})
+        cap = await db.products.find_one({"name": "Baseball Cap"})
+        
+        if customer1 and white_tee:
+            order1 = {
+                "user_id": str(customer1["_id"]),
+                "items": [
+                    {
+                        "product_id": str(white_tee["_id"]),
+                        "name": white_tee["name"],
+                        "price": white_tee["price"],
+                        "quantity": 2,
+                        "size": "M",
+                        "color": "White",
+                        "image": white_tee["images"][0]
+                    }
+                ],
+                "shipping_address": {
+                    "full_name": customer1["name"],
+                    "phone": customer1["phone"],
+                    "address": "123 Main Street",
+                    "city": "Karachi",
+                    "postal_code": "75000"
+                },
+                "subtotal": white_tee["price"] * 2,
+                "discount": 0,
+                "tax": round((white_tee["price"] * 2) * 0.10, 2),
+                "delivery_fee": 250,
+                "total": round((white_tee["price"] * 2) * 1.10 + 250, 2),
+                "status": "delivered",
+                "payment_method": "cod",
+                "status_history": [
+                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"},
+                    {"status": "confirmed", "timestamp": datetime.utcnow().isoformat(), "note": "Order confirmed"},
+                    {"status": "shipped", "timestamp": datetime.utcnow().isoformat(), "note": "Out for delivery"},
+                    {"status": "delivered", "timestamp": datetime.utcnow().isoformat(), "note": "Delivered"}
+                ],
+                "created_at": datetime.utcnow().isoformat()
+            }
+            await db.orders.insert_one(order1)
+            print("✅ Order 1: customer1 - delivered")
+        
+        if customer1 and black_hoodie:
+            order2 = {
+                "user_id": str(customer1["_id"]),
+                "items": [
+                    {
+                        "product_id": str(black_hoodie["_id"]),
+                        "name": black_hoodie["name"],
+                        "price": black_hoodie["price"],
+                        "quantity": 1,
+                        "size": "L",
+                        "color": "Black",
+                        "image": black_hoodie["images"][0]
+                    }
+                ],
+                "shipping_address": {
+                    "full_name": customer1["name"],
+                    "phone": customer1["phone"],
+                    "address": "123 Main Street",
+                    "city": "Karachi",
+                    "postal_code": "75000"
+                },
+                "subtotal": black_hoodie["price"],
+                "discount": 0,
+                "tax": round(black_hoodie["price"] * 0.10, 2),
+                "delivery_fee": 250,
+                "total": round(black_hoodie["price"] * 1.10 + 250, 2),
+                "status": "shipped",
+                "payment_method": "cod",
+                "status_history": [
+                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"},
+                    {"status": "confirmed", "timestamp": datetime.utcnow().isoformat(), "note": "Order confirmed"},
+                    {"status": "shipped", "timestamp": datetime.utcnow().isoformat(), "note": "Out for delivery"}
+                ],
+                "created_at": datetime.utcnow().isoformat()
+            }
+            await db.orders.insert_one(order2)
+            print("✅ Order 2: customer1 - shipped")
+        
+        if customer2 and backpack and cap:
+            order3 = {
+                "user_id": str(customer2["_id"]),
+                "items": [
+                    {
+                        "product_id": str(backpack["_id"]),
+                        "name": backpack["name"],
+                        "price": backpack["price"],
+                        "quantity": 1,
+                        "size": "",
+                        "color": "Black",
+                        "image": backpack["images"][0]
+                    },
+                    {
+                        "product_id": str(cap["_id"]),
+                        "name": cap["name"],
+                        "price": cap["price"],
+                        "quantity": 1,
+                        "size": "",
+                        "color": "Black",
+                        "image": cap["images"][0]
+                    }
+                ],
+                "shipping_address": {
+                    "full_name": customer2["name"],
+                    "phone": customer2["phone"],
+                    "address": "456 Oak Avenue",
+                    "city": "Lahore",
+                    "postal_code": "54000"
+                },
+                "subtotal": backpack["price"] + cap["price"],
+                "discount": 0,
+                "tax": round((backpack["price"] + cap["price"]) * 0.10, 2),
+                "delivery_fee": 250,
+                "total": round((backpack["price"] + cap["price"]) * 1.10 + 250, 2),
+                "status": "pending",
+                "payment_method": "cod",
+                "status_history": [
+                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"}
+                ],
+                "created_at": datetime.utcnow().isoformat()
+            }
+            await db.orders.insert_one(order3)
+            print("✅ Order 3: customer2 - pending")
+        
+        # ──────────────────────────────────────────────────────────────────────
+        # SUMMARY
+        # ──────────────────────────────────────────────────────────────────────
+        total_products = await db.products.count_documents({})
+        total_users = await db.users.count_documents({})
+        total_orders = await db.orders.count_documents({})
+        
+        print("\n" + "="*70)
+        print("✅ SEED COMPLETED SUCCESSFULLY")
+        print("="*70)
+        print(f"📊 Database: {DB_NAME}")
+        print(f"   • Products: {total_products}")
+        print(f"   • Users: {total_users}")
+        print(f"   • Orders: {total_orders}")
+        print("\n🔐 Test Credentials:")
+        print("   Admin:      admin@ecommerce.com / Admin@123")
+        print("   Customer 1: customer1@test.com / Test@123")
+        print("   Customer 2: customer2@test.com / Test@123")
+        print("\n▶️  Run: python -m uvicorn main:app --reload --port 8000")
+        print("="*70 + "\n")
+        
+    except Exception as e:
+        print(f"\n❌ SEED FAILED: {e}\n")
+        raise
+    finally:
+        client.close()
 
-    # Insert products
-    await db.products.insert_many(PRODUCTS)
-    print(f"✅ {len(PRODUCTS)} products inserted across 6 categories")
-
-    # Insert admin (with hashed password)
-    await db.users.insert_one({
-        "name": "Admin User",
-        "email": "admin@ecommerce.com",
-        "password": pwd.hash("admin123"),
-        "role": "admin",
-        "phone": "03001234567",
-        "created_at": datetime.utcnow().isoformat()
-    })
-    print("✅ Admin → admin@ecommerce.com / admin123")
-
-    # Insert rider (with hashed password)
-    if not await db.users.find_one({"email": "rider@ecommerce.com"}):
-        await db.users.insert_one({
-            "name": "Rider Ali",
-            "email": "rider@ecommerce.com",
-            "password": pwd.hash("rider123"),
-            "role": "rider",
-            "phone": "03111234567",
-            "created_at": datetime.utcnow().isoformat()
-        })
-        print("✅ Rider → rider@ecommerce.com / rider123")
-
-    # Insert test customer (with hashed password)
-    if not await db.users.find_one({"email": "customer@ecommerce.com"}):
-        await db.users.insert_one({
-            "name": "Test Customer",
-            "email": "customer@ecommerce.com",
-            "password": pwd.hash("test123"),
-            "role": "customer",
-            "phone": "03211234567",
-            "created_at": datetime.utcnow().isoformat()
-        })
-        print("✅ Customer → customer@ecommerce.com / test123")
-
-    print("\n🎉 Seed complete!")
-    print("Run: uvicorn main:app --reload --port 8000")
-
-asyncio.run(seed())
+if __name__ == "__main__":
+    asyncio.run(seed())
 

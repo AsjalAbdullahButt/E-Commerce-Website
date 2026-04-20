@@ -11,11 +11,11 @@ function redirectToLogin() {
 }
 
 // ════════════════════════════════════════════════════
-// 2️⃣  CLEAR AUTH LOCAL (safe local auth cleanup)
+// 2️⃣  CLEAR AUTH SESSION (safe session auth cleanup)
 // ════════════════════════════════════════════════════
-function clearAuthLocal() {
-  localStorage.removeItem('ecom_token');
-  localStorage.removeItem('ecom_user');
+function clearAuthSession() {
+  sessionStorage.removeItem('ecom_token');
+  sessionStorage.removeItem('ecom_user');
 }
 
 // ════════════════════════════════════════════════════
@@ -44,7 +44,7 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
   const headers = { 'Content-Type': 'application/json' };
 
   if (requiresAuth) {
-    const token = localStorage.getItem('ecom_token');
+    const token = sessionStorage.getItem('ecom_token');
     if (!token) {
       redirectToLogin();
       return null;
@@ -59,7 +59,7 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
     const res = await fetch(`${API_BASE}${endpoint}`, options);
 
     if (res.status === 401) {
-      clearAuthLocal();
+      clearAuthSession();
       redirectToLogin();
       return null;
     }
@@ -67,7 +67,7 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.detail || `Error ${res.status}`);
+      throw new Error(data.detail || data.error || `Error ${res.status}`);
     }
 
     return data;

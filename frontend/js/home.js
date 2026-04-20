@@ -28,8 +28,10 @@ async function loadCategories() {
     const container = document.querySelector('#categories-container');
     if (!container) return;
 
-    // Get unique categories from products
-    const categories = data.categories || ['All', 'T-Shirts', 'Hoodies', 'Pants', 'Accessories'];
+    const categories = data.categories || [];
+    if (categories.length === 0) {
+      throw new Error('No categories found');
+    }
     
     container.innerHTML = categories.map((cat, idx) => `
       <div class="category-item ${idx === 0 ? 'active' : ''}" data-category="${cat}">
@@ -52,13 +54,15 @@ async function loadCategories() {
     console.error('Failed to load categories', err);
     // Fallback categories if API fails
     const container = document.querySelector('#categories-container');
-    const fallbackCategories = ['All', 'T-Shirts', 'Hoodies', 'Pants', 'Accessories'];
-    container.innerHTML = fallbackCategories.map((cat, idx) => `
-      <div class="category-item ${idx === 0 ? 'active' : ''}" data-category="${cat}">
-        <i class="fas fa-tag"></i>
-        <span>${cat}</span>
-      </div>
-    `).join('');
+    if (container) {
+      const fallbackCategories = ['All', 'T-Shirts', 'Hoodies', 'Pants', 'Accessories'];
+      container.innerHTML = fallbackCategories.map((cat, idx) => `
+        <div class="category-item ${idx === 0 ? 'active' : ''}" data-category="${cat}">
+          <i class="fas fa-tag"></i>
+          <span>${cat}</span>
+        </div>
+      `).join('');
+    }
   }
 }
 
