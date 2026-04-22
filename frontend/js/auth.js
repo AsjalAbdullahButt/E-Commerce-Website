@@ -122,16 +122,50 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loginBtn) loginBtn.style.display = 'flex';
   }
 
-  // Hamburger menu
-  const hamburger = document.getElementById('hamburger');
-  const navLinks = document.getElementById('nav-links');
-  if (hamburger) {
-    hamburger.addEventListener('click', () => {
-      navLinks.classList.toggle('open');
-    });
-  }
-
   // Theme toggle button
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+
+  // Password visibility toggles
+  const loginToggleBtn = document.getElementById('login-toggle-pwd');
+  const loginPasswordInput = document.getElementById('login-password');
+  if (loginToggleBtn && loginPasswordInput) {
+    loginToggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isPassword = loginPasswordInput.type === 'password';
+      loginPasswordInput.type = isPassword ? 'text' : 'password';
+      const icon = loginToggleBtn.querySelector('i');
+      if (icon) {
+        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+      }
+    });
+  }
+
+  const registerToggleBtn = document.getElementById('register-toggle-pwd');
+  const registerPasswordInput = document.getElementById('register-password');
+  if (registerToggleBtn && registerPasswordInput) {
+    registerToggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isPassword = registerPasswordInput.type === 'password';
+      registerPasswordInput.type = isPassword ? 'text' : 'password';
+      const icon = registerToggleBtn.querySelector('i');
+      if (icon) {
+        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+      }
+    });
+  }
+
+  const registerToggleConfirmBtn = document.getElementById('register-toggle-confirm');
+  const registerConfirmInput = document.getElementById('register-confirm');
+  if (registerToggleConfirmBtn && registerConfirmInput) {
+    registerToggleConfirmBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isPassword = registerConfirmInput.type === 'password';
+      registerConfirmInput.type = isPassword ? 'text' : 'password';
+      const icon = registerToggleConfirmBtn.querySelector('i');
+      if (icon) {
+        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+      }
+    });
+  }
 });

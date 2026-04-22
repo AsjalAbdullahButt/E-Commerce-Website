@@ -39,9 +39,6 @@
         <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
           <i class="fas fa-moon" id="theme-icon"></i>
         </button>
-        <button class="hamburger" id="hamburger" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
       </div>
     </div>
   </nav>
@@ -137,6 +134,33 @@
     <section class="featured-section">
       <h2 class="section-title">Featured Products</h2>
       <div class="product-grid"></div>
+    </section>
+
+    <!-- Order Tracking Section -->
+    <section class="featured-section order-tracking-section">
+      <h2 class="section-title">Track Your Order</h2>
+      <div class="order-tracking-container">
+        <div class="order-tracking-content">
+          <p>Keep up with your delivery status in real-time</p>
+          <div class="order-tracking-widget">
+            <div id="tracking-guest-message" class="tracking-message">
+              <i class="fas fa-lock"></i>
+              <p>Sign in to track your orders</p>
+              <a href="./login.html" class="btn-primary">Login</a>
+              <p class="signup-link">Don't have an account? <a href="./register.html">Register here</a></p>
+            </div>
+            <div id="tracking-logged-in" class="tracking-widget" style="display:none;">
+              <div class="tracking-form">
+                <input type="text" id="tracking-order-input" placeholder="Enter your order number" class="tracking-input">
+                <button onclick="searchOrder()" class="tracking-btn">
+                  <i class="fas fa-search"></i> Track
+                </button>
+              </div>
+              <div id="tracking-result" class="tracking-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="featured-section">

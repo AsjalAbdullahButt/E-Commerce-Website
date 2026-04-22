@@ -145,4 +145,155 @@ document.addEventListener('DOMContentLoaded', () => {
   loadUserProfile();
   setupSidebarToggle();
   setupUserProfileButton();
+  setupOrderTracking();
 });
+
+// Setup order tracking feature
+function setupOrderTracking() {
+  const user = getUser();
+  const guestMessage = document.getElementById('tracking-guest-message');
+  const loggedInWidget = document.getElementById('tracking-logged-in');
+
+  if (user) {
+    // User is logged in - show tracking widget
+    if (guestMessage) guestMessage.style.display = 'none';
+    if (loggedInWidget) loggedInWidget.style.display = 'block';
+  } else {
+    // User not logged in - show login prompt
+    if (guestMessage) guestMessage.style.display = 'flex';
+    if (loggedInWidget) loggedInWidget.style.display = 'none';
+  }
+
+  // Setup search functionality
+  const trackingInput = document.getElementById('tracking-order-input');
+  if (trackingInput) {
+    trackingInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchOrder();
+      }
+    });
+  }
+}
+
+// Search for order
+async function searchOrder() {
+  const orderNumber = document.getElementById('tracking-order-input').value.trim();
+  
+  if (!orderNumber) {
+    showToast('Please enter an order number', 'warning');
+    return;
+  }
+
+  const resultDiv = document.getElementById('tracking-result');
+  resultDiv.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner"></i> Loading...</div>';
+
+  try {
+    // For demo purposes, create mock order data
+    // In real app, this would call API endpoint like /orders/{order_id}
+    const mockOrders = {
+      'ORD-001': {
+        id: 'ORD-001',
+        date: '2025-04-15',
+        total: 4990,
+        status: 'delivered',
+        items: ['E-COM Premium T-Shirt', 'Classic Hoodie'],
+        timeline: [
+          { stage: 'Order Placed', date: '2025-04-15', completed: true },
+          { stage: 'Confirmed', date: '2025-04-15', completed: true },
+          { stage: 'Packed', date: '2025-04-16', completed: true },
+          { stage: 'Shipped', date: '2025-04-17', completed: true },
+          { stage: 'Delivered', date: '2025-04-19', completed: true }
+        ]
+      },
+      'ORD-002': {
+        id: 'ORD-002',
+        date: '2025-04-20',
+        total: 2990,
+        status: 'in-transit',
+        items: ['Oversized Fit Pants'],
+        timeline: [
+          { stage: 'Order Placed', date: '2025-04-20', completed: true },
+          { stage: 'Confirmed', date: '2025-04-20', completed: true },
+          { stage: 'Packed', date: '2025-04-21', completed: true },
+          { stage: 'Shipped', date: '2025-04-21', completed: true },
+          { stage: 'Delivered', date: 'Pending', completed: false }
+        ]
+      }
+    };
+
+    const order = mockOrders[orderNumber.toUpperCase()];
+
+    if (!order) {
+      resultDiv.innerHTML = `<div style="color: var(--text-secondary); padding: 2rem; text-align: center;">
+        <i class="fas fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 1rem; display: block;"></i>
+        <p>Order not found. Please check the order number and try again.</p>
+      </div>`;
+      return;
+    }
+
+    // Display order details
+    const statusColors = {
+      'delivered': '#4CAF50',
+      'in-transit': '#FFC107',
+      'pending': '#FF9800',
+      'cancelled': '#F44336'
+    };
+
+    const statusText = {
+      'delivered': 'Delivered',
+      'in-transit': 'In Transit',
+      'pending': 'Pending',
+      'cancelled': 'Cancelled'
+    };
+
+    resultDiv.innerHTML = `
+      <div class="order-status">
+        <div class="order-header">
+          <div class="order-detail">
+            <label>Order Number</label>
+            <p>${order.id}</p>
+          </div>
+          <div class="order-detail">
+            <label>Status</label>
+            <p style="color: ${statusColors[order.status]}">${statusText[order.status]}</p>
+          </div>
+          <div class="order-detail">
+            <label>Order Date</label>
+            <p>${new Date(order.date).toLocaleDateString()}</p>
+          </div>
+          <div class="order-detail">
+            <label>Total Amount</label>
+            <p>Rs ${order.total.toLocaleString()}</p>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 1.5rem; text-align: left;">
+          <strong style="color: var(--text-primary);">Items:</strong>
+          <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem; color: var(--text-secondary);">
+            ${order.items.map(item => `<li>${item}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="order-timeline">
+          <strong style="display: block; margin-bottom: 1rem; color: var(--text-primary);">Delivery Timeline</strong>
+          ${order.timeline.map((item, idx) => `
+            <div class="timeline-item">
+              <div class="timeline-dot" style="background: ${item.completed ? 'var(--gold)' : 'var(--border)'}">
+                ${item.completed ? '✓' : idx + 1}
+              </div>
+              <div class="timeline-content">
+                <strong>${item.stage}</strong>
+                <span>${item.date}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+  } catch (err) {
+    console.error('Order tracking error:', err);
+    showToast('Error fetching order details', 'error');
+    resultDiv.innerHTML = '';
+  }
+}

@@ -153,11 +153,23 @@ function addToCartWithAnimation(buttonEl, product) {
   const btnRect   = buttonEl.getBoundingClientRect();
   const badgeRect = badgeEl.getBoundingClientRect();
 
+  // Calculate the button center position
+  const btnCenterX = btnRect.left + btnRect.width / 2;
+  const btnCenterY = btnRect.top + btnRect.height / 2;
+
+  // Calculate the badge center position
+  const badgeCenterX = badgeRect.left + badgeRect.width / 2;
+  const badgeCenterY = badgeRect.top + badgeRect.height / 2;
+
+  // Calculate the distance from button center to badge center
+  const distX = badgeCenterX - btnCenterX;
+  const distY = badgeCenterY - btnCenterY;
+
   dot.style.cssText = `
-    left:${btnRect.left + btnRect.width/2}px;
-    top:${btnRect.top + btnRect.height/2}px;
-    --dx:${badgeRect.left - btnRect.left}px;
-    --dy:${badgeRect.top - btnRect.top}px;
+    left:${btnCenterX}px;
+    top:${btnCenterY}px;
+    --dx:${distX}px;
+    --dy:${distY}px;
   `;
 
   document.body.appendChild(dot);

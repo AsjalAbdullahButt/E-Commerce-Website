@@ -64,7 +64,16 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
       return null;
     }
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      // Response is not JSON
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+      return null;
+    }
 
     if (!res.ok) {
       throw new Error(data.detail || data.error || `Error ${res.status}`);

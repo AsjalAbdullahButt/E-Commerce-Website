@@ -35,9 +35,6 @@
         <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
           <i class="fas fa-moon" id="theme-icon"></i>
         </button>
-        <button class="hamburger" id="hamburger" aria-label="Menu">
-          <span></span><span></span><span></span>
-        </button>
       </div>
     </div>
   </nav>
@@ -51,25 +48,107 @@
       <p>We'd love to hear from you</p>
     </section>
 
-    <section class="contact-section">
+    <!-- Contact Type Tabs -->
+    <section class="contact-tabs-section">
+      <div class="contact-tabs">
+        <button class="tab-btn active" data-tab="contact">Contact Us</button>
+        <button class="tab-btn" data-tab="complaint">File a Complaint</button>
+      </div>
+    </section>
+
+    <!-- Contact Form Tab -->
+    <section class="contact-section tab-content active" id="contact-tab">
       <form class="contact-form">
         <div class="form-group">
           <label>Name</label>
-          <input type="text" name="name" required>
+          <input type="text" name="name" placeholder="Your full name" required>
         </div>
         <div class="form-group">
           <label>Email</label>
-          <input type="email" name="email" required>
+          <input type="email" name="email" placeholder="your@email.com" required>
         </div>
         <div class="form-group">
           <label>Subject</label>
-          <input type="text" name="subject" required>
+          <input type="text" name="subject" placeholder="How can we help?" required>
         </div>
         <div class="form-group">
           <label>Message</label>
-          <textarea name="message" rows="6" required></textarea>
+          <textarea name="message" rows="6" placeholder="Tell us your thoughts..." required></textarea>
         </div>
         <button type="submit" class="submit-btn">Send Message</button>
+      </form>
+    </section>
+
+    <!-- Complaint Form Tab -->
+    <section class="contact-section tab-content" id="complaint-tab">
+      <div class="complaint-header">
+        <h2>File a Complaint</h2>
+        <p>We take your concerns seriously. Please provide details about your experience so we can resolve it quickly.</p>
+      </div>
+      <form class="complaint-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" name="complaint-name" placeholder="Your full name" required>
+          </div>
+          <div class="form-group">
+            <label>Email Address *</label>
+            <input type="email" name="complaint-email" placeholder="your@email.com" required>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Phone Number *</label>
+            <input type="tel" name="complaint-phone" placeholder="03001234567" required>
+          </div>
+          <div class="form-group">
+            <label>Order Number (if applicable)</label>
+            <input type="text" name="complaint-order" placeholder="e.g., ORD-12345">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Complaint Category *</label>
+          <select name="complaint-category" required>
+            <option value="">Select a category...</option>
+            <option value="product-quality">Product Quality Issue</option>
+            <option value="delivery">Delivery Issue</option>
+            <option value="incorrect-item">Incorrect Item Received</option>
+            <option value="damaged">Damaged Product</option>
+            <option value="payment">Payment Issue</option>
+            <option value="customer-service">Customer Service</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Date of Issue *</label>
+          <input type="date" name="complaint-date" required>
+        </div>
+
+        <div class="form-group">
+          <label>Complaint Description *</label>
+          <textarea name="complaint-description" rows="8" placeholder="Please describe your complaint in detail..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Evidence (Upload screenshot/image) *</label>
+          <div class="file-upload-area">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Drag and drop your file here or click to browse</p>
+            <input type="file" name="complaint-file" accept="image/*,.pdf" required>
+          </div>
+        </div>
+
+        <div class="form-group checkbox">
+          <input type="checkbox" id="complaint-agree" required>
+          <label for="complaint-agree">I agree that the information provided is accurate and true</label>
+        </div>
+
+        <button type="submit" class="submit-btn submit-complaint-btn">
+          <i class="fas fa-paper-plane"></i> Submit Complaint
+        </button>
       </form>
     </section>
 
@@ -87,6 +166,10 @@
         <div class="info-item">
           <i class="fas fa-map-marker-alt"></i>
           <p><strong>Location:</strong> Karachi, Pakistan</p>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <p><strong>Response Time:</strong> 24-48 hours</p>
         </div>
       </div>
     </section>
@@ -128,6 +211,90 @@
   <script src="./js/auth.js"></script>
   <script src="./js/cart.js"></script>
   <script src="./js/neural-bg.js"></script>
+
+  <script>
+    // Tab switching functionality
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tabName = btn.getAttribute('data-tab');
+          
+          // Remove active class from all buttons and contents
+          tabBtns.forEach(b => b.classList.remove('active'));
+          tabContents.forEach(content => content.classList.remove('active'));
+          
+          // Add active class to clicked button and corresponding content
+          btn.classList.add('active');
+          document.getElementById(tabName + '-tab').classList.add('active');
+        });
+      });
+
+      // File upload area click handler
+      const fileUploadArea = document.querySelector('.file-upload-area');
+      const fileInput = document.querySelector('input[name="complaint-file"]');
+      
+      if (fileUploadArea && fileInput) {
+        fileUploadArea.addEventListener('click', () => fileInput.click());
+        
+        // Drag and drop functionality
+        fileUploadArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.15)';
+        });
+        
+        fileUploadArea.addEventListener('dragleave', () => {
+          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.05)';
+        });
+        
+        fileUploadArea.addEventListener('drop', (e) => {
+          e.preventDefault();
+          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.05)';
+          if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+          }
+        });
+      }
+
+      // Contact form submission
+      const contactForm = document.querySelector('.contact-form');
+      if (contactForm) {
+        contactForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          showToast('Thank you for reaching out! We will respond shortly.', 'success');
+          contactForm.reset();
+        });
+      }
+
+      // Complaint form submission
+      const complaintForm = document.querySelector('.complaint-form');
+      if (complaintForm) {
+        complaintForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          
+          const complaintData = {
+            name: document.querySelector('input[name="complaint-name"]').value,
+            email: document.querySelector('input[name="complaint-email"]').value,
+            phone: document.querySelector('input[name="complaint-phone"]').value,
+            order_number: document.querySelector('input[name="complaint-order"]').value,
+            category: document.querySelector('select[name="complaint-category"]').value,
+            date_of_issue: document.querySelector('input[name="complaint-date"]').value,
+            description: document.querySelector('textarea[name="complaint-description"]').value,
+          };
+          
+          showToast('Complaint submitted successfully! Our team will review it and contact you within 24-48 hours.', 'success');
+          complaintForm.reset();
+          
+          // Switch back to contact tab after 2 seconds
+          setTimeout(() => {
+            document.querySelector('[data-tab="contact"]').click();
+          }, 2000);
+        });
+      }
+    });
+  </script>
 
   <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
