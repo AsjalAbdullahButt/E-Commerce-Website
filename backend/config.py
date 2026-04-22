@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 15            # 15 minutes for access token
     jwt_refresh_expire_minutes: int = 10080 # 7 days for refresh token
-    frontend_url: str = "http://localhost:5500"
-    allowed_origins: str = "http://localhost:5500,http://127.0.0.1:5500"
+    frontend_url: str = "http://localhost:8080"
+    allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500"
     docs_enabled: bool = True               # Set False in production
 
     # Rate limit overrides (requests/minute)

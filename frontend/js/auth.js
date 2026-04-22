@@ -126,12 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
-  // Password visibility toggles
+  // Password visibility toggles - Login
   const loginToggleBtn = document.getElementById('login-toggle-pwd');
   const loginPasswordInput = document.getElementById('login-password');
   if (loginToggleBtn && loginPasswordInput) {
     loginToggleBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const isPassword = loginPasswordInput.type === 'password';
       loginPasswordInput.type = isPassword ? 'text' : 'password';
       const icon = loginToggleBtn.querySelector('i');
@@ -141,11 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Password visibility toggles - Register (Password field)
   const registerToggleBtn = document.getElementById('register-toggle-pwd');
   const registerPasswordInput = document.getElementById('register-password');
   if (registerToggleBtn && registerPasswordInput) {
     registerToggleBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const isPassword = registerPasswordInput.type === 'password';
       registerPasswordInput.type = isPassword ? 'text' : 'password';
       const icon = registerToggleBtn.querySelector('i');
@@ -155,11 +158,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Password visibility toggles - Register (Confirm Password field)
   const registerToggleConfirmBtn = document.getElementById('register-toggle-confirm');
   const registerConfirmInput = document.getElementById('register-confirm');
   if (registerToggleConfirmBtn && registerConfirmInput) {
     registerToggleConfirmBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const isPassword = registerConfirmInput.type === 'password';
       registerConfirmInput.type = isPassword ? 'text' : 'password';
       const icon = registerToggleConfirmBtn.querySelector('i');
