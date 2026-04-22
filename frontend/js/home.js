@@ -177,15 +177,36 @@ function setupOrderTracking() {
 
 // Search for order
 async function searchOrder() {
-  const orderNumber = document.getElementById('tracking-order-input').value.trim();
+  // Null check for input element
+  const trackingInput = document.getElementById('tracking-order-input');
+  if (!trackingInput) {
+    console.error('Tracking input element not found');
+    showToast('Error: Form element not found', 'error');
+    return;
+  }
+
+  const orderNumber = trackingInput.value.trim();
   
   if (!orderNumber) {
     showToast('Please enter an order number', 'warning');
     return;
   }
 
+  // Null check for result div
   const resultDiv = document.getElementById('tracking-result');
-  resultDiv.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner"></i> Loading...</div>';
+  if (!resultDiv) {
+    console.error('Tracking result element not found');
+    showToast('Error: Result element not found', 'error');
+    return;
+  }
+
+  // Clear and show loading state
+  resultDiv.innerHTML = '';
+  resultDiv.classList.add('active');
+  const spinner = document.createElement('div');
+  spinner.className = 'loading-spinner';
+  spinner.innerHTML = '<i class="fas fa-spinner"></i> Loading...';
+  resultDiv.appendChild(spinner);
 
   try {
     // For demo purposes, create mock order data
@@ -224,14 +245,20 @@ async function searchOrder() {
     const order = mockOrders[orderNumber.toUpperCase()];
 
     if (!order) {
-      resultDiv.innerHTML = `<div style="color: var(--text-secondary); padding: 2rem; text-align: center;">
-        <i class="fas fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 1rem; display: block;"></i>
-        <p>Order not found. Please check the order number and try again.</p>
-      </div>`;
+      resultDiv.innerHTML = '';
+      const notFoundDiv = document.createElement('div');
+      notFoundDiv.style.color = 'var(--text-secondary)';
+      notFoundDiv.style.padding = '2rem';
+      notFoundDiv.style.textAlign = 'center';
+      notFoundDiv.innerHTML = '<i class="fas fa-search" style="font-size: 2rem; opacity: 0.5; margin-bottom: 1rem; display: block;"></i>';
+      const p = document.createElement('p');
+      p.textContent = 'Order not found. Please check the order number and try again.';
+      notFoundDiv.appendChild(p);
+      resultDiv.appendChild(notFoundDiv);
       return;
     }
 
-    // Display order details
+    // Display order details with proper sanitization
     const statusColors = {
       'delivered': '#4CAF50',
       'in-transit': '#FFC107',
@@ -246,54 +273,159 @@ async function searchOrder() {
       'cancelled': 'Cancelled'
     };
 
-    resultDiv.innerHTML = `
-      <div class="order-status">
-        <div class="order-header">
-          <div class="order-detail">
-            <label>Order Number</label>
-            <p>${order.id}</p>
-          </div>
-          <div class="order-detail">
-            <label>Status</label>
-            <p style="color: ${statusColors[order.status]}">${statusText[order.status]}</p>
-          </div>
-          <div class="order-detail">
-            <label>Order Date</label>
-            <p>${new Date(order.date).toLocaleDateString()}</p>
-          </div>
-          <div class="order-detail">
-            <label>Total Amount</label>
-            <p>Rs ${order.total.toLocaleString()}</p>
-          </div>
-        </div>
-        
-        <div style="margin-bottom: 1.5rem; text-align: left;">
-          <strong style="color: var(--text-primary);">Items:</strong>
-          <ul style="margin: 0.5rem 0 0; padding-left: 1.5rem; color: var(--text-secondary);">
-            ${order.items.map(item => `<li>${item}</li>`).join('')}
-          </ul>
-        </div>
+    resultDiv.innerHTML = '';
+    resultDiv.classList.add('active');
 
-        <div class="order-timeline">
-          <strong style="display: block; margin-bottom: 1rem; color: var(--text-primary);">Delivery Timeline</strong>
-          ${order.timeline.map((item, idx) => `
-            <div class="timeline-item">
-              <div class="timeline-dot" style="background: ${item.completed ? 'var(--gold)' : 'var(--border)'}">
-                ${item.completed ? '✓' : idx + 1}
-              </div>
-              <div class="timeline-content">
-                <strong>${item.stage}</strong>
-                <span>${item.date}</span>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
+    const orderStatus = document.createElement('div');
+    orderStatus.className = 'order-status';
+
+    const orderHeader = document.createElement('div');
+    orderHeader.className = 'order-header';
+
+    // Order number
+    const orderNumberDiv = document.createElement('div');
+    orderNumberDiv.className = 'order-detail';
+    const label1 = document.createElement('label');
+    label1.textContent = 'Order Number';
+    const p1 = document.createElement('p');
+    p1.textContent = sanitizeString(order.id);
+    orderNumberDiv.appendChild(label1);
+    orderNumberDiv.appendChild(p1);
+
+    // Status
+    const statusDiv = document.createElement('div');
+    statusDiv.className = 'order-detail';
+    const label2 = document.createElement('label');
+    label2.textContent = 'Status';
+    const p2 = document.createElement('p');
+    p2.style.color = statusColors[order.status] || '#999';
+    p2.textContent = statusText[order.status] || 'Unknown';
+    statusDiv.appendChild(label2);
+    statusDiv.appendChild(p2);
+
+    // Order date
+    const dateDiv = document.createElement('div');
+    dateDiv.className = 'order-detail';
+    const label3 = document.createElement('label');
+    label3.textContent = 'Order Date';
+    const p3 = document.createElement('p');
+    try {
+      p3.textContent = new Date(order.date).toLocaleDateString();
+    } catch {
+      p3.textContent = 'Invalid date';
+    }
+    dateDiv.appendChild(label3);
+    dateDiv.appendChild(p3);
+
+    // Total amount
+    const totalDiv = document.createElement('div');
+    totalDiv.className = 'order-detail';
+    const label4 = document.createElement('label');
+    label4.textContent = 'Total Amount';
+    const p4 = document.createElement('p');
+    const total = sanitizeNumber(order.total);
+    p4.textContent = `Rs ${total.toLocaleString()}`;
+    totalDiv.appendChild(label4);
+    totalDiv.appendChild(p4);
+
+    orderHeader.appendChild(orderNumberDiv);
+    orderHeader.appendChild(statusDiv);
+    orderHeader.appendChild(dateDiv);
+    orderHeader.appendChild(totalDiv);
+    orderStatus.appendChild(orderHeader);
+
+    // Items section
+    const itemsSection = document.createElement('div');
+    itemsSection.style.marginBottom = '1.5rem';
+    itemsSection.style.textAlign = 'left';
+
+    const itemsTitle = document.createElement('strong');
+    itemsTitle.style.color = 'var(--text-primary)';
+    itemsTitle.textContent = 'Items:';
+    itemsSection.appendChild(itemsTitle);
+
+    const itemsList = document.createElement('ul');
+    itemsList.style.margin = '0.5rem 0 0';
+    itemsList.style.paddingLeft = '1.5rem';
+    itemsList.style.color = 'var(--text-secondary)';
+
+    if (Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = sanitizeString(item);
+        itemsList.appendChild(li);
+      });
+    }
+    itemsSection.appendChild(itemsList);
+    orderStatus.appendChild(itemsSection);
+
+    // Timeline section
+    const timelineSection = document.createElement('div');
+    timelineSection.className = 'order-timeline';
+
+    const timelineTitle = document.createElement('strong');
+    timelineTitle.style.display = 'block';
+    timelineTitle.style.marginBottom = '1rem';
+    timelineTitle.style.color = 'var(--text-primary)';
+    timelineTitle.textContent = 'Delivery Timeline';
+    timelineSection.appendChild(timelineTitle);
+
+    if (Array.isArray(order.timeline)) {
+      order.timeline.forEach((item, idx) => {
+        if (!item) return;
+
+        const timelineItem = document.createElement('div');
+        timelineItem.className = 'timeline-item';
+
+        const dot = document.createElement('div');
+        dot.className = 'timeline-dot';
+        dot.style.background = item.completed ? 'var(--gold)' : 'var(--border)';
+        dot.textContent = item.completed ? '✓' : idx + 1;
+
+        const content = document.createElement('div');
+        content.className = 'timeline-content';
+
+        const stageStrong = document.createElement('strong');
+        stageStrong.textContent = sanitizeString(item.stage);
+
+        const dateSpan = document.createElement('span');
+        dateSpan.textContent = sanitizeString(item.date);
+
+        content.appendChild(stageStrong);
+        content.appendChild(dateSpan);
+
+        timelineItem.appendChild(dot);
+        timelineItem.appendChild(content);
+        timelineSection.appendChild(timelineItem);
+      });
+    }
+
+    orderStatus.appendChild(timelineSection);
+    resultDiv.appendChild(orderStatus);
 
   } catch (err) {
     console.error('Order tracking error:', err);
-    showToast('Error fetching order details', 'error');
+    // Don't expose raw backend errors to users
+    showToast('Error fetching order details. Please try again later.', 'error');
     resultDiv.innerHTML = '';
+    resultDiv.classList.remove('active');
   }
 }
+
+// ════════════════════════════════════════════════════
+// SANITIZATION FUNCTIONS
+// ════════════════════════════════════════════════════
+function sanitizeString(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .substring(0, 500); // Limit length
+}
+
+function sanitizeNumber(num) {
+  const parsed = parseFloat(num);
+  return isNaN(parsed) ? 0 : parsed;

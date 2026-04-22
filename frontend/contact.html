@@ -50,14 +50,14 @@
 
     <!-- Contact Type Tabs -->
     <section class="contact-tabs-section">
-      <div class="contact-tabs">
-        <button class="tab-btn active" data-tab="contact">Contact Us</button>
-        <button class="tab-btn" data-tab="complaint">File a Complaint</button>
+      <div class="contact-tabs" role="tablist">
+        <button class="tab-btn active" data-tab="contact" role="tab" aria-selected="true" aria-controls="contact-tab" tabindex="0">Contact Us</button>
+        <button class="tab-btn" data-tab="complaint" role="tab" aria-selected="false" aria-controls="complaint-tab" tabindex="-1">File a Complaint</button>
       </div>
     </section>
 
     <!-- Contact Form Tab -->
-    <section class="contact-section tab-content active" id="contact-tab">
+    <section class="contact-section tab-content active" id="contact-tab" role="tabpanel" aria-labelledby="contact">
       <form class="contact-form">
         <div class="form-group">
           <label>Name</label>
@@ -80,7 +80,7 @@
     </section>
 
     <!-- Complaint Form Tab -->
-    <section class="contact-section tab-content" id="complaint-tab">
+    <section class="contact-section tab-content" id="complaint-tab" role="tabpanel" aria-labelledby="complaint">
       <div class="complaint-header">
         <h2>File a Complaint</h2>
         <p>We take your concerns seriously. Please provide details about your experience so we can resolve it quickly.</p>
@@ -210,91 +210,8 @@
   <script src="./js/api.js"></script>
   <script src="./js/auth.js"></script>
   <script src="./js/cart.js"></script>
+  <script src="./js/contact.js"></script>
   <script src="./js/neural-bg.js"></script>
-
-  <script>
-    // Tab switching functionality
-    document.addEventListener('DOMContentLoaded', () => {
-      const tabBtns = document.querySelectorAll('.tab-btn');
-      const tabContents = document.querySelectorAll('.tab-content');
-
-      tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          const tabName = btn.getAttribute('data-tab');
-          
-          // Remove active class from all buttons and contents
-          tabBtns.forEach(b => b.classList.remove('active'));
-          tabContents.forEach(content => content.classList.remove('active'));
-          
-          // Add active class to clicked button and corresponding content
-          btn.classList.add('active');
-          document.getElementById(tabName + '-tab').classList.add('active');
-        });
-      });
-
-      // File upload area click handler
-      const fileUploadArea = document.querySelector('.file-upload-area');
-      const fileInput = document.querySelector('input[name="complaint-file"]');
-      
-      if (fileUploadArea && fileInput) {
-        fileUploadArea.addEventListener('click', () => fileInput.click());
-        
-        // Drag and drop functionality
-        fileUploadArea.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.15)';
-        });
-        
-        fileUploadArea.addEventListener('dragleave', () => {
-          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.05)';
-        });
-        
-        fileUploadArea.addEventListener('drop', (e) => {
-          e.preventDefault();
-          fileUploadArea.style.background = 'rgba(255, 215, 0, 0.05)';
-          if (e.dataTransfer.files.length) {
-            fileInput.files = e.dataTransfer.files;
-          }
-        });
-      }
-
-      // Contact form submission
-      const contactForm = document.querySelector('.contact-form');
-      if (contactForm) {
-        contactForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          showToast('Thank you for reaching out! We will respond shortly.', 'success');
-          contactForm.reset();
-        });
-      }
-
-      // Complaint form submission
-      const complaintForm = document.querySelector('.complaint-form');
-      if (complaintForm) {
-        complaintForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          
-          const complaintData = {
-            name: document.querySelector('input[name="complaint-name"]').value,
-            email: document.querySelector('input[name="complaint-email"]').value,
-            phone: document.querySelector('input[name="complaint-phone"]').value,
-            order_number: document.querySelector('input[name="complaint-order"]').value,
-            category: document.querySelector('select[name="complaint-category"]').value,
-            date_of_issue: document.querySelector('input[name="complaint-date"]').value,
-            description: document.querySelector('textarea[name="complaint-description"]').value,
-          };
-          
-          showToast('Complaint submitted successfully! Our team will review it and contact you within 24-48 hours.', 'success');
-          complaintForm.reset();
-          
-          // Switch back to contact tab after 2 seconds
-          setTimeout(() => {
-            document.querySelector('[data-tab="contact"]').click();
-          }, 2000);
-        });
-      }
-    });
-  </script>
 
   <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
