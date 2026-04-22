@@ -6,7 +6,8 @@ from slowapi.errors import RateLimitExceeded
 from config import settings
 from database import client
 from utils.limiter import limiter
-from routes import auth, products, orders, reviews, wishlist, promos, users, rider, admin
+from routes import auth, products, orders, reviews, wishlist, promos, users, rider, admin, admin_new
+from middleware.admin_auth import AdminAuthMiddleware
 import time
 
 app = FastAPI(
@@ -26,6 +27,9 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
 )
+
+# ── Admin Auth Middleware ─────────────────────────────────────────────────────
+app.add_middleware(AdminAuthMiddleware)
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
 origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
@@ -76,6 +80,7 @@ app.include_router(promos.router,   prefix="/promos",   tags=["Promos"])
 app.include_router(users.router,    prefix="/users",    tags=["Users"])
 app.include_router(rider.router,    prefix="/rider",    tags=["Rider"])
 app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
+app.include_router(admin_new.router, tags=["Admin Panel"])  # New professional admin module
 
 @app.get("/", tags=["Health"])
 async def root():
