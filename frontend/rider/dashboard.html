@@ -8,8 +8,8 @@
   <!-- AUTH GUARD — Runs FIRST before page renders -->
   <script>
     (function() {
-      const token = localStorage.getItem('ecom_token');
-      const user = JSON.parse(localStorage.getItem('ecom_user') || 'null');
+      const token = sessionStorage.getItem('ecom_token');
+      const user = JSON.parse(sessionStorage.getItem('ecom_user') || 'null');
       if (!token || !user) { window.location.replace('../login.html'); return; }
       const isRiderPage = true;
       if (isRiderPage && !['admin','rider'].includes(user.role)) { window.location.replace('../index.html'); return; }

@@ -117,9 +117,12 @@
       }
 
       try {
-        await login(email, password);
+        const user = await login(email, password);
         showToast('Login successful!');
-        setTimeout(() => { window.location.href = './index.html'; }, 1500);
+        // Redirect based on user role
+        setTimeout(() => {
+          redirectAfterLogin(user.role);
+        }, 1500);
       } catch (err) {
         console.error('Login error:', err);
         const errorMsg = err.message || 'Login failed. Please check your credentials and try again.';

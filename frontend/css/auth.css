@@ -224,38 +224,85 @@ input:focus {
 .password-toggle-btn {
   position: absolute;
   right: 0.75rem;
-  background: none;
-  border: none;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1.5px solid rgba(255, 215, 0, 0.4);
   color: var(--gold);
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   padding: 0.6rem 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0.8;
-  border-radius: 4px;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 0.85;
+  border-radius: 6px;
   width: 2.5rem;
   height: 2.5rem;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.2), inset 0 0 6px rgba(255, 215, 0, 0.1);
 }
 
 .password-toggle-btn i {
-  transition: all 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-block;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+/* Eyes closed state (password hidden - eye-slash icon) */
+.password-toggle-btn i.fa-eye-slash {
+  animation: eyesClosed 0.5s ease-out forwards;
+}
+
+/* Eyes open state (password visible - eye icon) */
+.password-toggle-btn i.fa-eye {
+  animation: eyesOpen 0.5s ease-out forwards;
+}
+
+@keyframes eyesClosed {
+  0% {
+    transform: scaleY(1) rotateZ(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleY(0.3) rotateZ(5deg);
+  }
+  100% {
+    transform: scaleY(1) rotateZ(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes eyesOpen {
+  0% {
+    transform: scaleY(1) rotateZ(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleY(0.3) rotateZ(-5deg);
+  }
+  100% {
+    transform: scaleY(1) rotateZ(0deg);
+    opacity: 1;
+  }
 }
 
 .password-toggle-btn:hover {
   opacity: 1;
-  background: rgba(255, 215, 0, 0.1);
-  transform: scale(1.2);
-  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.5));
+  background: rgba(255, 215, 0, 0.15);
+  border-color: var(--gold);
+  transform: scale(1.15);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.6), 
+              inset 0 0 10px rgba(255, 215, 0, 0.2),
+              0 0 24px rgba(255, 215, 0, 0.3);
 }
 
 .password-toggle-btn:hover i {
-  transform: scale(1.2);
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+  text-shadow: 0 0 16px rgba(255, 215, 0, 0.6);
 }
 
 .password-toggle-btn:active {
   transform: scale(0.95);
-  background: rgba(255, 215, 0, 0.15);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4), 
+              inset 0 0 8px rgba(255, 215, 0, 0.15);
+  background: rgba(255, 215, 0, 0.12);
 }
