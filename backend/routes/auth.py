@@ -4,6 +4,7 @@ from models.user import UserCreate, UserLogin, UserUpdate
 from utils.helpers import hash_password, verify_password, create_access_token, create_refresh_token, sanitize_input
 from middleware.auth_middleware import get_current_user
 from utils.limiter import limiter
+from config import settings
 from datetime import datetime
 from bson import ObjectId
 
@@ -44,7 +45,7 @@ async def register(request: Request, body: UserCreate):
     user   = await users_col.find_one({"_id": result.inserted_id})
     
     access_token = create_access_token(str(result.inserted_id), "customer")
-    refresh_token = create_refresh_token(str(result.inserted_id))
+    refresh_token = create_refresh_token(str(result.inserted_id), "customer")
 
     return {
         "access_token": access_token,
@@ -63,13 +64,13 @@ async def login(request: Request, body: UserLogin, response: Response):
     user = await users_col.find_one({"email": email})
     if user and verify_password(body.password, user["password"]):
         access_token = create_access_token(str(user["_id"]), user["role"])
-        refresh_token = create_refresh_token(str(user["_id"]))
+        refresh_token = create_refresh_token(str(user["_id"]), user["role"])
         
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=settings.cookie_secure,
             samesite="strict",
             max_age=7*24*60*60
         )
@@ -84,13 +85,13 @@ async def login(request: Request, body: UserLogin, response: Response):
     admin = await admin_users_col.find_one({"email": email})
     if admin and verify_password(body.password, admin["password"]):
         access_token = create_access_token(str(admin["_id"]), "admin")
-        refresh_token = create_refresh_token(str(admin["_id"]))
+        refresh_token = create_refresh_token(str(admin["_id"]), "admin")
         
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=settings.cookie_secure,
             samesite="strict",
             max_age=7*24*60*60
         )
@@ -112,13 +113,13 @@ async def login(request: Request, body: UserLogin, response: Response):
     rider = await riders_col.find_one({"email": email})
     if rider and verify_password(body.password, rider["password"]):
         access_token = create_access_token(str(rider["_id"]), "rider")
-        refresh_token = create_refresh_token(str(rider["_id"]))
+        refresh_token = create_refresh_token(str(rider["_id"]), "rider")
         
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=settings.cookie_secure,
             samesite="strict",
             max_age=7*24*60*60
         )
@@ -144,7 +145,6 @@ async def login(request: Request, body: UserLogin, response: Response):
 async def refresh(request: Request, response: Response):
     """Refresh access token using refresh token from cookie"""
     from jose import jwt, JWTError
-    from config import settings
     
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
@@ -176,14 +176,14 @@ async def refresh(request: Request, response: Response):
             raise HTTPException(status_code=401, detail="User not found")
         
         new_access_token = create_access_token(user_id, role)
-        new_refresh_token = create_refresh_token(user_id)
+        new_refresh_token = create_refresh_token(user_id, role)
         
         # Update refresh token cookie
         response.set_cookie(
             key="refresh_token",
             value=new_refresh_token,
             httponly=True,
-            secure=True,
+            secure=settings.cookie_secure,
             samesite="strict",
             max_age=7*24*60*60
         )
@@ -199,7 +199,7 @@ async def refresh(request: Request, response: Response):
 @limiter.limit("10/minute")
 async def logout(request: Request, response: Response, user=Depends(get_current_user)):
     """Logout by clearing refresh token cookie"""
-    response.delete_cookie("refresh_token", httponly=True, secure=True, samesite="strict")
+    response.delete_cookie("refresh_token", httponly=True, secure=settings.cookie_secure, samesite="strict")
     return {"message": "Logged out successfully"}
 
 @router.get("/me")

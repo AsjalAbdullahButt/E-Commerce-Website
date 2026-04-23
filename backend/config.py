@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:8080"
     allowed_origins: str = "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5500,http://127.0.0.1:5500"
     docs_enabled: bool = True               # Set False in production
+    cookie_secure: bool = False             # Set True in production HTTPS
 
     # Rate limit overrides (requests/minute)
     rate_login: str = "5/minute"

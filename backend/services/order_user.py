@@ -148,7 +148,7 @@ class UserService:
         
         user["id"] = str(user["_id"])
         del user["_id"]
-        del user.get("password_hash", None)  # Remove password
+        user.pop("password_hash", None)  # Remove password
         
         return user
 
@@ -170,7 +170,7 @@ class UserService:
         for u in users:
             u["id"] = str(u["_id"])
             del u["_id"]
-            del u.get("password_hash", None)
+            u.pop("password_hash", None)
         
         total = await users_col.count_documents(query)
         return users, total

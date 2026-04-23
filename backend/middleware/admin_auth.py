@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -12,7 +12,7 @@ logger = logging.getLogger("admin_auth")
 
 security = HTTPBearer()
 
-async def verify_admin_token(credentials: HTTPAuthCredentials) -> dict:
+async def verify_admin_token(credentials: HTTPAuthorizationCredentials) -> dict:
     """Verify admin JWT token"""
     try:
         token = credentials.credentials
@@ -53,12 +53,18 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
     """Middleware to verify admin authentication on protected routes"""
     
     async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # Apply this middleware only to admin routes.
+        if not path.startswith("/admin"):
+            return await call_next(request)
+
         # Skip auth for public endpoints
         public_paths = ["/docs", "/openapi.json", "/health"]
         if any(request.url.path.startswith(p) for p in public_paths):
             return await call_next(request)
         
-        if "/admin/auth" in request.url.path:  # Skip auth endpoint itself
+        if path.startswith("/admin/auth"):  # Skip admin auth endpoints
             return await call_next(request)
         
         # Check for authorization header

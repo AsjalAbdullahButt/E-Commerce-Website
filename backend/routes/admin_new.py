@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from middleware.admin_auth import verify_admin_token, check_permission
 from schemas.admin import *
 from services.admin_auth import AdminAuthService, AdminAuditService
@@ -41,7 +41,7 @@ async def login(credentials: AdminLogin, request: Request):
         raise HTTPException(status_code=500, detail="Login failed")
 
 @router.post("/auth/refresh")
-async def refresh(credentials: HTTPAuthCredentials = Depends(security)):
+async def refresh(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Refresh access token"""
     try:
         result = await AdminAuthService.refresh_token(credentials.credentials)

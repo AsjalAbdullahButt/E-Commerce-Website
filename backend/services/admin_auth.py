@@ -4,6 +4,7 @@ from database import admin_users_col, audit_logs_col
 from models.admin import admin_user_document, audit_log_document
 from bson import ObjectId
 from datetime import datetime
+from typing import Optional
 import logging
 
 logger = logging.getLogger("admin_auth_service")
@@ -230,8 +231,6 @@ class AdminAuditService:
         skip: int = 0,
     ) -> tuple:
         """Get audit logs with optional filtering"""
-        from typing import Optional
-        
         query = {}
         if entity_type:
             query["entity_type"] = entity_type
