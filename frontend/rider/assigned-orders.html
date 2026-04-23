@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Deliveries | E-COM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+  <style>
+    main {
+      max-width: 1280px;
+      margin: var(--nav-height) auto 0;
+      padding: 2rem;
+      min-height: calc(100vh - var(--nav-height) - 200px);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-header h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--gold);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .filter-bar select {
+      padding: 0.6rem 1rem;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .orders-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .order-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: var(--transition);
+    }
+
+    .order-card:hover {
+      border-color: var(--gold);
+      box-shadow: var(--shadow-md);
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .order-id {
+      font-family: var(--font-mono);
+      color: var(--gold);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--gold-glow);
+      border: 1px solid var(--gold-border);
+      border-radius: var(--radius-pill);
+      color: var(--gold);
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .status-badge.picked-up {
+      background: rgba(59,130,246,0.1);
+      border-color: rgba(59,130,246,0.3);
+      color: #3b82f6;
+    }
+
+    .status-badge.on-the-way {
+      background: rgba(245,158,11,0.1);
+      border-color: rgba(245,158,11,0.3);
+      color: #f59e0b;
+    }
+
+    .status-badge.delivered {
+      background: rgba(34,197,94,0.1);
+      border-color: rgba(34,197,94,0.3);
+      color: #22c55e;
+    }
+
+    .order-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .detail-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .detail-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .detail-value strong {
+      color: var(--gold);
+    }
+
+    .items-list {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .item:last-child {
+      border-bottom: none;
+    }
+
+    .status-controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-status {
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.9rem;
+    }
+
+    .btn-status:hover:not(:disabled) {
+      background: var(--gold);
+      color: #000;
+      border-color: var(--gold);
+    }
+
+    .btn-status:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-status.active {
+      background: var(--gold);
+      color: #000;
+      border-color: var(--gold);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state i {
+      font-size: 3rem;
+      opacity: 0.3;
+      margin-bottom: 1rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="./dashboard.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./dashboard.html">Dashboard</a></li>
+        <li><a href="./assigned-orders.html" class="active">My Orders</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer">
+          <i class="fas fa-sign-out-alt"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="page-header">
+      <div>
+        <h1>My Deliveries</h1>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Manage your assigned orders</p>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <select id="status-filter" onchange="filterOrders()">
+        <option value="">All Statuses</option>
+        <option value="picked_up">Picked Up</option>
+        <option value="on_the_way">On The Way</option>
+        <option value="delivered">Delivered</option>
+      </select>
+    </div>
+
+    <div id="orders-container" class="orders-list">
+      <div class="loading">
+        <i class="fas fa-spinner fa-spin"></i> Loading orders...
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
+  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+
+  <script>
+    let allOrders = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = requireRole(['rider']);
+      if (user) {
+        loadOrders();
+      }
+      document.getElementById('nav-logout-btn').addEventListener('click', logout);
+    });
+
+    async function loadOrders() {
+      try {
+        const orders = await api.get('/rider/orders', true);
+        allOrders = orders || [];
+        renderOrders(allOrders);
+      } catch (err) {
+        console.error('Failed to load orders:', err);
+        showToast('Failed to load orders', 'error');
+        document.getElementById('orders-container').innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>Failed to load orders</p>
+          </div>`;
+      }
+    }
+
+    function filterOrders() {
+      const status = document.getElementById('status-filter').value;
+      const filtered = status ? allOrders.filter(o => o.status === status) : allOrders;
+      renderOrders(filtered);
+    }
+
+    function renderOrders(orders) {
+      const container = document.getElementById('orders-container');
+
+      if (orders.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-box"></i>
+            <p>No orders to display</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = orders.map(order => `
+        <div class="order-card">
+          <div class="order-header">
+            <div>
+              <div class="order-id">Order #${order.id?.substring(0, 8) || 'N/A'}</div>
+              <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">
+                ${new Date(order.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <span class="status-badge ${order.status || 'picked-up'}">
+              <i class="fas fa-circle-dot"></i>
+              ${formatStatus(order.status || 'picked_up')}
+            </span>
+          </div>
+
+          <div class="order-details">
+            <div class="detail-group">
+              <span class="detail-label">Delivery Address</span>
+              <span class="detail-value">${order.delivery_address || 'N/A'}</span>
+            </div>
+            <div class="detail-group">
+              <span class="detail-label">Items Count</span>
+              <span class="detail-value"><strong>${order.items?.length || 0}</strong> item(s)</span>
+            </div>
+          </div>
+
+          <div class="items-list">
+            <strong style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Items:</strong>
+            ${(order.items || []).map((item, idx) => `
+              <div class="item">
+                ${item.name} x${item.quantity} - Rs ${item.price}
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="status-controls">
+            <button class="btn-status ${order.status === 'picked_up' ? 'active' : ''}" 
+              onclick="updateStatus('${order.id}', 'picked_up')" 
+              ${order.status === 'delivered' ? 'disabled' : ''}>
+              <i class="fas fa-box-open"></i> Picked Up
+            </button>
+            <button class="btn-status ${order.status === 'on_the_way' ? 'active' : ''}" 
+              onclick="updateStatus('${order.id}', 'on_the_way')"
+              ${order.status === 'delivered' ? 'disabled' : ''}>
+              <i class="fas fa-truck"></i> On The Way
+            </button>
+            <button class="btn-status ${order.status === 'delivered' ? 'active' : ''}" 
+              onclick="updateStatus('${order.id}', 'delivered')">
+              <i class="fas fa-check-circle"></i> Delivered
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function formatStatus(status) {
+      const map = {
+        'picked_up': 'Picked Up',
+        'on_the_way': 'On The Way',
+        'delivered': 'Delivered'
+      };
+      return map[status] || status;
+    }
+
+    async function updateStatus(orderId, newStatus) {
+      try {
+        await api.patch(`/rider/orders/${orderId}/status`, { status: newStatus }, true);
+        showToast('Status updated successfully', 'success');
+        loadOrders();
+      } catch (err) {
+        console.error('Failed to update status:', err);
+        showToast('Failed to update status', 'error');
+      }
+    }
+  </script>
+</body>
+</html>

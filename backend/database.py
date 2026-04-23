@@ -13,8 +13,9 @@ reviews_col    = db["reviews"]
 wishlist_col   = db["wishlist"]
 promos_col     = db["promos"]
 
-# Collections - Admin Side
+# Collections - Admin & Rider Side
 admin_users_col     = db["admin_users"]
+riders_col          = db["riders"]
 inventory_history_col = db["inventory_history"]
 audit_logs_col      = db["audit_logs"]
 discounts_col       = db["discounts"]

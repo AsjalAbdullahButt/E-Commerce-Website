@@ -4,49 +4,203 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rider Dashboard | E-COM</title>
-  
-  <!-- AUTH GUARD — Runs FIRST before page renders -->
-  <script>
-    (function() {
-      const token = sessionStorage.getItem('ecom_token');
-      const user = JSON.parse(sessionStorage.getItem('ecom_user') || 'null');
-      if (!token || !user) { window.location.replace('../login.html'); return; }
-      const isRiderPage = true;
-      if (isRiderPage && !['admin','rider'].includes(user.role)) { window.location.replace('../index.html'); return; }
-    })();
-  </script>
-  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="../css/global.css">
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+  <style>
+    main {
+      max-width: 1280px;
+      margin: var(--nav-height) auto 0;
+      padding: 2rem;
+      min-height: calc(100vh - var(--nav-height) - 200px);
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dashboard-header h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--gold);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-pill);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .status-badge.available {
+      background: rgba(34,197,94,0.1);
+      border-color: rgba(34,197,94,0.3);
+      color: #22c55e;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      border-color: var(--gold);
+      background: var(--bg-card-hover);
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state i {
+      font-size: 2.5rem;
+      opacity: 0.3;
+      margin-bottom: 1rem;
+    }
+  </style>
 </head>
-<body data-page="rider-dashboard">
+<body>
 
   <canvas id="neural-bg"></canvas>
 
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a class="nav-logo" href="../index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <a class="nav-logo" href="./dashboard.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
       <ul class="nav-links" id="nav-links">
-        <li><a href="./dashboard.html" class="active">Deliveries</a></li>
+        <li><a href="./dashboard.html" class="active">Dashboard</a></li>
+        <li><a href="./assigned-orders.html">My Orders</a></li>
       </ul>
       <div class="nav-actions">
-        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
-        <!-- Dark/Light Mode Toggle -->
         <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
           <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer">
+          <i class="fas fa-sign-out-alt"></i>
         </button>
       </div>
     </div>
   </nav>
 
   <main>
-    <h1 class="dashboard-title">Your Deliveries</h1>
+    <div class="dashboard-header">
+      <div>
+        <h1>Rider Dashboard</h1>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Welcome, <span id="rider-name">Rider</span></p>
+      </div>
+      <div class="status-badge available">
+        <span class="status-dot"></span>
+        <span>Available</span>
+      </div>
+    </div>
 
-    <div class="orders-container" data-section="rider-orders"></div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Total Orders</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-pending">0</div>
+        <div class="stat-label">Pending Delivery</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-delivered">0</div>
+        <div class="stat-label">Delivered</div>
+      </div>
+    </div>
+
+    <div class="empty-state">
+      <i class="fas fa-box"></i>
+      <p>Navigate to "My Orders" to view your assigned deliveries</p>
+    </div>
   </main>
+
+  <footer class="footer">
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
+  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = requireRole(['rider']);
+      if (user) {
+        document.getElementById('rider-name').textContent = user.name || 'Rider';
+        loadStats();
+      }
+      document.getElementById('nav-logout-btn').addEventListener('click', logout);
+    });
+
+    async function loadStats() {
+      try {
+        const orders = await api.get('/rider/orders', true);
+        if (orders && Array.isArray(orders)) {
+          const total = orders.length;
+          const pending = orders.filter(o => o.status !== 'delivered').length;
+          const delivered = orders.filter(o => o.status === 'delivered').length;
+
+          document.getElementById('stat-total').textContent = total;
+          document.getElementById('stat-pending').textContent = pending;
+          document.getElementById('stat-delivered').textContent = delivered;
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+  </script>
+</body>
+</html>
 
   <footer class="footer">
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce Rider Portal.</p></div>

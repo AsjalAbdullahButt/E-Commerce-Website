@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register | E-COM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+  <link rel="stylesheet" href="../shared/css/auth.css">
+</head>
+<body>
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="../customer/index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="../customer/index.html">Home</a></li>
+        <li><a href="../customer/shop.html">Shop</a></li>
+        <li><a href="../customer/about.html">About</a></li>
+        <li><a href="../customer/contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">
+          <i class="fas fa-shopping-bag"></i>
+          <span class="cart-badge" id="cart-badge">0</span>
+        </button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="cart-overlay" id="cart-overlay"></div>
+  <aside class="cart-drawer" id="cart-drawer"></aside>
+
+  <main>
+    <div class="auth-container">
+      <div class="auth-card">
+        <h1 class="auth-title">Join E-COM</h1>
+        <p class="auth-subtitle">Create your account to start shopping</p>
+
+        <form id="register-form">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="register-name" placeholder="Your Name" required>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="register-email" placeholder="your@email.com" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" id="register-phone" placeholder="03001234567">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="register-password" placeholder="••••••••" required>
+              <button type="button" class="password-toggle-btn" id="register-toggle-pwd" aria-label="Toggle password visibility">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <div class="password-input-wrapper">
+              <input type="password" id="register-confirm" placeholder="••••••••" required>
+              <button type="button" class="password-toggle-btn" id="register-toggle-confirm" aria-label="Toggle password visibility">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+          <button type="button" class="auth-btn" onclick="handleRegister()">Create Account</button>
+        </form>
+
+        <p class="auth-footer">
+          Already have an account? <a href="./login.html">Login here</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
+        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Shop</h4>
+        <a href="../customer/shop.html">All Products</a>
+        <a href="../customer/about.html">Our Story</a>
+        <a href="../customer/contact.html">Contact Us</a>
+      </div>
+      <div class="footer-col">
+        <h4>Account</h4>
+        <a href="./login.html">Login</a>
+        <a href="./register.html">Register</a>
+        <a href="../customer/profile.html">My Orders</a>
+        <a href="../customer/tracking.html">Track Order</a>
+      </div>
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <div class="footer-socials">
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
+  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/cart.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+
+  <script>
+    async function handleRegister() {
+      const name = document.getElementById('register-name').value;
+      const email = document.getElementById('register-email').value;
+      const phone = document.getElementById('register-phone').value;
+      const password = document.getElementById('register-password').value;
+      const confirm = document.getElementById('register-confirm').value;
+
+      if (!name || !email || !password || !confirm) {
+        showToast('Please fill all fields', 'warning');
+        return;
+      }
+
+      if (password !== confirm) {
+        showToast('Passwords do not match', 'warning');
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'warning');
+        return;
+      }
+
+      try {
+        const user = await register(name, email, password, phone);
+        showToast('Account created! Redirecting...', 'success');
+        
+        // Redirect to customer pages
+        setTimeout(() => {
+          window.location.href = '../customer/profile.html';
+        }, 1500);
+      } catch (err) {
+        console.error('Registration error:', err);
+        const errorMsg = err.message || 'Registration failed. Please try again.';
+        showToast(errorMsg, 'error');
+      }
+    }
+
+    // Make form submission work with Enter key
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('register-form');
+      form.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleRegister();
+        }
+      });
+    });
+  </script>
+
+  <!-- WhatsApp Support Button -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+</body>
+</html>
