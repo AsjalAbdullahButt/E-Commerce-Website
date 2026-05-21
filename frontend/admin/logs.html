@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Logs</title>
+  <link rel="stylesheet" href="./css/admin-style.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+</head>
+<body>
+  <main class="admin-container">
+    <h1>Audit Logs</h1>
+    <div id="controls">
+      <input id="filter-entity" placeholder="Entity type (optional)">
+      <button id="refresh">Refresh</button>
+    </div>
+
+    <table id="logs-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Admin</th>
+          <th>Action</th>
+          <th>Entity</th>
+          <th>Entity ID</th>
+          <th>Message</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/sanitize.js"></script>
+  <script>
+    async function fetchLogs() {
+      const token = localStorage.getItem('ecom_token');
+      if (!token) return window.location.href = '../auth/login.html';
+
+      const entity = document.getElementById('filter-entity').value || '';
+      const url = '/admin/audit-logs' + (entity ? `?entity_type=${encodeURIComponent(entity)}&limit=200` : '?limit=200');
+
+      try {
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const body = await res.json();
+        if (!body.success) throw new Error(body.detail || 'Failed');
+        renderLogs(body.data || []);
+      } catch (err) {
+        console.error('Fetch logs failed', err);
+        alert('Failed to fetch logs. Check console for details.');
+      }
+    }
+
+    function renderLogs(logs) {
+      const tbody = document.querySelector('#logs-table tbody');
+      tbody.textContent = '';
+      logs.forEach(l => {
+        const tr = document.createElement('tr');
+        const cells = [new Date(l.timestamp || l.time || '').toLocaleString(), l.admin_id || l.admin || '-', l.action || l.type || '-', l.entity_type || '-', l.entity_id || '-', (l.message || l.msg || '-'), l.ip || '-'];
+        cells.forEach(c => {
+          const td = document.createElement('td'); td.textContent = c == null ? '' : String(c); tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('refresh').addEventListener('click', fetchLogs);
+    document.addEventListener('DOMContentLoaded', fetchLogs);
+  </script>
+</body>
+</html>

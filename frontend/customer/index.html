@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home | E-COM</title>
+  <link rel="icon" type="image/png" href="../images/E_Commerce_Logo.png?v=20260511">
+  <link rel="shortcut icon" type="image/png" href="../images/E_Commerce_Logo.png?v=20260511">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../shared/css/global.css?v=20260511">
+  <link rel="stylesheet" href="../shared/css/home.css?v=20260511">
+</head>
+<body>
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="./index.html">
+        <span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./index.html" class="active">Home</a></li>
+        <li><a href="./shop.html">Shop</a></li>
+        <li><a href="./about.html">About</a></li>
+        <li><a href="./contact.html">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="./profile.html"  class="nav-icon" id="nav-profile-btn"  aria-label="Profile"><i class="fas fa-user"></i></a>
+        <a href="../auth/login.html"    class="nav-icon" id="nav-login-btn"    aria-label="Login"><i class="fas fa-sign-in-alt"></i></a>
+        <button                   class="nav-icon" id="nav-logout-btn"   aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">
+          <i class="fas fa-shopping-bag"></i>
+          <span class="cart-badge" id="cart-badge">0</span>
+        </button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="cart-overlay" id="cart-overlay"></div>
+  <aside class="cart-drawer" id="cart-drawer"></aside>
+
+  <main>
+    <div class="home-layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <h3><i class="fas fa-sliders-h" style="margin-right:0.5rem;font-size:0.85rem;"></i>Browse &amp; Filter</h3>
+          <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Categories -->
+        <div class="filter-section">
+          <p class="filter-section-title"><i class="fas fa-tag"></i> Categories</p>
+          <div class="categories-container" id="categories-container">
+            <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+          </div>
+        </div>
+
+        <!-- Price Filter -->
+        <div class="filter-section">
+          <p class="filter-section-title"><i class="fas fa-coins"></i> Price Range (Rs)</p>
+          <div class="price-range-inputs">
+            <input type="number" class="price-input" id="price-min" placeholder="Min" min="0">
+            <span class="price-separator">—</span>
+            <input type="number" class="price-input" id="price-max" placeholder="Max" min="0">
+          </div>
+          <button class="apply-filter-btn" id="apply-price-filter">
+            <i class="fas fa-filter"></i> Apply
+          </button>
+        </div>
+
+        <!-- Size Filter -->
+        <div class="filter-section" style="padding-bottom:1rem;">
+          <p class="filter-section-title"><i class="fas fa-ruler"></i> Sizes</p>
+          <div class="size-chips" id="size-chips">
+            <span class="size-chip" data-size="XS">XS</span>
+            <span class="size-chip" data-size="S">S</span>
+            <span class="size-chip" data-size="M">M</span>
+            <span class="size-chip" data-size="L">L</span>
+            <span class="size-chip" data-size="XL">XL</span>
+            <span class="size-chip" data-size="XXL">XXL</span>
+          </div>
+        </div>
+
+        <!-- Clear -->
+        <span class="clear-filters" id="clear-filters">
+          <i class="fas fa-times-circle"></i> Clear all filters
+        </span>
+
+        <div class="sidebar-footer">
+          <div class="user-profile-section" id="user-profile-section">
+            <div class="user-profile-header">
+              <i class="fas fa-user-circle"></i>
+              <div class="user-info">
+                <p class="user-name">Guest User</p>
+                <p class="user-email"></p>
+              </div>
+            </div>
+            <button class="user-profile-btn" id="user-profile-btn">
+              <i class="fas fa-edit"></i> Edit Profile
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+      <div class="main-content">
+        <section class="hero">
+          <div class="hero-logo">
+            <img src="../images/E_Commerce_Logo.png" alt="E-COM Logo" class="logo-image">
+          </div>
+          <h1>E-<span style="color:var(--gold)">COM</span></h1>
+          <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
+          <div class="hero-buttons">
+            <a href="./shop.html" class="btn-primary">Shop Now</a>
+            <a href="./about.html" class="btn-outline">Our Story</a>
+          </div>
+          <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open sidebar">
+            <i class="fas fa-bars"></i> Categories
+          </button>
+        </section>
+      </div>
+    </div>
+
+    <section class="featured-section">
+      <h2 class="section-title">Featured Products</h2>
+      <div class="product-grid"></div>
+    </section>
+
+    <!-- Order Tracking Section -->
+    <section class="featured-section order-tracking-section">
+      <h2 class="section-title">Track Your Order</h2>
+      <div class="order-tracking-container">
+        <div class="order-tracking-content">
+          <p>Keep up with your delivery status in real-time</p>
+          <div class="order-tracking-widget">
+            <div id="tracking-guest-message" class="tracking-message">
+              <i class="fas fa-lock"></i>
+              <p>Sign in to track your orders</p>
+              <a href="../auth/login.html" class="btn-primary">Login</a>
+              <p class="signup-link">Don't have an account? <a href="../auth/register.html">Register here</a></p>
+            </div>
+            <div id="tracking-logged-in" class="tracking-widget" style="display:none;">
+              <div class="tracking-form">
+                <input type="text" id="tracking-order-input" placeholder="Enter your order number" class="tracking-input">
+                <button onclick="searchOrder()" class="tracking-btn">
+                  <i class="fas fa-search"></i> Track
+                </button>
+              </div>
+              <div id="tracking-result" class="tracking-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="featured-section">
+      <h2 class="section-title">Why E-Commerce</h2>
+      <div class="why-section">
+        <div class="why-card">
+          <i class="fas fa-leaf"></i>
+          <h3>Premium Cotton</h3>
+          <p>Soft, breathable, and made to last. Pure comfort in every wear.</p>
+        </div>
+        <div class="why-card">
+          <i class="fas fa-tshirt"></i>
+          <h3>Drop Shoulder Fit</h3>
+          <p>Oversized comfort with an urban edge. Perfect for every occasion.</p>
+        </div>
+        <div class="why-card">
+          <i class="fas fa-heart"></i>
+          <h3>Crafted in Pakistan</h3>
+          <p>Supporting local artistry and quality. Made with pride.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
+        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Shop</h4>
+        <a href="./shop.html">All Products</a>
+        <a href="./about.html">Our Story</a>
+        <a href="./contact.html">Contact Us</a>
+      </div>
+      <div class="footer-col">
+        <h4>Account</h4>
+        <a href="../auth/login.html">Login</a>
+        <a href="../auth/register.html">Register</a>
+        <a href="./profile.html">My Orders</a>
+        <a href="./tracking.html">Track Order</a>
+      </div>
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <div class="footer-socials">
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js?v=20260511"></script>
+  <script src="../shared/js/api.js?v=20260511"></script>
+  <script src="../shared/js/auth.js?v=20260511"></script>
+  <script src="../shared/js/cart.js?v=20260511"></script>
+  <script src="../shared/js/sanitize.js?v=20260511"></script>
+  <script src="../js/home.js?v=20260511"></script>
+  <script src="../shared/js/neural-bg.js?v=20260511"></script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+</body>
+</html>
+
