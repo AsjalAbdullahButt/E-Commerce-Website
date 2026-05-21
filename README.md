@@ -124,6 +124,12 @@ pytest tests/ -v
 - Email: `admin@example.com`
 - Password: `AdminPass123`
 
+### Admin Dashboard Accounts
+- Email: `superadmin@example.com` / Password: `SuperAdmin@123`
+- Email: `admin@example.com` / Password: `AdminPass123`
+- Email: `manager@example.com` / Password: `Manager@123456`
+- Email: `support@example.com` / Password: `Support@123456`
+
 ### Customer Account
 - Email: `test@example.com`
 - Password: `Test123456!`

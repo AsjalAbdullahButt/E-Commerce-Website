@@ -3,43 +3,141 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin Logs</title>
+  <title>Audit Logs | E-COM Admin</title>
   <link rel="stylesheet" href="./css/admin-style.css">
   <link rel="stylesheet" href="../shared/css/global.css">
 </head>
 <body>
-  <main class="admin-container">
-    <h1>Audit Logs</h1>
-    <div id="controls">
-      <input id="filter-entity" placeholder="Entity type (optional)">
-      <button id="refresh">Refresh</button>
-    </div>
+  <main class="admin-container audit-page">
+    <section class="audit-hero">
+      <div>
+        <p class="audit-kicker">Security • Traceability • Oversight</p>
+        <h1>Audit Logs</h1>
+        <p class="audit-subtitle">Review administrative activity with a clearer timeline, faster filters, and visual severity cues.</p>
+      </div>
+      <div class="audit-hero-actions">
+        <button id="refresh" class="audit-button audit-button-primary">Refresh</button>
+        <button id="export-btn" class="audit-button audit-button-secondary" type="button">Export View</button>
+      </div>
+    </section>
 
-    <table id="logs-table">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Admin</th>
-          <th>Action</th>
-          <th>Entity</th>
-          <th>Entity ID</th>
-          <th>Message</th>
-          <th>IP</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <section class="audit-summary-grid" aria-label="Audit summary">
+      <article class="audit-summary-card">
+        <span class="audit-summary-label">Total logs</span>
+        <strong id="total-count">0</strong>
+        <span class="audit-summary-note">Latest events in the current view</span>
+      </article>
+      <article class="audit-summary-card">
+        <span class="audit-summary-label">Admins involved</span>
+        <strong id="admin-count">0</strong>
+        <span class="audit-summary-note">Unique actors captured</span>
+      </article>
+      <article class="audit-summary-card">
+        <span class="audit-summary-label">Sensitive actions</span>
+        <strong id="high-count">0</strong>
+        <span class="audit-summary-note">Deletes, bans, and auth changes</span>
+      </article>
+      <article class="audit-summary-card audit-summary-card-accent">
+        <span class="audit-summary-label">Last refresh</span>
+        <strong id="last-updated">--</strong>
+        <span class="audit-summary-note">View updates on demand</span>
+      </article>
+    </section>
+
+    <section class="audit-panel">
+      <div class="audit-panel-header">
+        <div>
+          <h2>Activity Feed</h2>
+          <p>Filter by entity or search within the current set of logs.</p>
+        </div>
+        <div class="audit-pill-row" id="filter-pills"></div>
+      </div>
+
+      <div class="audit-controls" id="controls">
+        <div class="audit-control-group">
+          <label for="filter-entity">Entity type</label>
+          <input id="filter-entity" placeholder="product, order, user, discount">
+        </div>
+        <div class="audit-control-group">
+          <label for="filter-search">Search</label>
+          <input id="filter-search" placeholder="Search admin, action, message, or IP">
+        </div>
+        <div class="audit-control-group audit-control-inline">
+          <label>&nbsp;</label>
+          <button id="clear-filters" class="audit-button audit-button-secondary" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="audit-table-wrap">
+        <table id="logs-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Admin</th>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Entity ID</th>
+              <th>Details</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div id="empty-state" class="audit-empty-state" style="display:none;">
+          <div class="audit-empty-icon">↯</div>
+          <h3>No logs match this view</h3>
+          <p>Try clearing filters or refresh after more admin activity is recorded.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
+  <script src="./js/admin-config.js"></script>
   <script src="../shared/js/auth.js"></script>
   <script src="../shared/js/sanitize.js"></script>
   <script>
+    const AUDIT_STATE = {
+      logs: [],
+      filtered: [],
+    };
+
+    function escapeText(value) {
+      return value == null ? '' : String(value);
+    }
+
+    function getSeverity(action, entityType) {
+      const text = `${action || ''} ${entityType || ''}`.toLowerCase();
+      if (/delete|ban|lock|unlock|password|login|logout/.test(text)) return 'critical';
+      if (/create|update|assign|status|approve|reject/.test(text)) return 'warning';
+      return 'neutral';
+    }
+
+    function getActionLabel(action) {
+      return escapeText(action || '-').replace(/_/g, ' ');
+    }
+
+    function getDetails(log) {
+      const message = log.message || log.msg || '';
+      if (message) return message;
+      const changes = log.changes;
+      if (changes && typeof changes === 'object') {
+        const pairs = Object.entries(changes).slice(0, 2).map(([key, value]) => {
+          if (value && typeof value === 'object' && 'old' in value && 'new' in value) {
+            return `${key}: ${escapeText(value.old)} → ${escapeText(value.new)}`;
+          }
+          return `${key}: ${escapeText(value)}`;
+        });
+        if (pairs.length) return pairs.join(' • ');
+      }
+      return '-';
+    }
+
     async function fetchLogs() {
-      const token = localStorage.getItem('ecom_token');
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || localStorage.getItem('ecom_token');
       if (!token) return window.location.href = '../auth/login.html';
 
       const entity = document.getElementById('filter-entity').value || '';
-      const url = '/admin/audit-logs' + (entity ? `?entity_type=${encodeURIComponent(entity)}&limit=200` : '?limit=200');
+      const url = `${ADMIN_CONFIG.API_URL}${ADMIN_CONFIG.ENDPOINTS.AUDIT.LOGS}` + (entity ? `?entity_type=${encodeURIComponent(entity)}&limit=200` : '?limit=200');
 
       try {
         const res = await fetch(url, {
@@ -47,27 +145,159 @@
         });
         const body = await res.json();
         if (!body.success) throw new Error(body.detail || 'Failed');
-        renderLogs(body.data || []);
+        AUDIT_STATE.logs = body.data || [];
+        updateSummary(AUDIT_STATE.logs);
+        applyFilters();
+        updatePills();
+        document.getElementById('last-updated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } catch (err) {
         console.error('Fetch logs failed', err);
-        alert('Failed to fetch logs. Check console for details.');
+        const tbody = document.querySelector('#logs-table tbody');
+        tbody.textContent = '';
+        document.getElementById('empty-state').style.display = 'block';
       }
+    }
+
+    function updateSummary(logs) {
+      const adminNames = new Set();
+      let sensitiveCount = 0;
+
+      logs.forEach((log) => {
+        if (log.admin_name) adminNames.add(log.admin_name);
+        if (getSeverity(log.action, log.entity_type) === 'critical') sensitiveCount += 1;
+      });
+
+      document.getElementById('total-count').textContent = String(logs.length);
+      document.getElementById('admin-count').textContent = String(adminNames.size);
+      document.getElementById('high-count').textContent = String(sensitiveCount);
+    }
+
+    function updatePills() {
+      const pillRow = document.getElementById('filter-pills');
+      const entities = [...new Set(AUDIT_STATE.logs.map((log) => log.entity_type).filter(Boolean))].slice(0, 4);
+      pillRow.textContent = '';
+
+      const allPill = document.createElement('button');
+      allPill.type = 'button';
+      allPill.className = 'audit-pill active';
+      allPill.textContent = 'All';
+      allPill.addEventListener('click', () => {
+        document.getElementById('filter-entity').value = '';
+        applyFilters();
+      });
+      pillRow.appendChild(allPill);
+
+      entities.forEach((entity) => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'audit-pill';
+        pill.textContent = entity;
+        pill.addEventListener('click', () => {
+          document.getElementById('filter-entity').value = entity;
+          applyFilters();
+        });
+        pillRow.appendChild(pill);
+      });
+    }
+
+    function applyFilters() {
+      const entity = document.getElementById('filter-entity').value.trim().toLowerCase();
+      const search = document.getElementById('filter-search').value.trim().toLowerCase();
+
+      AUDIT_STATE.filtered = AUDIT_STATE.logs.filter((log) => {
+        const entityType = escapeText(log.entity_type).toLowerCase();
+        const adminName = escapeText(log.admin_name || log.admin_id).toLowerCase();
+        const action = escapeText(log.action).toLowerCase();
+        const details = getDetails(log).toLowerCase();
+        const ip = escapeText(log.ip_address || log.ip).toLowerCase();
+
+        const matchesEntity = !entity || entityType.includes(entity);
+        const matchesSearch = !search || [adminName, action, entityType, details, ip].some((field) => field.includes(search));
+        return matchesEntity && matchesSearch;
+      });
+
+      renderLogs(AUDIT_STATE.filtered);
+      document.querySelectorAll('.audit-pill').forEach((pill) => {
+        pill.classList.toggle('active', pill.textContent.toLowerCase() === (entity || 'all'));
+      });
     }
 
     function renderLogs(logs) {
       const tbody = document.querySelector('#logs-table tbody');
       tbody.textContent = '';
+      const emptyState = document.getElementById('empty-state');
+
+      if (!logs.length) {
+        emptyState.style.display = 'grid';
+        return;
+      }
+
+      emptyState.style.display = 'none';
       logs.forEach(l => {
         const tr = document.createElement('tr');
-        const cells = [new Date(l.timestamp || l.time || '').toLocaleString(), l.admin_id || l.admin || '-', l.action || l.type || '-', l.entity_type || '-', l.entity_id || '-', (l.message || l.msg || '-'), l.ip || '-'];
-        cells.forEach(c => {
-          const td = document.createElement('td'); td.textContent = c == null ? '' : String(c); tr.appendChild(td);
-        });
+
+        const timeTd = document.createElement('td');
+        timeTd.textContent = new Date(l.timestamp || l.time || '').toLocaleString();
+
+        const adminTd = document.createElement('td');
+        const adminBadge = document.createElement('span');
+        adminBadge.className = 'audit-admin-badge';
+        adminBadge.textContent = l.admin_name || l.admin || l.admin_id || '-';
+        adminTd.appendChild(adminBadge);
+
+        const actionTd = document.createElement('td');
+        const actionBadge = document.createElement('span');
+        actionBadge.className = `audit-action-badge audit-action-${getSeverity(l.action, l.entity_type)}`;
+        actionBadge.textContent = getActionLabel(l.action || l.type);
+        actionTd.appendChild(actionBadge);
+
+        const entityTd = document.createElement('td');
+        entityTd.textContent = l.entity_type || '-';
+
+        const entityIdTd = document.createElement('td');
+        entityIdTd.className = 'audit-mono';
+        entityIdTd.textContent = l.entity_id || '-';
+
+        const detailsTd = document.createElement('td');
+        detailsTd.textContent = getDetails(l);
+
+        const ipTd = document.createElement('td');
+        ipTd.className = 'audit-mono';
+        ipTd.textContent = l.ip_address || l.ip || '-';
+
+        [timeTd, adminTd, actionTd, entityTd, entityIdTd, detailsTd, ipTd].forEach((cell) => tr.appendChild(cell));
         tbody.appendChild(tr);
       });
     }
 
     document.getElementById('refresh').addEventListener('click', fetchLogs);
+    document.getElementById('filter-entity').addEventListener('input', applyFilters);
+    document.getElementById('filter-search').addEventListener('input', applyFilters);
+    document.getElementById('clear-filters').addEventListener('click', () => {
+      document.getElementById('filter-entity').value = '';
+      document.getElementById('filter-search').value = '';
+      applyFilters();
+    });
+    document.getElementById('export-btn').addEventListener('click', () => {
+      const rows = [['Time', 'Admin', 'Action', 'Entity', 'Entity ID', 'Details', 'IP']].concat(
+        AUDIT_STATE.filtered.map((log) => [
+          new Date(log.timestamp || log.time || '').toLocaleString(),
+          log.admin_name || log.admin || log.admin_id || '-',
+          log.action || log.type || '-',
+          log.entity_type || '-',
+          log.entity_id || '-',
+          getDetails(log),
+          log.ip_address || log.ip || '-',
+        ])
+      );
+      const csv = rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'audit-logs.csv';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
     document.addEventListener('DOMContentLoaded', fetchLogs);
   </script>
 </body>

@@ -79,29 +79,36 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     # Apply promo code if provided
     if body.promo_code:
         promo = await promos_col.find_one({
-            "code":      body.promo_code.upper(),
+            "code": body.promo_code.upper(),
             "is_active": True,
         })
-        if promo and subtotal >= promo.get("min_order", 0):
-            # Robust expiry check: promo.expires_at may be stored as datetime
-            expires = promo.get("expires_at")
-            if expires:
-                if isinstance(expires, str):
-                    try:
-                        expires = datetime.fromisoformat(expires)
-                    except Exception:
-                        expires = None
-            if expires and expires < datetime.utcnow():
-                raise HTTPException(status_code=400, detail="Promo code has expired")
-            if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
-                raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+        if not promo:
+            raise HTTPException(status_code=400, detail="Invalid or expired promo code")
 
-            if promo["discount_type"] == "percentage":
-                discount = subtotal * (promo["discount_value"] / 100)
-            else:
-                discount = float(promo["discount_value"])
+        # Robust expiry check: promo.expires_at may be stored as datetime
+        expires = promo.get("expires_at")
+        if expires:
+            if isinstance(expires, str):
+                try:
+                    expires = datetime.fromisoformat(expires)
+                except Exception:
+                    expires = None
+        if expires and expires < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Promo code has expired")
 
-            await promos_col.update_one({"_id": promo["_id"]}, {"$inc": {"uses": 1}})
+        if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
+            raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+
+        min_order = float(promo.get("min_order", 0) or 0)
+        if subtotal < min_order:
+            raise HTTPException(status_code=400, detail=f"Minimum order of Rs {min_order} required")
+
+        if promo["discount_type"] == "percentage":
+            discount = subtotal * (promo["discount_value"] / 100)
+        else:
+            discount = float(promo["discount_value"])
+
+        await promos_col.update_one({"_id": promo["_id"]}, {"$inc": {"uses": 1}})
 
     after_discount = subtotal - discount
     tax            = after_discount * TAX_RATE

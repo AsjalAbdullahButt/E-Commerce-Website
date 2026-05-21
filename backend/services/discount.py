@@ -30,10 +30,12 @@ class DiscountService:
                 detail="Discount code already exists"
             )
 
+        discount_type_value = getattr(discount_type, "value", discount_type)
+
         doc = {
             "code": code.upper(),
             "description": description,
-            "discount_type": discount_type,
+            "discount_type": discount_type_value,
             "discount_value": discount_value,
             "max_uses": max_usage,
             "uses": 0,

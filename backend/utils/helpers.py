@@ -16,7 +16,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(user_id: str, role: str) -> str:
     """Create a JWT access token (15 minute expiry)"""
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expire_minutes)
+    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_expire_minutes)
     payload = {
         "sub": user_id,
         "role": role,
@@ -27,7 +27,7 @@ def create_access_token(user_id: str, role: str) -> str:
 
 def create_refresh_token(user_id: str, role: str) -> str:
     """Create a JWT refresh token (7 days expiry)"""
-    expire = datetime.utcnow() + timedelta(days=7)
+    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_refresh_expire_minutes)
     payload = {
         "sub": user_id,
         "role": role,
@@ -80,7 +80,7 @@ class Security:
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expire_minutes)
+            expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_expire_minutes)
         payload.update({"exp": expire, "type": "access"})
         return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 

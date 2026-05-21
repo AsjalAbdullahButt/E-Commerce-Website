@@ -8,11 +8,10 @@
   <!-- AUTH GUARD — Runs FIRST before page renders -->
   <script>
     (function() {
-      const token = localStorage.getItem('ecom_token');
-      const user = JSON.parse(localStorage.getItem('ecom_user') || 'null');
+      const token = localStorage.getItem('admin_access_token');
+      const user = JSON.parse(localStorage.getItem('admin_data') || 'null');
       if (!token || !user) { window.location.replace('../auth/login.html'); return; }
-      const isAdminPage = true;
-      if (isAdminPage && user.role !== 'admin') { window.location.replace('../customer/index.html'); return; }
+      if (!['admin', 'super_admin'].includes(user.role)) { window.location.replace('../customer/index.html'); return; }
     })();
   </script>
   
@@ -49,23 +48,38 @@
   <main>
     <div class="admin-header">
       <h1 class="dashboard-title">Promo Codes</h1>
-      <button class="btn-primary" onclick="alert('Create promo feature coming soon')">+ Create Promo</button>
+      <button class="btn-primary" id="create-promo-btn" type="button">+ Create Promo</button>
     </div>
 
+    <div class="admin-grid" id="promo-summary"></div>
+
     <section data-section="promos">
-      <table class="table-wrapper">
+      <div class="filters" style="margin-bottom: 1rem;">
+        <input class="search-box" id="promo-search" type="search" placeholder="Search code, description, or type">
+        <select class="filter-select" id="promo-status-filter">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <table class="table-wrapper data-table">
         <thead>
           <tr>
             <th>Code</th>
+            <th>Description</th>
+            <th>Type</th>
             <th>Discount</th>
+            <th>Min Order</th>
             <th>Valid Until</th>
             <th>Usage</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td colspan="5" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
+        <tbody id="promo-table-body">
+          <tr id="promo-empty-row">
+            <td colspan="8" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
           </tr>
         </tbody>
       </table>
@@ -78,18 +92,10 @@
 
   <script src="../shared/js/config.js"></script>
   <script src="../shared/js/api.js"></script>
-  <script src="../shared/js/auth.js"></script>
-  <script src="../shared/js/cart.js"></script>
-  <script src="../js/admin.js"></script>
+  <script src="./js/admin-config.js"></script>
+  <script src="./js/admin-api.js"></script>
+  <script src="./js/promos.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
-
-  <script>
-    document.getElementById('nav-logout-btn').addEventListener('click', () => {
-      clearAuth();
-      showToast('Logged out');
-      window.location.href = '../auth/login.html';
-    });
-  </script>
 
   <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"

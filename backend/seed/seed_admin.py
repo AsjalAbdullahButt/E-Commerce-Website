@@ -5,7 +5,9 @@ Run: python backend/seed/seed_admin.py
 
 import asyncio
 import sys
-sys.path.append('..')
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from services.admin_auth import AdminAuthService
 
@@ -18,28 +20,28 @@ async def main():
     admins = [
         {
             'name': 'Super Administrator',
-            'email': 'superadmin@ecom.local',
+            'email': 'superadmin@example.com',
             'password': 'SuperAdmin@123',
             'role': 'super_admin',
             'description': 'Full system access'
         },
         {
             'name': 'Operations Manager',
-            'email': 'admin@ecom.local',
-            'password': 'Admin@123456',
+            'email': 'admin@example.com',
+            'password': 'AdminPass123',
             'role': 'admin',
             'description': 'Products, Orders, Users'
         },
         {
             'name': 'Inventory Manager',
-            'email': 'manager@ecom.local',
+            'email': 'manager@example.com',
             'password': 'Manager@123456',
             'role': 'manager',
             'description': 'Inventory & order read/update'
         },
         {
             'name': 'Support Staff',
-            'email': 'support@ecom.local',
+            'email': 'support@example.com',
             'password': 'Support@123456',
             'role': 'support',
             'description': 'Orders & users read-only'

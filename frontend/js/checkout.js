@@ -120,7 +120,10 @@ function displayOrderSummary(cart, changedItems = []) {
     r.appendChild(l); r.appendChild(v); return r;
   };
   breakdown.appendChild(row('Subtotal', `Rs ${subtotal.toLocaleString()}`));
-  const discountRow = row('Discount', `-Rs ${0}`, 'discount-row'); discountRow.style.display = 'none';
+  const discountRow = row('Discount', `-Rs 0`, 'discount-row');
+  discountRow.classList.add('discount');
+  discountRow.style.display = 'none';
+  discountRow.querySelector('.price-value').id = 'discount-amount';
   breakdown.appendChild(discountRow);
   breakdown.appendChild(row('Tax (10%)', `Rs ${tax.toLocaleString()}`));
   breakdown.appendChild(row('Delivery', `Rs ${delivery}`));
@@ -173,7 +176,10 @@ async function setupPromoCode() {
         const total = afterDiscount + tax + delivery;
 
         document.getElementById('final-total').textContent = `Rs ${total.toLocaleString()}`;
-        showToast('Promo code applied!');
+        const promoLabel = result.discount_type === 'percentage'
+          ? `${result.discount_value}% off`
+          : `Rs ${Number(result.discount_value).toLocaleString()} off`;
+        showToast(`Promo applied: ${promoLabel}`, 'success');
       } catch (err) {
         showToast(err.message || 'Invalid promo code', 'error');
       }

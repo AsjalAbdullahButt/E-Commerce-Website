@@ -213,6 +213,22 @@ textarea {
   background: var(--gold-glow);
 }
 
+.promo-section button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.promo-feedback {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.price-row.discount .price-label,
+.price-row.discount .price-value {
+  color: #16a34a;
+}
+
 /* === PAYMENT METHOD STYLES === */
 .section-label {
   font-size: 1.1rem;

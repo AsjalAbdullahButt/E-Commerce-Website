@@ -72,6 +72,11 @@ const ADMIN_CONFIG = {
         { value: 'hoodies', label: 'Hoodies' },
         { value: 'accessories', label: 'Accessories' }
     ],
+
+    PROMO_DISCOUNT_TYPES: [
+        { value: 'percentage', label: 'Percentage' },
+        { value: 'fixed', label: 'Fixed Amount' },
+    ],
 };
 
 // Storage keys

@@ -1,7 +1,9 @@
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
+import re
+
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, ConfigDict
 from typing import Optional, List
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ════════════════════════════════════════════════════════════════════════════
 # ENUMS
@@ -226,12 +228,58 @@ class DiscountCreate(BaseModel):
     min_order_value: float = 0
     expiry_date: datetime
 
+    @field_validator('code')
+    @classmethod
+    def code_must_be_valid(cls, v):
+        value = v.strip().upper()
+        if len(value) < 3 or len(value) > 20:
+            raise ValueError('Code must be between 3 and 20 characters')
+        if not re.fullmatch(r'[A-Z0-9_-]+', value):
+            raise ValueError('Code may only contain letters, numbers, underscores, and hyphens')
+        return value
+
+    @field_validator('description')
+    @classmethod
+    def description_must_be_valid(cls, v):
+        value = v.strip()
+        if len(value) < 3:
+            raise ValueError('Description must be at least 3 characters')
+        return value
+
     @field_validator('discount_value')
     @classmethod
     def discount_value_valid(cls, v):
         if v <= 0:
             raise ValueError('Discount value must be positive')
         return v
+
+    @field_validator('max_usage')
+    @classmethod
+    def max_usage_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError('Max usage must be greater than 0')
+        return v
+
+    @field_validator('min_order_value')
+    @classmethod
+    def min_order_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError('Minimum order value cannot be negative')
+        return v
+
+    @field_validator('expiry_date')
+    @classmethod
+    def expiry_must_be_future(cls, v):
+        expiry = v.astimezone(timezone.utc).replace(tzinfo=None) if v.tzinfo else v
+        if expiry <= datetime.utcnow():
+            raise ValueError('Expiry date must be in the future')
+        return v
+
+    @model_validator(mode='after')
+    def percentage_must_be_within_bounds(self):
+        if self.discount_type == DiscountType.percentage and self.discount_value > 100:
+            raise ValueError('Percentage discounts cannot exceed 100')
+        return self
 
 class DiscountUpdate(BaseModel):
     description: Optional[str] = None
