@@ -388,6 +388,295 @@ textarea:focus {
   margin-bottom: 1.5rem;
 }
 
+/* === PRODUCT MANAGEMENT === */
+.product-page .admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.product-page .admin-header-copy {
+  max-width: 700px;
+}
+
+.product-page .dashboard-subtitle {
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+  line-height: 1.6;
+}
+
+.product-page .admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  align-items: center;
+}
+
+.product-page .filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(160px, 0.7fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.product-page .search-box,
+.product-page .filter-select {
+  width: 100%;
+}
+
+.product-page .summary-note {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.product-page .summary-card .stat-value {
+  margin-bottom: 0.25rem;
+}
+
+.product-page .summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: rgba(212,175,55,0.1);
+  color: var(--gold);
+  border: 1px solid var(--gold-border);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.product-page .product-table .badge.low-stock {
+  background: rgba(245,158,11,0.16);
+  color: var(--warning);
+}
+
+.product-page .product-table .badge.out-of-stock {
+  background: rgba(239,68,68,0.2);
+  color: var(--error);
+}
+
+.product-page .product-table .badge.healthy {
+  background: rgba(34,197,94,0.18);
+  color: var(--success);
+}
+
+.product-page .product-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.product-page .product-meta small {
+  color: var(--text-muted);
+}
+
+.product-page .product-modal-content {
+  max-width: 1100px;
+}
+
+.product-page .product-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.product-page .product-form-grid .full-span,
+.product-page .product-section-full {
+  grid-column: 1 / -1;
+}
+
+.product-page .builder-section {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+}
+
+.product-page .builder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.product-page .builder-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.product-page .builder-title strong {
+  font-size: 1rem;
+}
+
+.product-page .builder-title small {
+  color: var(--text-muted);
+}
+
+.product-page .builder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.product-page .builder-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(180px, 1.3fr) minmax(100px, 0.65fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.18);
+}
+
+.product-page .builder-row.compact-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.product-page .builder-row .builder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.product-page .builder-row .builder-field small {
+  color: var(--text-muted);
+}
+
+.product-page .builder-row input,
+.product-page .builder-row select,
+.product-page .builder-row textarea {
+  width: 100%;
+}
+
+.product-page .builder-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.product-page .builder-button,
+.product-page .builder-icon-button {
+  border: 1px solid var(--gold-border);
+  background: rgba(212,175,55,0.08);
+  color: var(--gold);
+  border-radius: var(--radius-pill);
+  padding: 0.65rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.product-page .builder-button:hover,
+.product-page .builder-icon-button:hover {
+  background: rgba(212,175,55,0.18);
+  border-color: var(--gold);
+}
+
+.product-page .builder-icon-button {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.product-page .builder-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.product-page .builder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: rgba(212,175,55,0.08);
+  color: var(--gold);
+  border: 1px solid rgba(212,175,55,0.22);
+}
+
+.product-page .builder-chip button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.product-page .product-form-footer {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.product-page .product-form-footer .btn-secondary,
+.product-page .product-form-footer .btn-primary {
+  min-width: 140px;
+}
+
+.product-page .inline-help {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.product-page .stock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.03);
+}
+
+@media (max-width: 980px) {
+  .product-page .filters,
+  .product-page .product-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-page .builder-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .product-page .builder-row .builder-actions,
+  .product-page .builder-row .builder-button,
+  .product-page .builder-row .builder-icon-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-page .builder-row {
+    grid-template-columns: 1fr;
+  }
+
+  .product-page .product-form-footer,
+  .product-page .builder-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .image-url-form {
   display: flex;
   flex-direction: column;

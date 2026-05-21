@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="../shared/css/global.css">
   <link rel="stylesheet" href="../shared/css/admin.css">
 </head>
-<body data-page="admin-products">
+<body class="product-page" data-page="admin-products">
 
   <canvas id="neural-bg"></canvas>
 
@@ -48,39 +48,141 @@
 
   <main>
     <div class="admin-header">
-      <h1 class="dashboard-title">Products</h1>
-      <button class="btn-primary" onclick="alert('Add product feature coming soon')">+ Add Product</button>
-    </div>
-
-    <!-- Image URL Preview Section -->
-    <div class="admin-form-section" id="image-section">
-      <h2>Product Images (URL Preview)</h2>
-      <p class="admin-section-desc">Add and preview product images by URL before uploading</p>
-      
-      <div class="image-url-form">
-        <div class="url-input-row">
-          <input type="url" 
-                 id="image-url-input" 
-                 class="form-control"
-                 placeholder="Enter image URL (e.g., https://...)"
-                 aria-label="Image URL input">
-          <button type="button" class="btn-secondary" onclick="addImageRow()">
-            <i class="fas fa-plus"></i> Add
-          </button>
-        </div>
-
-        <div id="image-urls-container" class="image-urls-list">
-          <!-- Image rows will be added here -->
-        </div>
-
-        <div class="image-preview-grid" id="image-preview-grid">
-          <!-- Images will be previewed here -->
-        </div>
+      <div class="admin-header-copy">
+        <h1 class="dashboard-title">Product Catalog</h1>
+        <p class="dashboard-subtitle">Create structured products with variants, pricing, imagery, and tags from one polished admin workspace.</p>
+      </div>
+      <div class="admin-toolbar">
+        <button class="btn-primary" id="open-product-modal-btn" type="button">+ Add Product</button>
+        <button class="builder-button" id="refresh-products-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
       </div>
     </div>
 
-    <section data-section="products"></section>
+    <div class="admin-grid" id="product-summary"></div>
+
+    <section data-section="products">
+      <div class="admin-form-section">
+        <div class="section-title-row" style="margin-bottom: 1rem;">
+          <div>
+            <h2>Catalog Filters</h2>
+            <p class="admin-section-desc">Search by name, narrow by category, or inspect active inventory only.</p>
+          </div>
+          <span class="summary-pill" id="products-visible-count">0 visible</span>
+        </div>
+
+        <div class="filters">
+          <input id="product-search" class="search-box" type="search" placeholder="Search products, tags, SKUs, or categories">
+          <select id="product-category-filter" class="filter-select">
+            <option value="all">All categories</option>
+          </select>
+          <select id="product-status-filter" class="filter-select">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrapper product-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>Variants</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="product-table-body">
+            <tr id="product-empty-row">
+              <td colspan="7" style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading products...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </main>
+
+  <div class="modal" id="product-modal" aria-hidden="true">
+    <div class="modal-content product-modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="product-modal-title">Add Product</h3>
+          <p class="inline-help" id="product-modal-copy">Build a product record with explicit variants, images, and tags.</p>
+        </div>
+        <button class="modal-close" type="button" id="close-product-modal-btn" aria-label="Close product modal">&times;</button>
+      </div>
+
+      <form id="product-form">
+        <input type="hidden" id="product-id">
+        <div class="product-form-grid">
+          <div class="form-group">
+            <label for="product-name">Product Name</label>
+            <input id="product-name" type="text" maxlength="120" placeholder="Black Label Oversized Tee" required>
+          </div>
+
+          <div class="form-group">
+            <label for="product-category">Category</label>
+            <select id="product-category" required></select>
+          </div>
+
+          <div class="form-group">
+            <label for="product-price">Price</label>
+            <input id="product-price" type="number" min="0.01" step="0.01" placeholder="2499" required>
+          </div>
+
+          <div class="form-group">
+            <label for="product-discount">Discount %</label>
+            <input id="product-discount" type="number" min="0" max="100" step="0.01" value="0" placeholder="0">
+          </div>
+
+          <div class="form-group full-span">
+            <label for="product-description">Description</label>
+            <textarea id="product-description" rows="4" maxlength="1200" placeholder="Describe the materials, fit, and selling points." required></textarea>
+          </div>
+
+          <div class="form-group full-span">
+            <label for="product-tags">Tags</label>
+            <input id="product-tags" type="text" placeholder="summer, premium, bestseller">
+            <small class="inline-help">Separate tags with commas. They are stored as a searchable list on the product record.</small>
+          </div>
+
+          <div class="form-group full-span builder-section">
+            <div class="builder-header">
+              <div class="builder-title">
+                <strong>Product Images</strong>
+                <small>Add image URLs that will be saved with the product.</small>
+              </div>
+              <button class="builder-button" id="add-image-row-btn" type="button"><i class="fas fa-plus"></i> Add image</button>
+            </div>
+            <div class="builder-list" id="product-image-rows"></div>
+          </div>
+
+          <div class="form-group full-span builder-section">
+            <div class="builder-header">
+              <div class="builder-title">
+                <strong>Variants</strong>
+                <small>Each variant needs a size, color, SKU, and stock value.</small>
+              </div>
+              <div class="stock-pill"><i class="fas fa-cubes"></i> <span id="product-stock-total">0 units</span></div>
+            </div>
+            <div class="builder-list" id="product-variant-rows"></div>
+            <div class="builder-actions" style="margin-top: 0.85rem;">
+              <button class="builder-button" id="add-variant-row-btn" type="button"><i class="fas fa-plus"></i> Add variant</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="product-form-footer">
+          <button class="btn-secondary" id="cancel-product-btn" type="button">Cancel</button>
+          <button class="btn-primary" id="product-submit-btn" type="submit">Create Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <footer class="footer">
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce Admin Panel.</p></div>
@@ -88,18 +190,10 @@
 
   <script src="../shared/js/config.js"></script>
   <script src="../shared/js/api.js"></script>
-  <script src="../shared/js/auth.js"></script>
-  <script src="../shared/js/cart.js"></script>
-  <script src="../js/admin.js"></script>
+  <script src="./js/admin-config.js"></script>
+  <script src="./js/admin-api.js"></script>
+  <script src="./js/products.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
-
-  <script>
-    document.getElementById('nav-logout-btn').addEventListener('click', () => {
-      clearAuth();
-      showToast('Logged out');
-      window.location.href = '../auth/login.html';
-    });
-  </script>
 
   <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"

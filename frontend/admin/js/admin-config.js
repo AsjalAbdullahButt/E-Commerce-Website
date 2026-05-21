@@ -73,6 +73,8 @@ const ADMIN_CONFIG = {
         { value: 'accessories', label: 'Accessories' }
     ],
 
+    PRODUCT_SIZES: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+
     PROMO_DISCOUNT_TYPES: [
         { value: 'percentage', label: 'Percentage' },
         { value: 'fixed', label: 'Fixed Amount' },
