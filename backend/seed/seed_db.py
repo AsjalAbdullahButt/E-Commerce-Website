@@ -5,11 +5,16 @@ Inserts: 20 products (12 clothing + 8 accessories), 3 users, 3 sample orders
 
 import asyncio
 import os
+import sys
+from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from passlib.context import CryptContext
 from datetime import datetime
 from bson import ObjectId
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from scripts.migrate_products_to_variants import build_variants_from_flat
 
 load_dotenv()
 
@@ -23,9 +28,13 @@ db = client[DB_NAME]
 
 # ═════════════════════════════════════════════════════════════════════════════
 # PRODUCTS: 20 Items (12 Clothing + 8 Accessories) - All prices in PKR
+#
+# Authored here in a flat sizes/colors/stock shorthand for readability, then converted to the
+# canonical variants[] schema (see NOTES_schema_audit.md §1) by build_variants_from_flat()
+# before insertion — the `products` collection itself only ever stores variants[]/total_stock.
 # ═════════════════════════════════════════════════════════════════════════════
 
-PRODUCTS = [
+PRODUCTS_AUTHORED = [
     # ━━━━━ CLOTHING (12 items) ━━━━━
     {"name": "Classic White T-Shirt", "price": 1200, "category": "clothing", "description": "Premium 100% cotton classic white t-shirt.", "images": ["https://via.placeholder.com/600x600/ffffff/000000?text=WhiteTee"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
     {"name": "Oversized Black Hoodie", "price": 3500, "category": "clothing", "description": "Comfortable oversized hoodie in premium fabric.", "images": ["https://via.placeholder.com/600x600/1a1a1a/ffffff?text=Hoodie"], "sizes": ["M", "L", "XL", "XXL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 75, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},

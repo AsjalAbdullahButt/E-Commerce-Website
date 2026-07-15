@@ -51,7 +51,7 @@ class ProductService:
     async def get_product(product_id: str) -> dict:
         """Get product by ID"""
         product = await products_col.find_one(
-            {"_id": ObjectId(product_id), "is_deleted": False}
+            {"_id": ObjectId(product_id)}
         )
         
         if not product:
@@ -102,20 +102,20 @@ class ProductService:
 
     @staticmethod
     async def delete_product(product_id: str, admin_id: str) -> bool:
-        """Soft delete product"""
+        """Soft delete product. `is_active: False` is the single source of truth for
+        visibility — there is no separate `is_deleted` flag."""
         product = await ProductService.get_product(product_id)
-        
+
         await products_col.update_one(
             {"_id": ObjectId(product_id)},
             {
                 "$set": {
-                    "is_deleted": True,
                     "is_active": False,
                     "updated_at": datetime.utcnow()
                 }
             }
         )
-        
+
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
@@ -124,7 +124,7 @@ class ProductService:
             action="delete_product",
             entity_type="product",
             entity_id=product_id,
-            changes={"is_deleted": {"old": False, "new": True}},
+            changes={"is_active": {"old": product.get("is_active", True), "new": False}},
             ip_address="0.0.0.0"
         )
         
@@ -139,8 +139,8 @@ class ProductService:
         skip: int = 0,
     ) -> tuple:
         """List products with filtering"""
-        query = {"is_deleted": False}
-        
+        query = {}
+
         if category:
             query["category"] = category
         if is_active is not None:
@@ -162,7 +162,7 @@ class ProductService:
         """Get products with low stock"""
         products = await products_col.find(
             {
-                "is_deleted": False,
+                "is_active": True,
                 "total_stock": {"$lte": threshold}
             }
         ).to_list(length=100)
@@ -176,6 +176,50 @@ class ProductService:
 
 class InventoryService:
     """Inventory management service"""
+
+    @staticmethod
+    async def decrement_variant_stock(product_id: str, size: str, color: str, quantity: int) -> bool:
+        """Atomically decrement stock for the variant matching (size, color).
+
+        Uses a single `elemMatch` + positional-`$` update so concurrent checkouts can't both
+        pass a stale read-then-write check (the race the old flat-schema decrement guarded
+        against). Returns False if no variant with enough stock matched — caller should treat
+        that as "insufficient stock" or "no such size/color".
+        """
+        oid = ObjectId(product_id)
+        result = await products_col.update_one(
+            {
+                "_id": oid,
+                "variants": {
+                    "$elemMatch": {"size": size, "color": color, "stock": {"$gte": quantity}}
+                },
+            },
+            {
+                "$inc": {
+                    "variants.$.stock": -quantity,
+                    "total_stock": -quantity,
+                }
+            },
+        )
+        return result.modified_count > 0
+
+    @staticmethod
+    async def restore_variant_stock(product_id: str, size: str, color: str, quantity: int) -> bool:
+        """Atomically restore stock for the variant matching (size, color) — used on cancel."""
+        try:
+            oid = ObjectId(product_id)
+        except Exception:
+            return False
+        result = await products_col.update_one(
+            {"_id": oid, "variants": {"$elemMatch": {"size": size, "color": color}}},
+            {
+                "$inc": {
+                    "variants.$.stock": quantity,
+                    "total_stock": quantity,
+                }
+            },
+        )
+        return result.modified_count > 0
 
     @staticmethod
     async def adjust_stock(

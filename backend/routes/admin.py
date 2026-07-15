@@ -9,7 +9,7 @@ from services.discount import DiscountService
 from services.dashboard import DashboardService
 from typing import Optional
 from utils.logger import get_logger, log_to_db
-from utils.cache import cache_get, cache_set
+from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
 from database import products_col, orders_col, users_col
 from utils.limiter import limiter
 
@@ -419,6 +419,8 @@ async def create_product(
             images=product.images,
             admin_id=admin_data["admin_id"],
         )
+        await cache_clear_prefix("products:list:")
+        await cache_delete("products:categories")
         return {
             "success": True,
             "message": "Product created successfully",
@@ -472,6 +474,8 @@ async def update_product(
             updates=updates,
             admin_id=admin_data["admin_id"],
         )
+        await cache_clear_prefix("products:list:")
+        await cache_delete("products:categories")
         return {
             "success": True,
             "message": "Product updated successfully",
@@ -495,6 +499,8 @@ async def delete_product(
     
     try:
         await ProductService.delete_product(product_id, admin_data["admin_id"])
+        await cache_clear_prefix("products:list:")
+        await cache_delete("products:categories")
         return {
             "success": True,
             "message": "Product deleted successfully"

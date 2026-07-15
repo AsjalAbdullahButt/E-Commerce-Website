@@ -5,6 +5,12 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# NOTE: `created_at` on orders is currently stored as an ISO string (routes/orders.py) while
+# this module compares against native `datetime` objects. Comparing a BSON string field to a
+# datetime in a Mongo query silently matches nothing. Tracked and fixed in NOTES_schema_audit.md
+# §7 / task 9 (timestamp standardization) — left as-is here since fixing it requires touching
+# every order write path in one coordinated pass, not just the read side.
+
 class DashboardService:
     """Dashboard analytics service"""
 
@@ -16,19 +22,19 @@ class DashboardService:
         # Total sales (sum of final_price for delivered orders)
         total_sales_result = await orders_col.aggregate([
             {"$match": {"status": "delivered"}},
-            {"$group": {"_id": None, "total": {"$sum": "$final_price"}}}
+            {"$group": {"_id": None, "total": {"$sum": "$total"}}}
         ]).to_list(length=1)
         total_sales = total_sales_result[0]["total"] if total_sales_result else 0
         
         # Total orders
-        total_orders = await orders_col.count_documents({"is_deleted": False})
-        
+        total_orders = await orders_col.count_documents({})
+
         # Total users
         total_users = await users_col.count_documents({})
-        
+
         # Low stock items
         low_stock = await products_col.count_documents({
-            "is_deleted": False,
+            "is_active": True,
             "total_stock": {"$lte": 10}
         })
         
@@ -43,7 +49,7 @@ class DashboardService:
                     "created_at": {"$gte": today}
                 }
             },
-            {"$group": {"_id": None, "total": {"$sum": "$final_price"}}}
+            {"$group": {"_id": None, "total": {"$sum": "$total"}}}
         ]).to_list(length=1)
         revenue_today = today_result[0]["total"] if today_result else 0
         
@@ -82,7 +88,7 @@ class DashboardService:
                             "date": "$created_at"
                         }
                     },
-                    "revenue": {"$sum": "$final_price"},
+                    "revenue": {"$sum": "$total"},
                     "orders": {"$sum": 1}
                 }
             },
@@ -105,7 +111,7 @@ class DashboardService:
             {
                 "$group": {
                     "_id": "$items.product_id",
-                    "name": {"$first": "$items.product_name"},
+                    "name": {"$first": "$items.name"},
                     "total_sold": {"$sum": "$items.quantity"},
                     "revenue": {"$sum": {"$multiply": ["$items.quantity", "$items.price"]}}
                 }

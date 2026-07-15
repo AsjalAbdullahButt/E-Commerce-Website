@@ -1,9 +1,24 @@
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 
-class ColorOption(BaseModel):
-    name: str
-    hex: str
+class ProductVariant(BaseModel):
+    size: str
+    color: str
+    sku: str
+    stock: int = 0
+
+    @field_validator('stock')
+    @classmethod
+    def stock_non_negative(cls, v):
+        if v < 0:
+            raise ValueError('Stock cannot be negative')
+        return v
+
+class ProductVariantUpdate(BaseModel):
+    size: Optional[str] = None
+    color: Optional[str] = None
+    sku: Optional[str] = None
+    stock: Optional[int] = None
 
 class ProductCreate(BaseModel):
     name: str
@@ -11,9 +26,9 @@ class ProductCreate(BaseModel):
     description: str
     category: str = "t-shirts"
     images: List[str] = []
-    sizes: List[str] = []
-    colors: List[ColorOption] = []
-    stock: int = 0
+    discount_percentage: float = 0.0
+    tags: List[str] = []
+    variants: List[ProductVariant] = []
 
     @field_validator('price')
     @classmethod
@@ -24,11 +39,11 @@ class ProductCreate(BaseModel):
             raise ValueError('Price seems unrealistically high')
         return round(v, 2)
 
-    @field_validator('stock')
+    @field_validator('discount_percentage')
     @classmethod
-    def stock_non_negative(cls, v):
-        if v < 0:
-            raise ValueError('Stock cannot be negative')
+    def discount_valid(cls, v):
+        if not 0 <= v <= 100:
+            raise ValueError('Discount must be between 0 and 100')
         return v
 
 class ProductUpdate(BaseModel):
@@ -37,7 +52,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     images: Optional[List[str]] = None
-    sizes: Optional[List[str]] = None
-    colors: Optional[List[ColorOption]] = None
-    stock: Optional[int] = None
+    discount_percentage: Optional[float] = None
+    tags: Optional[List[str]] = None
+    variants: Optional[List[ProductVariant]] = None
     is_active: Optional[bool] = None

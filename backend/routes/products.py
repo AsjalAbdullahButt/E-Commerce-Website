@@ -1,14 +1,16 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from database import products_col
-from models.product import ProductCreate, ProductUpdate
-from middleware.auth_middleware import require_admin
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
-from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
-from datetime import datetime
+from utils.cache import cache_get, cache_set
 from bson import ObjectId
 import re
 from schemas.product import ProductListResponse, ProductResponse
+
+# NOTE: product writes (create/update/delete) live exclusively under /admin/products
+# (routes/admin.py -> services/product.py::ProductService), which enforces the granular
+# permission matrix in utils/permissions.py. This router is intentionally read-only so there
+# is exactly one write path for the `products` collection — see NOTES_schema_audit.md §1.
 
 logger = get_logger(__name__)
 
@@ -93,56 +95,3 @@ async def get_product(request: Request, product_id: str):
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     return serialize(p)
-
-@router.post("", response_model=ProductResponse)
-@limiter.limit("30/minute")
-async def create_product(request: Request, body: ProductCreate, _=Depends(require_admin)):
-    """Create new product (admin only)."""
-    doc = {
-        **body.dict(),
-        "rating":       0.0,
-        "review_count": 0,
-        "is_active":    True,
-        "created_at":   datetime.utcnow().isoformat(),
-        "updated_at":   datetime.utcnow().isoformat(),
-    }
-    result = await products_col.insert_one(doc)
-    p = await products_col.find_one({"_id": result.inserted_id})
-    await cache_clear_prefix("products:list:")
-    await cache_delete("products:categories")
-    return serialize(p)
-
-@router.put("/{product_id}", response_model=ProductResponse)
-@limiter.limit("30/minute")
-async def update_product(request: Request, product_id: str, body: ProductUpdate, _=Depends(require_admin)):
-    """Update product (admin only)."""
-    try:
-        oid = ObjectId(product_id)
-    except Exception as e:
-        await log_to_db("INVALID_PRODUCT_ID", f"admin tried to update product with invalid ID {product_id}", {"error": str(e)})
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-
-    update_data = {k: v for k, v in body.dict().items() if v is not None}
-    if update_data:
-        update_data["updated_at"] = datetime.utcnow().isoformat()
-        await products_col.update_one({"_id": oid}, {"$set": update_data})
-    p = await products_col.find_one({"_id": oid})
-    if not p:
-        raise HTTPException(status_code=404, detail="Product not found")
-    await cache_clear_prefix("products:list:")
-    await cache_delete("products:categories")
-    return serialize(p)
-
-@router.delete("/{product_id}")
-@limiter.limit("20/minute")
-async def delete_product(request: Request, product_id: str, _=Depends(require_admin)):
-    """Soft-delete product (admin only)."""
-    try:
-        oid = ObjectId(product_id)
-    except Exception as e:
-        await log_to_db("INVALID_PRODUCT_ID", f"admin tried to delete product with invalid ID {product_id}", {"error": str(e)})
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-    await products_col.update_one({"_id": oid}, {"$set": {"is_active": False, "updated_at": datetime.utcnow().isoformat()}})
-    await cache_clear_prefix("products:list:")
-    await cache_delete("products:categories")
-    return {"message": "Product deactivated"}

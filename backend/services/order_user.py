@@ -4,23 +4,29 @@ from bson import ObjectId
 from datetime import datetime
 from typing import Optional, List
 from utils.logger import get_logger
+from utils.order_transitions import assert_valid_transition
 
 logger = get_logger(__name__)
 
 class OrderService:
-    """Order management service"""
+    """Order management service.
+
+    Operates on the canonical order shape written by the real checkout flow
+    (routes/orders.py::place_order): status/status_history/total — NOT the
+    legacy timeline/total_price/final_price shape. See NOTES_schema_audit.md §2.
+    """
 
     @staticmethod
     async def get_order(order_id: str) -> dict:
         """Get order by ID"""
-        order = await orders_col.find_one({"_id": ObjectId(order_id), "is_deleted": False})
-        
+        order = await orders_col.find_one({"_id": ObjectId(order_id)})
+
         if not order:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Order not found"
             )
-        
+
         order["id"] = str(order["_id"])
         del order["_id"]
         return order
@@ -35,40 +41,23 @@ class OrderService:
         """Update order status with validation"""
         order = await OrderService.get_order(order_id)
         current_status = order["status"]
-        
-        # Validate status transition
-        valid_transitions = {
-            "pending": ["confirmed", "cancelled"],
-            "confirmed": ["packed", "cancelled"],
-            "packed": ["shipped"],
-            "shipped": ["delivered"],
-            "delivered": ["returned"],
-            "cancelled": [],
-            "returned": [],
-        }
-        
-        if new_status not in valid_transitions.get(current_status, []):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot transition from {current_status} to {new_status}"
-            )
-        
-        # Add to timeline
-        timeline_entry = {
+
+        assert_valid_transition(current_status, new_status)
+
+        history_entry = {
             "status": new_status,
-            "timestamp": datetime.utcnow(),
-            "note": note,
-            "updated_by": admin_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "note": note or "",
         }
-        
+
         await orders_col.update_one(
             {"_id": ObjectId(order_id)},
             {
-                "$set": {"status": new_status, "updated_at": datetime.utcnow()},
-                "$push": {"timeline": timeline_entry}
+                "$set": {"status": new_status, "updated_at": datetime.utcnow().isoformat()},
+                "$push": {"status_history": history_entry}
             }
         )
-        
+
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
@@ -80,7 +69,7 @@ class OrderService:
             changes={"status": {"old": current_status, "new": new_status}},
             ip_address="0.0.0.0"
         )
-        
+
         logger.info(f"Order {order_id} status updated: {current_status} -> {new_status}")
         return await OrderService.get_order(order_id)
 
@@ -92,20 +81,20 @@ class OrderService:
         skip: int = 0,
     ) -> tuple:
         """List orders with filtering"""
-        query = {"is_deleted": False}
-        
+        query: dict = {}
+
         if status:
             query["status"] = status
         if user_id:
             query["user_id"] = user_id
-        
+
         cursor = orders_col.find(query).sort("created_at", -1).skip(skip).limit(limit)
         orders = await cursor.to_list(length=limit)
-        
+
         for o in orders:
             o["id"] = str(o["_id"])
             del o["_id"]
-        
+
         total = await orders_col.count_documents(query)
         return orders, total
 
@@ -247,7 +236,7 @@ class UserService:
     async def get_user_order_history(user_id: str, limit: int = 20) -> List[dict]:
         """Get user's order history"""
         orders = await orders_col.find(
-            {"user_id": user_id, "is_deleted": False}
+            {"user_id": user_id}
         ).sort("created_at", -1).limit(limit).to_list(length=limit)
         
         for o in orders:

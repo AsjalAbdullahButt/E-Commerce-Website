@@ -32,7 +32,6 @@ def product_document(
         "images": images,
         "total_stock": total_stock,
         "is_active": True,
-        "is_deleted": False,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
         "created_by": None,  # admin_id
@@ -68,45 +67,8 @@ def inventory_history_document(product_id: str) -> dict:
         "updated_at": datetime.utcnow(),
     }
 
-# ════════════════════════════════════════════════════════════════════════════
-# ORDER DOCUMENT
-# ════════════════════════════════════════════════════════════════════════════
-
-def order_status_timeline_entry(status: str, note: Optional[str] = None) -> dict:
-    """Create order status timeline entry"""
-    return {
-        "status": status,
-        "timestamp": datetime.utcnow(),
-        "note": note,
-    }
-
-def order_document(
-    user_id: str,
-    user_email: str,
-    items: List[dict],
-    shipping_address: dict,
-    payment_method: str,
-    total_price: float,
-    discount_applied: float,
-) -> dict:
-    """Create order document"""
-    return {
-        "user_id": user_id,
-        "user_email": user_email,
-        "items": items,  # [{product_id, name, price, quantity, size, color, image}, ...]
-        "shipping_address": shipping_address,
-        "payment_method": payment_method,  # "cod", "jazzcash", "easypaisa"
-        "payment_status": "pending",
-        "total_price": total_price,
-        "discount_applied": discount_applied,
-        "final_price": total_price - discount_applied,
-        "status": "pending",
-        "timeline": [order_status_timeline_entry("pending")],
-        "notes": [],
-        "is_deleted": False,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-    }
+# NOTE: order documents are created exclusively by routes/orders.py::place_order (the real
+# checkout path) — there is no admin.py-side order_document() builder. See NOTES_schema_audit.md §2.
 
 # ════════════════════════════════════════════════════════════════════════════
 # ADMIN USER DOCUMENT

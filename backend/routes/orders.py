@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from database import orders_col, promos_col, products_col
 from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, require_admin, require_rider
+from services.product import InventoryService
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
+from utils.order_transitions import assert_valid_transition
 from datetime import datetime
 from bson import ObjectId
 from fastapi import Query
@@ -30,49 +32,63 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     A client sending price=1 for a Rs5000 item will be charged the real price.
     """
     resolved_items = []
+    decremented = []  # [(product_id, size, color, quantity)] — for compensating rollback on failure
     subtotal = 0.0
 
-    for item in body.items:
-        # ── CRITICAL: fetch real price from DB ──────────────────────────────
-        try:
-            oid = ObjectId(item.product_id)
-        except Exception as e:
-            await log_to_db("INVALID_PRODUCT_ID", f"order placement with invalid ID {item.product_id}", {"error": str(e), "user_id": str(user["_id"])})
-            raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
+    try:
+        for item in body.items:
+            # ── CRITICAL: fetch real price from DB ──────────────────────────────
+            try:
+                oid = ObjectId(item.product_id)
+            except Exception as e:
+                await log_to_db("INVALID_PRODUCT_ID", f"order placement with invalid ID {item.product_id}", {"error": str(e), "user_id": str(user["_id"])})
+                raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
 
-        product = await products_col.find_one({"_id": oid, "is_active": True})
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
+            product = await products_col.find_one({"_id": oid, "is_active": True})
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
 
-        # Check stock for product (support either 'stock' or 'total_stock')
-        available_stock = int(product.get("stock", product.get("total_stock", 0)))
-        if available_stock < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient stock for '{product['name']}'. Available: {available_stock}"
+            variant = next(
+                (v for v in product.get("variants", []) if v.get("size") == item.size and v.get("color") == item.color),
+                None,
             )
+            if not variant:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"'{product['name']}' has no {item.size}/{item.color} variant",
+                )
+            if int(variant.get("stock", 0)) < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Insufficient stock for '{product['name']}' ({item.size}/{item.color}). Available: {variant.get('stock', 0)}",
+                )
 
-        # Atomically decrement stock to avoid race conditions
-        stock_update = await products_col.update_one(
-            {"_id": oid, "stock": {"$gte": item.quantity}},
-            {"$inc": {"stock": -item.quantity}}
-        )
-        if stock_update.modified_count == 0:
-            raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product['name']}'. Please refresh.")
+            # Atomically decrement the matching variant's stock to avoid race conditions
+            decremented_ok = await InventoryService.decrement_variant_stock(
+                item.product_id, item.size, item.color, item.quantity
+            )
+            if not decremented_ok:
+                raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product['name']}'. Please refresh.")
+            decremented.append((item.product_id, item.size, item.color, item.quantity))
 
-        real_price = float(product["price"])
-        line_total = real_price * item.quantity
-        subtotal  += line_total
+            real_price = float(product["price"])
+            line_total = real_price * item.quantity
+            subtotal  += line_total
 
-        resolved_items.append({
-            "product_id": item.product_id,
-            "name":       product["name"],
-            "price":      real_price,          # ← always server price
-            "quantity":   item.quantity,
-            "size":       item.size,
-            "color":      item.color,
-            "image":      item.image,
-        })
+            resolved_items.append({
+                "product_id": item.product_id,
+                "name":       product["name"],
+                "price":      real_price,          # ← always server price
+                "quantity":   item.quantity,
+                "size":       item.size,
+                "color":      item.color,
+                "image":      item.image,
+            })
+    except HTTPException:
+        # Compensating rollback: restore any variant stock already decremented earlier in this loop.
+        for product_id, size, color, quantity in decremented:
+            await InventoryService.restore_variant_stock(product_id, size, color, quantity)
+        raise
 
     discount = 0.0
 
@@ -188,6 +204,11 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
+    order = await orders_col.find_one({"_id": oid})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    assert_valid_transition(order["status"], body.status)
+
     history_entry = {
         "status":    body.status,
         "timestamp": datetime.utcnow().isoformat(),
@@ -230,11 +251,8 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
         await log_to_db("UNAUTHORIZED_CANCEL", f"user {str(user['_id'])} tried to cancel another user's order {order_id}", {"order_id": order_id, "user_id": str(user["_id"])})
         raise HTTPException(status_code=403, detail="Cannot cancel another user's order")
     
-    # Only pending orders can be cancelled
-    if order["status"] != "pending":
-        await log_to_db("INVALID_CANCEL_STATUS", f"attempted to cancel order {order_id} with status {order['status']}", {"order_id": order_id, "user_id": str(user["_id"])})
-        raise HTTPException(status_code=400, detail=f"Cannot cancel order with status '{order['status']}'. Only pending orders can be cancelled.")
-    
+    assert_valid_transition(order["status"], "cancelled")
+
     try:
         history_entry = {
             "status": "cancelled",
@@ -245,11 +263,14 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
             {"_id": oid},
             {"$set": {"status": "cancelled", "updated_at": datetime.utcnow().isoformat()}, "$push": {"status_history": history_entry}}
         )
-        # Restore stock for items in cancelled order
+        # Restore variant stock for items in cancelled order
         for it in order.get("items", []):
             try:
-                prod_oid = ObjectId(it.get("product_id"))
-                await products_col.update_one({"_id": prod_oid}, {"$inc": {"stock": it.get("quantity", 0)}})
+                restored = await InventoryService.restore_variant_stock(
+                    it.get("product_id"), it.get("size"), it.get("color"), it.get("quantity", 0)
+                )
+                if not restored:
+                    await log_to_db("STOCK_RESTORE_FAILED", "no matching variant to restore stock on cancel", {"order_id": order_id, "item": it})
             except Exception:
                 # Ignore stock restore failures but log
                 await log_to_db("STOCK_RESTORE_FAILED", "failed to restore stock on cancel", {"order_id": order_id, "item": it})

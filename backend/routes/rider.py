@@ -4,6 +4,7 @@ from models.order import OrderStatusUpdate
 from middleware.auth_middleware import require_rider
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
+from utils.order_transitions import assert_valid_transition
 from datetime import datetime
 from bson import ObjectId
 from database import riders_col
@@ -38,6 +39,14 @@ async def update_delivery_status(request: Request, order_id: str, body: OrderSta
     except Exception as e:
         await log_to_db("INVALID_ORDER_ID", f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": str(e), "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    order = await orders_col.find_one({"_id": oid})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get("rider_id") != str(user["_id"]):
+        raise HTTPException(status_code=403, detail="Not assigned to this order")
+    assert_valid_transition(order["status"], body.status)
+
     history_entry = {"status": body.status, "timestamp": datetime.utcnow().isoformat(), "note": body.note or ""}
     await orders_col.update_one(
         {"_id": oid},
@@ -147,10 +156,7 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
         await log_to_db("UNAUTHORIZED_DELIVERY", f"rider {str(user['_id'])} tried to complete order {order_id} assigned to {order.get('rider_id')}", {"order_id": order_id, "user_id": str(user["_id"])})
         raise HTTPException(status_code=403, detail="Not assigned to this order")
     
-    # Only shipped orders can be marked as delivered
-    if order.get("status") != "shipped":
-        await log_to_db("INVALID_DELIVERY_STATUS", f"rider tried to complete non-shipped order {order_id} with status {order.get('status')}", {"order_id": order_id, "user_id": str(user["_id"])})
-        raise HTTPException(status_code=400, detail="Only shipped orders can be marked as delivered")
+    assert_valid_transition(order.get("status"), "delivered")
     
     try:
         history_entry = {
