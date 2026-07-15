@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Promos | E-COM Admin</title>
+  
+  <!-- AUTH GUARD — Runs FIRST before page renders -->
+  <script>
+    (function() {
+      const token = localStorage.getItem('admin_access_token');
+      const user = JSON.parse(localStorage.getItem('admin_data') || 'null');
+      if (!token || !user) { window.location.replace('../auth/login.html'); return; }
+      if (!['admin', 'super_admin'].includes(user.role)) { window.location.replace('../customer/index.html'); return; }
+    })();
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+  <link rel="stylesheet" href="../shared/css/admin.css">
+</head>
+<body data-page="admin-promos">
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="../customer/index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./dashboard.html">Dashboard</a></li>
+        <li><a href="./products.html">Products</a></li>
+        <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./promos.html" class="active">Promos</a></li>
+        <li><a href="./logs.html">Logs</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="admin-header">
+      <h1 class="dashboard-title">Promo Codes</h1>
+      <button class="btn-primary" id="create-promo-btn" type="button">+ Create Promo</button>
+    </div>
+
+    <div class="admin-grid" id="promo-summary"></div>
+
+    <section data-section="promos">
+      <div class="filters" style="margin-bottom: 1rem;">
+        <input class="search-box" id="promo-search" type="search" placeholder="Search code, description, or type">
+        <select class="filter-select" id="promo-status-filter">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <table class="table-wrapper data-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th>Discount</th>
+            <th>Min Order</th>
+            <th>Valid Until</th>
+            <th>Usage</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="promo-table-body">
+          <tr id="promo-empty-row">
+            <td colspan="8" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce Admin Panel.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
+  <script src="./js/admin-config.js"></script>
+  <script src="./js/admin-api.js"></script>
+  <script src="./js/promos.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+</body>
+</html>
+

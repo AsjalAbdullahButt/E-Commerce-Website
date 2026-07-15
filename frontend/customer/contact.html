@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact | E-COM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="../shared/css/global.css">
+  <link rel="stylesheet" href="../shared/css/about.css">
+</head>
+<body>
+
+  <canvas id="neural-bg"></canvas>
+
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a class="nav-logo" href="./index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./index.html">Home</a></li>
+        <li><a href="./shop.html">Shop</a></li>
+        <li><a href="./about.html">About</a></li>
+        <li><a href="./contact.html" class="active">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="./profile.html"  class="nav-icon" id="nav-profile-btn"  aria-label="Profile"><i class="fas fa-user"></i></a>
+        <a href="../auth/login.html"    class="nav-icon" id="nav-login-btn"    aria-label="Login"><i class="fas fa-sign-in-alt"></i></a>
+        <button                   class="nav-icon" id="nav-logout-btn"   aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">
+          <i class="fas fa-shopping-bag"></i>
+          <span class="cart-badge" id="cart-badge">0</span>
+        </button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="cart-overlay" id="cart-overlay"></div>
+  <aside class="cart-drawer" id="cart-drawer"></aside>
+
+  <main>
+    <section class="page-header">
+      <h1>Get In Touch</h1>
+      <p>We'd love to hear from you</p>
+    </section>
+
+    <!-- Contact Type Tabs -->
+    <section class="contact-tabs-section">
+      <div class="contact-tabs" role="tablist">
+        <button class="tab-btn active" data-tab="contact" role="tab" aria-selected="true" aria-controls="contact-tab" tabindex="0">Contact Us</button>
+        <button class="tab-btn" data-tab="complaint" role="tab" aria-selected="false" aria-controls="complaint-tab" tabindex="-1">File a Complaint</button>
+      </div>
+    </section>
+
+    <!-- Contact Form Tab -->
+    <section class="contact-section tab-content active" id="contact-tab" role="tabpanel" aria-labelledby="contact">
+      <form class="contact-form">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="Your full name" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label>Subject</label>
+          <input type="text" name="subject" placeholder="How can we help?" required>
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea name="message" rows="6" placeholder="Tell us your thoughts..." required></textarea>
+        </div>
+        <button type="submit" class="submit-btn">Send Message</button>
+      </form>
+    </section>
+
+    <!-- Complaint Form Tab -->
+    <section class="contact-section tab-content" id="complaint-tab" role="tabpanel" aria-labelledby="complaint">
+      <div class="complaint-header">
+        <h2>File a Complaint</h2>
+        <p>We take your concerns seriously. Please provide details about your experience so we can resolve it quickly.</p>
+      </div>
+      <form class="complaint-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" name="complaint-name" placeholder="Your full name" required>
+          </div>
+          <div class="form-group">
+            <label>Email Address *</label>
+            <input type="email" name="complaint-email" placeholder="your@email.com" required>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Phone Number *</label>
+            <input type="tel" name="complaint-phone" placeholder="03001234567" required>
+          </div>
+          <div class="form-group">
+            <label>Order Number (if applicable)</label>
+            <input type="text" name="complaint-order" placeholder="e.g., ORD-12345">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Complaint Category *</label>
+          <select name="complaint-category" required>
+            <option value="">Select a category...</option>
+            <option value="product-quality">Product Quality Issue</option>
+            <option value="delivery">Delivery Issue</option>
+            <option value="incorrect-item">Incorrect Item Received</option>
+            <option value="damaged">Damaged Product</option>
+            <option value="payment">Payment Issue</option>
+            <option value="customer-service">Customer Service</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Date of Issue *</label>
+          <input type="date" name="complaint-date" required>
+        </div>
+
+        <div class="form-group">
+          <label>Complaint Description *</label>
+          <textarea name="complaint-description" rows="8" placeholder="Please describe your complaint in detail..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Evidence (Upload screenshot/image) *</label>
+          <div class="file-upload-area">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>Drag and drop your file here or click to browse</p>
+            <input type="file" name="complaint-file" accept="image/*,.pdf" required>
+          </div>
+        </div>
+
+        <div class="form-group checkbox">
+          <input type="checkbox" id="complaint-agree" required>
+          <label for="complaint-agree">I agree that the information provided is accurate and true</label>
+        </div>
+
+        <button type="submit" class="submit-btn submit-complaint-btn">
+          <i class="fas fa-paper-plane"></i> Submit Complaint
+        </button>
+      </form>
+    </section>
+
+    <section class="content-section">
+      <h2>Contact Information</h2>
+      <div class="contact-info">
+        <div class="info-item">
+          <i class="fas fa-envelope"></i>
+          <p><strong>Email:</strong> hello@tribeof5.com</p>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-phone"></i>
+          <p><strong>Phone:</strong> +92 300 1234567</p>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-map-marker-alt"></i>
+          <p><strong>Location:</strong> Karachi, Pakistan</p>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-clock"></i>
+          <p><strong>Response Time:</strong> 24-48 hours</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
+        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Shop</h4>
+        <a href="./shop.html">All Products</a>
+        <a href="./about.html">Our Story</a>
+        <a href="./contact.html">Contact Us</a>
+      </div>
+      <div class="footer-col">
+        <h4>Account</h4>
+        <a href="../auth/login.html">Login</a>
+        <a href="../auth/register.html">Register</a>
+        <a href="./profile.html">My Orders</a>
+        <a href="./tracking.html">Track Order</a>
+      </div>
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <div class="footer-socials">
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
+  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/cart.js"></script>
+  <script src="../js/contact.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+</body>
+</html>
+
