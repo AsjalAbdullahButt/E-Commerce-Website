@@ -34,6 +34,7 @@
         <li><a href="./dashboard.html" class="active">Dashboard</a></li>
         <li><a href="./products.html">Products</a></li>
         <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./riders.html">Riders</a></li>
         <li><a href="./promos.html">Promos</a></li>
         <li><a href="./logs.html">Logs</a></li>
       </ul>
@@ -144,18 +145,34 @@
 
   <script src="../shared/js/config.js"></script>
   <script src="../shared/js/api.js"></script>
-  <script src="../shared/js/auth.js"></script>
-  <script src="../shared/js/cart.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
   <script src="./js/analytics.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
 
   <script>
-    document.getElementById('nav-logout-btn').addEventListener('click', () => {
-      clearAuth();
-      showToast('Logged out');
-      window.location.href = '../auth/login.html';
+    (function () {
+      const saved = localStorage.getItem('ecom_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.addEventListener('DOMContentLoaded', () => {
+        const icon = document.getElementById('theme-icon');
+        if (icon) icon.className = saved === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        document.getElementById('theme-toggle')?.addEventListener('click', () => {
+          const html = document.documentElement;
+          const next = (html.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark';
+          html.setAttribute('data-theme', next);
+          localStorage.setItem('ecom_theme', next);
+          if (icon) icon.className = next === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        });
+      });
+    })();
+
+    document.getElementById('nav-logout-btn').addEventListener('click', async () => {
+      try { await adminAPI.logout(); } catch {}
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
+      window.location.href = './login.html';
     });
   </script>
 

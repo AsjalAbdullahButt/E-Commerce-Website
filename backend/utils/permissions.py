@@ -6,6 +6,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "admin:read", "admin:create", "admin:update", "admin:delete",
         "audit:read", "inventory:read", "inventory:update",
         "promo:create", "promo:read", "promo:update", "promo:delete",
+        "rider:create", "rider:read", "rider:update", "rider:delete",
         "dashboard:read", "settings:update",
     ],
     "admin": [
@@ -14,16 +15,18 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "user:read", "user:update",
         "audit:read", "inventory:read", "inventory:update",
         "promo:create", "promo:read", "promo:update",
+        "rider:create", "rider:read", "rider:update",
         "dashboard:read",
     ],
     "manager": [
         "product:read", "product:update",
         "order:read", "order:update",
         "user:read", "inventory:read",
+        "rider:read",
         "dashboard:read", "promo:read",
     ],
     "support": [
-        "order:read", "user:read",
+        "order:read", "user:read", "rider:read",
         "dashboard:read",
     ],
 }

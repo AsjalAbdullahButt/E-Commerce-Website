@@ -184,16 +184,20 @@
 
     async function loadStats() {
       try {
-        const orders = await api.get('/rider/orders', true);
-        if (orders && Array.isArray(orders)) {
-          const total = orders.length;
-          const pending = orders.filter(o => o.status !== 'delivered').length;
-          const delivered = orders.filter(o => o.status === 'delivered').length;
+        // /rider/orders only returns orders still in progress (shipped/confirmed/packed) —
+        // it never includes delivered orders, so "delivered" must come from /rider/stats instead,
+        // which counts across the rider's full order history server-side.
+        const [activeOrders, stats] = await Promise.all([
+          api.get('/rider/orders', true),
+          api.get('/rider/stats', true),
+        ]);
 
-          document.getElementById('stat-total').textContent = total;
-          document.getElementById('stat-pending').textContent = pending;
-          document.getElementById('stat-delivered').textContent = delivered;
-        }
+        const pending = Array.isArray(activeOrders) ? activeOrders.length : 0;
+        const delivered = stats?.delivered || 0;
+
+        document.getElementById('stat-total').textContent = pending + delivered;
+        document.getElementById('stat-pending').textContent = pending;
+        document.getElementById('stat-delivered').textContent = delivered;
       } catch (err) {
         console.error('Failed to load stats:', err);
       }

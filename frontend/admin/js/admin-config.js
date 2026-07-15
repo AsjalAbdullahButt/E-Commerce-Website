@@ -24,6 +24,14 @@ const ADMIN_CONFIG = {
             GET: (id) => `/admin/orders/${id}`,
             UPDATE_STATUS: (id) => `/admin/orders/${id}/status`,
             ADD_NOTE: (id) => `/admin/orders/${id}/note`,
+            ASSIGN_RIDER: (id) => `/admin/orders/${id}/assign-rider`,
+        },
+        RIDERS: {
+            LIST: '/admin/riders',
+            CREATE: '/admin/riders',
+            ACTIVATE: (id) => `/admin/riders/${id}/activate`,
+            DEACTIVATE: (id) => `/admin/riders/${id}/deactivate`,
+            ACTIVE_ORDERS: (id) => `/admin/riders/${id}/active-orders`,
         },
         USERS: {
             LIST: '/admin/users',

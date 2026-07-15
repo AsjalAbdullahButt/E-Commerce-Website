@@ -99,13 +99,14 @@
       font-size: 0.85rem;
     }
 
-    .status-badge.picked-up {
+    .status-badge.confirmed,
+    .status-badge.packed {
       background: rgba(59,130,246,0.1);
       border-color: rgba(59,130,246,0.3);
       color: #3b82f6;
     }
 
-    .status-badge.on-the-way {
+    .status-badge.shipped {
       background: rgba(245,158,11,0.1);
       border-color: rgba(245,158,11,0.3);
       color: #f59e0b;
@@ -254,8 +255,9 @@
     <div class="filter-bar">
       <select id="status-filter" onchange="filterOrders()">
         <option value="">All Statuses</option>
-        <option value="picked_up">Picked Up</option>
-        <option value="on_the_way">On The Way</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="packed">Packed</option>
+        <option value="shipped">Shipped</option>
         <option value="delivered">Delivered</option>
       </select>
     </div>
@@ -329,9 +331,9 @@
         const dateP = document.createElement('p'); dateP.style.color = 'var(--text-secondary)'; dateP.style.fontSize = '0.85rem'; dateP.style.marginTop = '0.25rem'; dateP.textContent = new Date(order.created_at).toLocaleDateString();
         left.appendChild(idDiv); left.appendChild(dateP);
 
-        const statusSpan = document.createElement('span'); statusSpan.className = `status-badge ${order.status || 'picked-up'}`;
+        const statusSpan = document.createElement('span'); statusSpan.className = `status-badge ${order.status || 'confirmed'}`;
         const statusIcon = document.createElement('i'); statusIcon.className = 'fas fa-circle-dot';
-        const statusText = document.createTextNode(' ' + formatStatus(order.status || 'picked_up'));
+        const statusText = document.createTextNode(' ' + formatStatus(order.status));
         statusSpan.appendChild(statusIcon); statusSpan.appendChild(statusText);
 
         header.appendChild(left); header.appendChild(statusSpan);
@@ -339,7 +341,9 @@
         const details = document.createElement('div'); details.className = 'order-details';
         const addrGroup = document.createElement('div'); addrGroup.className = 'detail-group';
         const addrLabel = document.createElement('span'); addrLabel.className = 'detail-label'; addrLabel.textContent = 'Delivery Address';
-        const addrValue = document.createElement('span'); addrValue.className = 'detail-value'; addrValue.textContent = order.delivery_address || 'N/A';
+        const addr = order.shipping_address;
+        const addrValue = document.createElement('span'); addrValue.className = 'detail-value';
+        addrValue.textContent = addr ? `${addr.address}, ${addr.city} ${addr.postal_code}` : 'N/A';
         addrGroup.appendChild(addrLabel); addrGroup.appendChild(addrValue);
 
         const countGroup = document.createElement('div'); countGroup.className = 'detail-group';
@@ -358,11 +362,22 @@
           itemsList.appendChild(itemDiv);
         });
 
+        // Backend only allows a rider to set 'shipped' (from confirmed/packed) or 'delivered'
+        // (from shipped) — see backend/utils/order_transitions.py.
         const controls = document.createElement('div'); controls.className = 'status-controls';
-        const pickedBtn = document.createElement('button'); pickedBtn.className = `btn-status ${order.status === 'picked_up' ? 'active' : ''}`; pickedBtn.textContent = 'Picked Up'; pickedBtn.addEventListener('click', () => updateStatus(order.id, 'picked_up')); if (order.status === 'delivered') pickedBtn.disabled = true;
-        const wayBtn = document.createElement('button'); wayBtn.className = `btn-status ${order.status === 'on_the_way' ? 'active' : ''}`; wayBtn.textContent = 'On The Way'; wayBtn.addEventListener('click', () => updateStatus(order.id, 'on_the_way')); if (order.status === 'delivered') wayBtn.disabled = true;
-        const delBtn = document.createElement('button'); delBtn.className = `btn-status ${order.status === 'delivered' ? 'active' : ''}`; delBtn.textContent = 'Delivered'; delBtn.addEventListener('click', () => updateStatus(order.id, 'delivered'));
-        controls.appendChild(pickedBtn); controls.appendChild(wayBtn); controls.appendChild(delBtn);
+        const shipBtn = document.createElement('button');
+        shipBtn.className = `btn-status ${order.status === 'shipped' ? 'active' : ''}`;
+        shipBtn.textContent = 'Mark Shipped';
+        shipBtn.disabled = !['confirmed', 'packed'].includes(order.status);
+        shipBtn.addEventListener('click', () => updateStatus(order.id, 'shipped'));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = `btn-status ${order.status === 'delivered' ? 'active' : ''}`;
+        delBtn.textContent = 'Mark Delivered';
+        delBtn.disabled = order.status !== 'shipped';
+        delBtn.addEventListener('click', () => updateStatus(order.id, 'delivered'));
+
+        controls.appendChild(shipBtn); controls.appendChild(delBtn);
 
         card.appendChild(header); card.appendChild(details); card.appendChild(itemsList); card.appendChild(controls);
         container.appendChild(card);
@@ -371,11 +386,12 @@
 
     function formatStatus(status) {
       const map = {
-        'picked_up': 'Picked Up',
-        'on_the_way': 'On The Way',
-        'delivered': 'Delivered'
+        confirmed: 'Confirmed',
+        packed: 'Packed',
+        shipped: 'Shipped',
+        delivered: 'Delivered',
       };
-      return map[status] || status;
+      return map[status] || status || 'Unknown';
     }
 
     async function updateStatus(orderId, newStatus) {

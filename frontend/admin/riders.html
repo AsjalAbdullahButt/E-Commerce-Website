@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orders | E-COM Admin</title>
-  
+  <title>Riders | E-COM Admin</title>
+
   <!-- AUTH GUARD — Runs FIRST before page renders. Checks the admin token/session set by
        admin/login.html (POST /admin/auth/login), not the customer-facing ecom_* keys. -->
   <script>
@@ -15,14 +15,14 @@
       if (!['admin', 'super_admin', 'manager', 'support'].includes(user.role)) { window.location.replace('../customer/index.html'); return; }
     })();
   </script>
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../shared/css/global.css">
   <link rel="stylesheet" href="../shared/css/admin.css">
 </head>
-<body data-page="admin-orders">
+<body data-page="admin-riders">
 
   <canvas id="neural-bg"></canvas>
 
@@ -32,14 +32,13 @@
       <ul class="nav-links" id="nav-links">
         <li><a href="./dashboard.html">Dashboard</a></li>
         <li><a href="./products.html">Products</a></li>
-        <li><a href="./orders.html" class="active">Orders</a></li>
-        <li><a href="./riders.html">Riders</a></li>
+        <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./riders.html" class="active">Riders</a></li>
         <li><a href="./promos.html">Promos</a></li>
         <li><a href="./logs.html">Logs</a></li>
       </ul>
       <div class="nav-actions">
         <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
-        <!-- Dark/Light Mode Toggle -->
         <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
           <i class="fas fa-moon" id="theme-icon"></i>
         </button>
@@ -50,61 +49,94 @@
   <main>
     <div class="admin-header">
       <div class="admin-header-copy">
-        <h1 class="dashboard-title">Orders</h1>
-        <p class="dashboard-subtitle">Track every order, update fulfillment status, and assign riders.</p>
+        <h1 class="dashboard-title">Riders</h1>
+        <p class="dashboard-subtitle">Create rider accounts and manage who's available for delivery assignment.</p>
       </div>
       <div class="admin-toolbar">
-        <button class="builder-button" id="refresh-orders-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
+        <button class="btn-primary" id="open-rider-modal-btn" type="button">+ Add Rider</button>
+        <button class="builder-button" id="refresh-riders-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
       </div>
     </div>
 
-    <section data-section="orders">
+    <section data-section="riders">
       <div class="admin-form-section">
         <div class="section-title-row" style="margin-bottom: 1rem;">
           <div>
-            <h2>Order Filters</h2>
-            <p class="admin-section-desc">Narrow the list by fulfillment status.</p>
+            <h2>Rider Roster</h2>
+            <p class="admin-section-desc">Live status, availability, and current delivery load.</p>
           </div>
-          <span class="summary-pill" id="orders-visible-count">0 visible</span>
+          <span class="summary-pill" id="riders-visible-count">0 riders</span>
         </div>
 
         <div class="filters">
-          <select id="order-status-filter" class="filter-select">
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="packed">Packed</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="returned">Returned</option>
+          <select id="rider-status-filter" class="filter-select">
+            <option value="all">All riders</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
       </div>
 
-      <div class="table-wrapper order-table">
+      <div class="table-wrapper rider-table">
         <table>
           <thead>
             <tr>
-              <th>Order</th>
-              <th>Customer</th>
-              <th>Items</th>
-              <th>Total</th>
-              <th>Status</th>
               <th>Rider</th>
-              <th>Placed</th>
+              <th>Phone</th>
+              <th>Availability</th>
+              <th>Active Deliveries</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="order-table-body">
-            <tr id="order-empty-row">
-              <td colspan="8" style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading orders...</td>
+          <tbody id="rider-table-body">
+            <tr id="rider-empty-row">
+              <td colspan="6" style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading riders...</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
   </main>
+
+  <div class="modal" id="rider-modal" aria-hidden="true">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Add Rider</h3>
+          <p class="inline-help">Create a rider account. The rider logs in with this email/password at the shared login page.</p>
+        </div>
+        <button class="modal-close" type="button" id="close-rider-modal-btn" aria-label="Close rider modal">&times;</button>
+      </div>
+
+      <form id="rider-form">
+        <div class="product-form-grid">
+          <div class="form-group">
+            <label for="rider-name">Full Name</label>
+            <input id="rider-name" type="text" maxlength="80" required>
+          </div>
+          <div class="form-group">
+            <label for="rider-phone">Phone</label>
+            <input id="rider-phone" type="text" maxlength="20" required>
+          </div>
+          <div class="form-group full-span">
+            <label for="rider-email">Email</label>
+            <input id="rider-email" type="email" required>
+          </div>
+          <div class="form-group full-span">
+            <label for="rider-password">Password</label>
+            <input id="rider-password" type="password" minlength="8" required>
+            <small class="inline-help">At least 8 characters, one uppercase letter, one digit.</small>
+          </div>
+        </div>
+
+        <div class="product-form-footer">
+          <button class="btn-secondary" id="cancel-rider-btn" type="button">Cancel</button>
+          <button class="btn-primary" id="rider-submit-btn" type="submit">Create Rider</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <footer class="footer">
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce Admin Panel.</p></div>
@@ -114,7 +146,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
-  <script src="./js/orders.js"></script>
+  <script src="./js/riders.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
 
   <script>
@@ -134,16 +166,5 @@
       });
     })();
   </script>
-
-  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
-  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
-     class="whatsapp-float"
-     target="_blank"
-     rel="noopener noreferrer"
-     aria-label="Chat with us on WhatsApp"
-     title="WhatsApp Support">
-    <i class="fab fa-whatsapp"></i>
-  </a>
 </body>
 </html>
-

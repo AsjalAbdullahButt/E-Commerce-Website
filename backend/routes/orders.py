@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import orders_col, promos_col, products_col
 from models.order import OrderCreate, OrderStatusUpdate
-from middleware.auth_middleware import get_current_user, require_admin, require_rider
+from middleware.auth_middleware import get_current_user, require_admin
 from services.product import InventoryService
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
@@ -220,16 +220,10 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
     )
     return {"message": "Status updated"}
 
-@router.patch("/{order_id}/assign-rider")
-@limiter.limit("20/minute")
-async def assign_rider(request: Request, order_id: str, rider_id: str, _=Depends(require_admin)):
-    """Assign rider to order (admin only)."""
-    try:
-        oid = ObjectId(order_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid order ID")
-    await orders_col.update_one({"_id": oid}, {"$set": {"rider_id": rider_id, "updated_at": datetime.utcnow().isoformat()}})
-    return {"message": "Rider assigned"}
+# NOTE: rider assignment lives at PATCH /admin/orders/{id}/assign-rider (routes/admin.py),
+# which validates the rider exists and is active/available and that the order isn't already
+# delivered/cancelled — this router no longer has its own unvalidated copy. See
+# NOTES_schema_audit.md §4.
 
 @router.post("/{order_id}/cancel")
 @limiter.limit("10/minute")

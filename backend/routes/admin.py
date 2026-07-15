@@ -7,10 +7,15 @@ from services.product import ProductService, InventoryService
 from services.order_user import OrderService, UserService
 from services.discount import DiscountService
 from services.dashboard import DashboardService
+from services.rider import RiderService
+from schemas.rider import RiderCreate
 from typing import Optional
 from utils.logger import get_logger, log_to_db
 from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
+from utils.order_transitions import assert_valid_transition
 from database import products_col, orders_col, users_col
+from bson import ObjectId
+from datetime import datetime
 from utils.limiter import limiter
 
 logger = get_logger(__name__)
@@ -860,6 +865,113 @@ async def get_user_orders(
     except Exception as e:
         logger.error(f"Get user orders error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch user orders")
+
+# ════════════════════════════════════════════════════════════════════════════
+# RIDER MANAGEMENT ROUTES
+# ════════════════════════════════════════════════════════════════════════════
+
+@router.post("/riders")
+async def create_rider(rider: RiderCreate, admin_data: dict = Depends(verify_admin_token)):
+    """Create a new rider account"""
+    if not await check_permission(admin_data, "rider:create"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        created = await RiderService.create_rider(
+            name=rider.name, email=rider.email, password=rider.password,
+            phone=rider.phone, admin_id=admin_data["admin_id"],
+        )
+        return {"success": True, "message": "Rider created successfully", "data": created}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await log_to_db("ERROR", __name__, f"Rider creation error: {e}", {"admin_id": admin_data.get("admin_id")})
+        logger.error(f"Rider creation error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create rider")
+
+@router.get("/riders")
+async def list_riders(is_active: Optional[bool] = None, admin_data: dict = Depends(verify_admin_token)):
+    """List riders with their live status/availability"""
+    if not await check_permission(admin_data, "rider:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        riders = await RiderService.list_riders(is_active=is_active)
+        return {"success": True, "data": riders, "total": len(riders)}
+    except Exception as e:
+        logger.error(f"List riders error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch riders")
+
+@router.get("/riders/{rider_id}/active-orders")
+async def get_rider_active_orders(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+    """Count of a rider's currently active (not delivered/cancelled) orders"""
+    if not await check_permission(admin_data, "rider:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        count = await RiderService.get_active_order_count(rider_id)
+        return {"success": True, "data": {"rider_id": rider_id, "active_orders": count}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Rider active-orders error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch rider's active orders")
+
+@router.patch("/riders/{rider_id}/activate")
+async def activate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+    """Activate a rider account"""
+    if not await check_permission(admin_data, "rider:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        updated = await RiderService.set_active(rider_id, True, admin_data["admin_id"])
+        return {"success": True, "message": "Rider activated", "data": updated}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Activate rider error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to activate rider")
+
+@router.patch("/riders/{rider_id}/deactivate")
+async def deactivate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+    """Deactivate a rider account"""
+    if not await check_permission(admin_data, "rider:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        updated = await RiderService.set_active(rider_id, False, admin_data["admin_id"])
+        return {"success": True, "message": "Rider deactivated", "data": updated}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Deactivate rider error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to deactivate rider")
+
+@router.patch("/orders/{order_id}/assign-rider")
+async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+    """Assign a rider to an order (admin only).
+
+    Canonical assign-rider path — validates the rider exists and is active/available, and that
+    the order isn't already delivered/cancelled, before assigning. Replaces the old
+    routes/orders.py::assign_rider, which had neither check and was gated by the customer-facing
+    JWT auth path instead of the admin permission matrix. See NOTES_schema_audit.md §4.
+    """
+    if not await check_permission(admin_data, "order:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        oid = ObjectId(order_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    order = await orders_col.find_one({"_id": oid})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order["status"] in ("delivered", "cancelled", "returned"):
+        raise HTTPException(status_code=400, detail=f"Cannot assign a rider to a {order['status']} order")
+
+    if not await RiderService.is_available_for_assignment(rider_id):
+        raise HTTPException(status_code=400, detail="Rider does not exist or is not active/available")
+
+    await orders_col.update_one(
+        {"_id": oid},
+        {"$set": {"rider_id": rider_id, "updated_at": datetime.utcnow().isoformat()}},
+    )
+    return {"success": True, "message": "Rider assigned"}
 
 # ════════════════════════════════════════════════════════════════════════════
 # DISCOUNT ROUTES

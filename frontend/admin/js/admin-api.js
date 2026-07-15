@@ -165,6 +165,37 @@ class AdminAPI {
         return this.request(url, 'POST');
     }
 
+    async assignRider(orderId, riderId) {
+        const url = ADMIN_CONFIG.ENDPOINTS.ORDERS.ASSIGN_RIDER(orderId) + `?rider_id=${encodeURIComponent(riderId)}`;
+        return this.request(url, 'PATCH');
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RIDERS
+    // ════════════════════════════════════════════════════════════════════════
+
+    async getRiders(isActive = null) {
+        let url = ADMIN_CONFIG.ENDPOINTS.RIDERS.LIST;
+        if (isActive !== null) url += `?is_active=${isActive}`;
+        return this.request(url);
+    }
+
+    async createRider(riderData) {
+        return this.request(ADMIN_CONFIG.ENDPOINTS.RIDERS.CREATE, 'POST', riderData);
+    }
+
+    async activateRider(riderId) {
+        return this.request(ADMIN_CONFIG.ENDPOINTS.RIDERS.ACTIVATE(riderId), 'PATCH');
+    }
+
+    async deactivateRider(riderId) {
+        return this.request(ADMIN_CONFIG.ENDPOINTS.RIDERS.DEACTIVATE(riderId), 'PATCH');
+    }
+
+    async getRiderActiveOrders(riderId) {
+        return this.request(ADMIN_CONFIG.ENDPOINTS.RIDERS.ACTIVE_ORDERS(riderId));
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // USERS
     // ════════════════════════════════════════════════════════════════════════
