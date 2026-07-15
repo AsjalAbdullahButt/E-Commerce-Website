@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 *.pyo
@@ -12,8 +14,30 @@ build/
 .DS_Store
 Thumbs.db
 *.log
+*.log.*
+logs/*
+!logs/.gitkeep
 node_modules/
 .idea/
 .vscode/
 *.sqlite
+*.sqlite3
+*.db
 .pytest_cache/
+
+# Cache directories
+.cache/
+cache/
+**/__pycache__/
+.mypy_cache/
+.ruff_cache/
+.parcel-cache/
+.eslintcache
+*.cache
+
+# Secrets / credentials
+*.pem
+*.key
+*.crt
+*credentials*.json
+*secret*.json

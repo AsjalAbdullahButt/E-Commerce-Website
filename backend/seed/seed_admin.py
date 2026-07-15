@@ -4,45 +4,65 @@ Run: python backend/seed/seed_admin.py
 """
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
+load_dotenv()
 
 from services.admin_auth import AdminAuthService
+
+REQUIRED_PASSWORD_VARS = [
+    'SEED_SUPERADMIN_PASSWORD',
+    'SEED_ADMIN_PASSWORD',
+    'SEED_MANAGER_PASSWORD',
+    'SEED_SUPPORT_PASSWORD',
+]
+
 
 async def main():
     print("\n" + "="*60)
     print("  🌱 ADMIN USER SEED SCRIPT")
     print("="*60 + "\n")
 
+    missing = [var for var in REQUIRED_PASSWORD_VARS if not os.getenv(var)]
+    if missing:
+        print("❌ Missing required environment variables:")
+        for var in missing:
+            print(f"   {var}")
+        print("\nSet these in your .env file before running the seed script.\n")
+        return
+
     # Admin users to create
     admins = [
         {
             'name': 'Super Administrator',
             'email': 'superadmin@example.com',
-            'password': 'SuperAdmin@123',
+            'password': os.getenv('SEED_SUPERADMIN_PASSWORD'),
             'role': 'super_admin',
             'description': 'Full system access'
         },
         {
             'name': 'Operations Manager',
             'email': 'admin@example.com',
-            'password': 'AdminPass123',
+            'password': os.getenv('SEED_ADMIN_PASSWORD'),
             'role': 'admin',
             'description': 'Products, Orders, Users'
         },
         {
             'name': 'Inventory Manager',
             'email': 'manager@example.com',
-            'password': 'Manager@123456',
+            'password': os.getenv('SEED_MANAGER_PASSWORD'),
             'role': 'manager',
             'description': 'Inventory & order read/update'
         },
         {
             'name': 'Support Staff',
             'email': 'support@example.com',
-            'password': 'Support@123456',
+            'password': os.getenv('SEED_SUPPORT_PASSWORD'),
             'role': 'support',
             'description': 'Orders & users read-only'
         },
