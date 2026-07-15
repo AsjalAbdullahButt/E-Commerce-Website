@@ -132,6 +132,11 @@ main {
   border-color: var(--gold);
 }
 
+.size-btn.out-of-stock {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
 .color-select {
   display: flex;
   flex-direction: column;
@@ -149,34 +154,6 @@ main {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.color-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid var(--border);
-  cursor: pointer;
-  transition: var(--transition);
-  position: relative;
-}
-
-.color-swatch:hover,
-.color-swatch.selected {
-  border-color: var(--gold);
-  transform: scale(1.1);
-}
-
-.color-swatch.selected::after {
-  content: '✓';
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: white;
-  text-shadow: 0 0 2px rgba(0,0,0,0.8);
 }
 
 .quantity-control {
@@ -236,6 +213,18 @@ main {
 .add-to-cart-btn:hover {
   background: #FFE033;
   transform: translateY(-2px);
+}
+
+.add-to-cart-btn:disabled {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quantity-input button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .reviews-section {

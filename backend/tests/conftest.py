@@ -1,11 +1,46 @@
 """Test configuration and fixtures"""
 import pytest
 import os
+import sys
 from pathlib import Path
 
 # Set environment to test mode
 os.environ["ENVIRONMENT"] = "development"
 os.environ["DOCS_ENABLED"] = "false"
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+# ── In-memory MongoDB for tests ────────────────────────────────────────────────
+# No real MongoDB is available in CI/dev sandboxes here, so every collection the app touches is
+# backed by mongomock-motor instead. This must happen BEFORE any app module (database.py, main.py,
+# routes/*, services/*) is imported, since they all call motor.motor_asyncio.AsyncIOMotorClient(...)
+# at import time and bind collection references into their own module namespace.
+import motor.motor_asyncio
+from mongomock_motor import AsyncMongoMockClient
+
+motor.motor_asyncio.AsyncIOMotorClient = AsyncMongoMockClient
+
+import asyncio  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+import database  # noqa: E402
+from main import app  # noqa: E402
+
+
+async def _clear_all_collections():
+    for col in (
+        database.users_col, database.products_col, database.orders_col, database.reviews_col,
+        database.wishlist_col, database.promos_col, database.admin_users_col, database.riders_col,
+        database.inventory_history_col, database.audit_logs_col, database.notifications_col,
+    ):
+        await col.delete_many({})
+
+
+@pytest.fixture()
+def client():
+    """A TestClient against the real app, with every collection cleared before each test."""
+    asyncio.run(_clear_all_collections())
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture(scope="session")

@@ -112,13 +112,27 @@ async function toggleWishlist(productId, event) {
 async function quickAddToCart(productId, buttonEl) {
   try {
     const product = await api.get(`/products/${productId}`);
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    const inStock = variants.find(v => v.stock > 0);
+
+    if (variants.length && !inStock) {
+      showToast('This product is out of stock', 'error');
+      return;
+    }
+    if (variants.length > 1) {
+      // Multiple size/color combos exist — let the shopper choose on the product page
+      // instead of guessing which variant "Quick Add" should pick.
+      window.location.href = `./product.html?id=${encodeURIComponent(productId)}`;
+      return;
+    }
+
     addToCartWithAnimation(buttonEl, {
       id: product.id,
       name: product.name,
       price: product.price,
       images: product.images,
-      selectedSize: product.sizes?.[0] || '',
-      selectedColor: product.colors?.[0]?.name || ''
+      selectedSize: inStock?.size || '',
+      selectedColor: inStock?.color || ''
     });
   } catch (err) {
     showToast('Failed to add to cart', 'error');

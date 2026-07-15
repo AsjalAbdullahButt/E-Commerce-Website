@@ -60,6 +60,21 @@ PRODUCTS_AUTHORED = [
     {"name": "Canvas Tote Bag", "price": 950, "category": "accessories", "description": "Large canvas tote bag for shopping and daily use.", "images": ["https://via.placeholder.com/600x600/e8d4b8/000000?text=Tote"], "sizes": [], "colors": [{"name": "Natural", "hex": "#e8d4b8"}, {"name": "Black", "hex": "#000000"}], "stock": 130, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
 ]
 
+
+def to_canonical_product(authored: dict) -> dict:
+    """Convert one PRODUCTS_AUTHORED entry (flat sizes/colors/stock shorthand) into the
+    canonical variants[]/total_stock document shape stored in the `products` collection."""
+    variants = build_variants_from_flat(authored)
+    doc = {k: v for k, v in authored.items() if k not in ("sizes", "colors", "stock")}
+    doc["variants"] = variants
+    doc["total_stock"] = sum(v["stock"] for v in variants)
+    doc["discount_percentage"] = 0.0
+    return doc
+
+
+PRODUCTS = [to_canonical_product(p) for p in PRODUCTS_AUTHORED]
+
+
 async def seed():
     try:
         print("\n" + "="*70)

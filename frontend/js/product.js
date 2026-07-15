@@ -49,68 +49,7 @@ async function loadProduct() {
     document.querySelector('.product-price').textContent = `Rs ${Number(product.price || 0).toLocaleString()}`;
     document.querySelector('.product-description').textContent = product.description;
 
-    // Update size options
-    const sizeBtns = document.querySelectorAll('.size-btn');
-    sizeBtns.forEach(btn => {
-      btn.onclick = () => {
-        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-      };
-    });
-
-    // Update color swatches
-    const colorSwatches = document.querySelectorAll('.color-swatch');
-    colorSwatches.forEach(swatch => {
-      swatch.onclick = () => {
-        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
-        swatch.classList.add('selected');
-      };
-      // Set first as selected
-      if (colorSwatches[0] === swatch) swatch.classList.add('selected');
-    });
-
-    // Quantity handlers
-    const qtyMinus = document.querySelector('.quantity-input button:first-child');
-    const qtyPlus = document.querySelector('.quantity-input button:last-child');
-    const qtySpan = document.querySelector('.quantity-input span');
-
-    qtyMinus?.addEventListener('click', () => {
-      let qty = parseInt(qtySpan.textContent);
-      if (qty > 1) qtySpan.textContent = qty - 1;
-    });
-
-    qtyPlus?.addEventListener('click', () => {
-      let qty = parseInt(qtySpan.textContent);
-      qtySpan.textContent = qty + 1;
-    });
-
-    // Add to cart button
-    const addBtn = document.querySelector('.add-to-cart-btn');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => {
-        const size = document.querySelector('.size-btn.selected')?.textContent;
-        const color = document.querySelector('.color-swatch.selected')?.getAttribute('data-color');
-        const qty = parseInt(document.querySelector('.quantity-input span').textContent);
-
-        if (!size) {
-          showToast('Please select a size', 'warning');
-          return;
-        }
-
-        for (let i = 0; i < qty; i++) {
-          addToCart({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            images: product.images,
-            selectedSize: size,
-            selectedColor: color || product.colors?.[0]?.name || ''
-          });
-        }
-
-        addToCartWithAnimation(addBtn, {});
-      });
-    }
+    setupVariantSelectors(product);
 
     // Load reviews
     await loadReviews(id);
@@ -118,6 +57,129 @@ async function loadProduct() {
     console.error('Failed to load product', err);
     showToast('Failed to load product', 'error');
   }
+}
+
+function setupVariantSelectors(product) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const sizeContainer = document.querySelector('.size-options');
+  const colorContainer = document.querySelector('.color-options');
+  const qtySpan = document.querySelector('.quantity-input span');
+  const qtyMinus = document.querySelector('.quantity-input button:first-child');
+  const qtyPlus = document.querySelector('.quantity-input button:last-child');
+  const addBtn = document.querySelector('.add-to-cart-btn');
+
+  const sizes = [...new Set(variants.map(v => v.size))];
+  const colors = [...new Set(variants.map(v => v.color))];
+
+  const state = { size: null, color: null };
+
+  function findVariant() {
+    return variants.find(v => v.size === state.size && v.color === state.color) || null;
+  }
+
+  function refresh() {
+    const variant = findVariant();
+    const stock = variant ? variant.stock : 0;
+    const qty = Math.max(1, parseInt(qtySpan?.textContent, 10) || 1);
+
+    if (qtySpan) qtySpan.textContent = String(Math.min(qty, Math.max(stock, 1)));
+    if (qtyMinus) qtyMinus.disabled = !variant || stock === 0;
+    if (qtyPlus) qtyPlus.disabled = !variant || stock === 0 || qty >= stock;
+
+    if (addBtn) {
+      const ready = Boolean(state.size && state.color);
+      if (!ready) {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Add to Cart';
+      } else if (!variant || stock === 0) {
+        addBtn.disabled = true;
+        addBtn.textContent = 'Out of Stock';
+      } else {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Add to Cart';
+      }
+    }
+  }
+
+  if (sizeContainer) {
+    sizeContainer.textContent = '';
+    sizes.forEach(size => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'size-btn';
+      btn.textContent = size;
+      const hasStock = variants.some(v => v.size === size && v.stock > 0);
+      if (!hasStock) btn.classList.add('out-of-stock');
+      btn.addEventListener('click', () => {
+        state.size = size;
+        sizeContainer.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        refresh();
+      });
+      sizeContainer.appendChild(btn);
+    });
+  }
+
+  if (colorContainer) {
+    colorContainer.textContent = '';
+    colors.forEach(color => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'size-btn color-btn';
+      btn.textContent = color;
+      btn.setAttribute('data-color', color);
+      const hasStock = variants.some(v => v.color === color && v.stock > 0);
+      if (!hasStock) btn.classList.add('out-of-stock');
+      btn.addEventListener('click', () => {
+        state.color = color;
+        colorContainer.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        refresh();
+      });
+      colorContainer.appendChild(btn);
+    });
+  }
+
+  qtyMinus?.addEventListener('click', () => {
+    let qty = parseInt(qtySpan.textContent, 10) || 1;
+    if (qty > 1) qtySpan.textContent = qty - 1;
+    refresh();
+  });
+
+  qtyPlus?.addEventListener('click', () => {
+    const variant = findVariant();
+    let qty = parseInt(qtySpan.textContent, 10) || 1;
+    if (variant && qty < variant.stock) qtySpan.textContent = qty + 1;
+    refresh();
+  });
+
+  addBtn?.addEventListener('click', () => {
+    if (!state.size || !state.color) {
+      showToast('Please select a size and color', 'warning');
+      return;
+    }
+    const variant = findVariant();
+    if (!variant || variant.stock <= 0) {
+      showToast('This size/color combination is out of stock', 'error');
+      return;
+    }
+    const qty = Math.min(parseInt(qtySpan.textContent, 10) || 1, variant.stock);
+
+    for (let i = 0; i < qty; i++) {
+      addToCart({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        images: product.images,
+        selectedSize: state.size,
+        selectedColor: state.color,
+      });
+    }
+
+    addToCartWithAnimation(addBtn, {});
+  });
+
+  refresh();
 }
 
 function changeImage(imageSrc, element) {
