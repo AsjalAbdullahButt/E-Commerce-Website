@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 load_dotenv()
 
+import database
 from services.admin_auth import AdminAuthService
 
 REQUIRED_PASSWORD_VARS = [
@@ -91,6 +92,9 @@ async def main():
     print("\n🔐 Login Credentials:")
     print("   URL: http://localhost:8080/admin/login.html")
     print("   Try any of the above email/password combinations\n")
+
+    # See seed_db.py's matching comment: disposes pooled connections before the loop closes.
+    await database.engine.dispose()
 
 if __name__ == '__main__':
     asyncio.run(main())

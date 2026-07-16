@@ -500,3 +500,99 @@ dedicated component and touches every list view; flagging rather than partially 
 `routes/promos.py` independently write the *same* field names, so no conflict today, though they
 are still two separate code paths for the same collection worth noting for a future consolidation
 — not in original list, low priority, not fixing now), `reviews_col`, `audit_logs_col`.
+
+## 14. Backend datastore migration — MongoDB to MySQL (2026-07-17)
+
+Full, direct cutover from Motor/PyMongo (schemaless documents) to MySQL 8.0.46 via SQLAlchemy 2.0
+async + `aiomysql`, requested mid-session once a real local MySQL instance became available. Not
+an additive/dual-write migration — every collection, route, and service that touched Mongo was
+ported in one pass; `pymongo`/`motor`/`mongomock-motor` are no longer dependencies anywhere in the
+app. All 91 backend tests pass against a real MySQL test database (`ecommerce_test`), and the
+golden path (register → login → list products → checkout → admin login → admin create product) was
+manually smoke-tested against the real `ecommerce` database via `uvicorn main:app`.
+
+**ID strategy.** Kept the *shape* of MongoDB's ObjectId (24 lowercase hex characters, roughly
+time-ordered) but dropped the dependency: `backend/utils/ids.py` is a ~15-line stdlib-only
+generator (4-byte timestamp + 5 random bytes + 3-byte counter, hex-encoded). Every existing
+`is_valid_id(x)` call-site pattern (46 occurrences across 15 files) kept working unchanged, and
+neither the frontend nor the test suite needed any changes for this (both were already
+ID-format-agnostic — confirmed via grep before deciding this). Stored as `CHAR(24) CHARACTER SET
+ascii COLLATE ascii_bin`, not `utf8mb4`, since hex is always ASCII and this avoids a 4x
+per-character storage/index overhead on every primary and foreign key in the schema. FK columns
+must share this exact charset/collation with the PK they reference — plain `String(24)` FK columns
+initially failed with MySQL error 3780 (incompatible collation) until every FK was declared with
+the same shared `ID_TYPE` constant from `db/base.py`.
+
+**Schema shape decisions.**
+
+- **Nested Mongo arrays became proper FK-linked child tables**: `product_variants`, `order_items`,
+  `order_status_history`, `order_notes` (one row per array element, not JSON blobs). This also
+  fixed a real pre-existing gap: `inventory_history` was one Mongo document per product with an
+  unboundedly-growing `logs[]` array and zero indexes, despite being queried by `product_id` — it's
+  now `inventory_history` with one row per log entry and an index on `product_id`.
+- **`orders.shipping_address` flattened onto `orders` directly** (`full_name`, `phone`, `address`,
+  `city`, `postal_code` columns) — it was always 1:1 with the order and never queried
+  independently, so a separate table would have bought nothing.
+- **`audit_logs` stayed one table, not two**, with an `entry_type` discriminator column
+  (`system_log` | `admin_action`). The admin Logs page (`AdminAuditService.get_logs`) needs one
+  unified time-sorted feed across both writers (`utils/logger.py::log_to_db` and
+  `AdminAuditService.log_action`); splitting would have required a `UNION` to reproduce that.
+- **`users`, `admin_users`, `riders` stayed three independent tables** — matches the pre-existing
+  design where the admin panel has its own account system (lockout, audit trail) separate from
+  customer accounts, not a byproduct of the migration. (This is why `seed/seed_db.py`'s "Admin
+  User" row lands in `users` with `role="admin"` and is *not* a valid `/admin/auth/login` account —
+  real admin-panel accounts only come from `seed/seed_admin.py`, which writes to `admin_users`. Not
+  a new inconsistency; the two account systems were already independent before this migration.)
+- No `relationship()` declarations anywhere — the app has zero cross-collection joins today
+  (confirmed via the original audit), so plain `select()` + explicit FK filters were simpler to
+  reason about than a relationship graph nobody would traverse.
+
+**Transactions.** `utils/db_transaction.py` — the dual-path real-Mongo-transaction vs.
+manual-compensating-rollback complexity that existed because `mongomock` couldn't create sessions —
+was deleted outright. MySQL/InnoDB always supports real ACID transactions, so one request-scoped
+SQLAlchemy session with commit-on-success/rollback-on-exception baked into `database.py::get_db()`
+gives full-request atomicity for free. `routes/orders.py::place_order`'s manual `decremented = [...]`
+compensating-rollback list and restore loop were deleted along with it — a plain `HTTPException` now
+rolls back the whole request correctly.
+
+**Variant stock atomicity.** Replaced Mongo's `$elemMatch` + `$gte` + positional-`$` atomic update
+with a plain `UPDATE product_variants SET stock = stock - :qty WHERE ... AND stock >= :qty`,
+checking `result.rowcount == 0` for the insufficient-stock case (`services/product.py::
+InventoryService`). InnoDB's `UPDATE ... WHERE` is always a locking read even under `REPEATABLE
+READ`, so concurrent checkouts of the same variant still correctly serialize on that row — same
+atomicity guarantee as before, not a weaker one.
+
+**Test isolation — deviation from the originally approved plan.** The plan called for SQLAlchemy
+2.0's `join_transaction_mode="create_savepoint"` per-test rollback pattern. This was abandoned
+during implementation after hitting a real, reproducible blocker: `TestClient` runs the ASGI app in
+its own internal event-loop portal, and an async SQLAlchemy session/connection created via a
+separate `asyncio.run()` call in a pytest fixture cannot safely be shared or reused across that
+different loop (surfaces as `AttributeError: 'NoneType' object has no attribute 'send'` on
+Windows' Proactor event loop). Switched instead to: `NullPool` for the test engine (a fresh
+connection per checkout, selected via a `TESTING=1` env var in `database.py`, so production keeps
+normal connection pooling) plus TRUNCATE-based per-test isolation in `tests/conftest.py` (every
+table truncated, FK checks temporarily disabled, before each test). Simpler than the savepoint
+pattern and sidesteps the cross-loop problem entirely, at the cost of being slightly slower per
+test than a savepoint rollback would be — not measured as a problem in practice (91 tests in
+~130-170s). `pytest-asyncio` was removed from `requirements.txt` after landing on this design, since
+it ended up using zero async fixtures/`@pytest.mark.asyncio` markers (confirmed via grep) — the
+dependency the original plan anticipated needing was never actually exercised.
+
+**What was deleted.** `models/admin.py`'s 4 document-builder functions (replaced by ORM
+constructors), `utils/db_transaction.py`, `scripts/migrate_timestamps_to_datetime.py` (its whole
+job — cleaning up ISO-string-vs-BSON-date drift — can't recur under MySQL's native `DATETIME`
+columns), `scripts/migrate_products_to_variants.py` (its `migrate()` function operated directly on
+Mongo documents and had no MySQL equivalent; its `build_variants_from_flat()`/`slugify()` helpers
+were genuinely still needed by `seed/seed_db.py`'s flat-shorthand product authoring, so those two
+functions were copied into `seed/seed_db.py` itself before the script was deleted, not lost).
+
+**Explicitly deferred, not part of this migration:** money columns (`price`, `subtotal`,
+`discount`, `tax`, `delivery_fee`, `total`) stay `Float`, matching the prior BSON-double behavior —
+switching to `DECIMAL(10,2)` would touch every Pydantic schema and JSON serialization path and is
+better done as its own explicit pass.
+
+**Verification.** 91/91 pytest suite green against real MySQL (`ecommerce_test`), confirmed after
+every service/route file was ported (not just once at the end). Manual smoke pass via `uvicorn
+main:app` against the real `ecommerce` database covered: customer register, login, product listing,
+full checkout (stock decrement + order + status history all landing correctly), admin login, and
+admin product creation — all functioned identically to the pre-migration behavior.
