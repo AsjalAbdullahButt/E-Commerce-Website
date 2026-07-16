@@ -1024,7 +1024,7 @@ async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(
 
     await orders_col.update_one(
         {"_id": oid},
-        {"$set": {"rider_id": rider_id, "updated_at": datetime.utcnow().isoformat()}},
+        {"$set": {"rider_id": rider_id, "updated_at": datetime.utcnow()}},
     )
     return {"success": True, "message": "Rider assigned"}
 

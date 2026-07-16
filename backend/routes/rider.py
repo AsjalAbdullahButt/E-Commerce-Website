@@ -76,7 +76,7 @@ async def update_profile(request: Request, body: RiderProfileUpdate, user=Depend
         updates["phone"] = body.phone
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
-    updates["updated_at"] = datetime.utcnow().isoformat()
+    updates["updated_at"] = datetime.utcnow()
     await riders_col.update_one({"_id": ObjectId(user["_id"])}, {"$set": updates})
     return {"success": True, "message": "Profile updated"}
 
@@ -84,7 +84,7 @@ async def update_profile(request: Request, body: RiderProfileUpdate, user=Depend
 @router.patch("/status")
 @limiter.limit("30/minute")
 async def set_status(request: Request, status: str = Query(..., regex="^(available|busy|offline)$"), user=Depends(require_rider)):
-    await riders_col.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"status": status, "updated_at": datetime.utcnow().isoformat()}})
+    await riders_col.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"status": status, "updated_at": datetime.utcnow()}})
     return {"success": True, "status": status}
 
 @router.get("/earnings")

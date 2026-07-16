@@ -25,7 +25,7 @@ async def add_to_wishlist(request: Request, product_id: str, user=Depends(get_cu
         await wishlist_col.insert_one({
             "user_id":    str(user["_id"]),
             "product_id": product_id,
-            "added_at":   datetime.utcnow().isoformat(),
+            "added_at":   datetime.utcnow(),
         })
     return {"message": "Added to wishlist"}
 

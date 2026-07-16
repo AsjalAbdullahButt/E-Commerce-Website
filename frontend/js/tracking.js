@@ -18,7 +18,7 @@ async function loadTrackingData() {
     // Safe: use textContent instead of innerHTML for user data
     const orderIdElement = document.querySelector('.order-id');
     if (orderIdElement) {
-      orderIdElement.textContent = `Order #${sanitizeString(orderId.substring(0, 8))}...`;
+      safeText(orderIdElement, `Order #${orderId.substring(0, 8)}...`);
     }
 
     // Status timeline with sanitized data. status_history (already returned by
@@ -71,7 +71,7 @@ async function loadTrackingData() {
         if (entry?.note) {
           const noteP = document.createElement('p');
           noteP.className = 'timeline-note';
-          noteP.textContent = sanitizeString(entry.note);
+          safeText(noteP, entry.note);
           content.appendChild(noteP);
         }
 
@@ -120,20 +120,20 @@ async function loadTrackingData() {
         imageDiv.className = 'item-image';
         const img = document.createElement('img');
         img.src = sanitizeUrl(item.image);
-        img.alt = sanitizeString(item.name || 'Product image');
+        img.alt = item.name || 'Product image';
         img.onerror = () => { img.src = '../images/fallback.jpg'; };
         imageDiv.appendChild(img);
-        
+
         const detailsDiv = document.createElement('div');
         detailsDiv.className = 'item-details';
-        
+
         const nameP = document.createElement('p');
         nameP.className = 'item-name';
-        nameP.textContent = sanitizeString(item.name || 'Unknown');
-        
+        safeText(nameP, item.name || 'Unknown');
+
         const optionsP = document.createElement('p');
         optionsP.className = 'item-options';
-        optionsP.textContent = `${sanitizeString(item.size || 'N/A')} · ${sanitizeString(item.color || 'N/A')}`;
+        safeText(optionsP, `${item.size || 'N/A'} · ${item.color || 'N/A'}`);
         
         const qtyP = document.createElement('p');
         qtyP.className = 'item-qty';
@@ -169,13 +169,13 @@ async function loadTrackingData() {
         addressDiv.className = 'shipping-address';
         
         const content = [
-          sanitizeString(addr.full_name || 'N/A'),
-          sanitizeString(addr.phone || 'N/A'),
-          sanitizeString(addr.address || 'N/A'),
-          `${sanitizeString(addr.city || 'N/A')}, ${sanitizeString(addr.postal_code || 'N/A')}`
+          addr.full_name || 'N/A',
+          addr.phone || 'N/A',
+          addr.address || 'N/A',
+          `${addr.city || 'N/A'}, ${addr.postal_code || 'N/A'}`
         ].join('\n');
-        
-        addressDiv.textContent = content;
+
+        safeText(addressDiv, content);
         shippingDiv.appendChild(title);
         shippingDiv.appendChild(addressDiv);
       }
@@ -190,17 +190,6 @@ async function loadTrackingData() {
 // ════════════════════════════════════════════════════
 // SANITIZATION FUNCTIONS
 // ════════════════════════════════════════════════════
-function sanitizeString(str) {
-  if (typeof str !== 'string') return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .substring(0, 500); // Limit length
-}
-
 function sanitizeUrl(url) {
   if (typeof url !== 'string') return '../images/fallback.jpg';
   // Only allow http, https, and data URLs

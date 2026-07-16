@@ -46,7 +46,7 @@ async def register(request: Request, body: UserCreate):
         "phone":      body.phone,
         "role":       "customer",
         "is_active":  True,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow(),
     }
     result = await users_col.insert_one(doc)
     user   = await users_col.find_one({"_id": result.inserted_id})
@@ -303,11 +303,11 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
         hashed = hash_password(new_pw)
         # Update in correct collection
         if role == "admin":
-            await admin_users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow().isoformat()}})
+            await admin_users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
         elif role == "rider":
-            await riders_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow().isoformat()}})
+            await riders_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
         else:
-            await users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow().isoformat()}})
+            await users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
 
         await log_to_db("PASSWORD_CHANGED", __name__, f"user {str(uid)} changed password", {"user_id": str(uid)})
         return {"success": True, "message": "Password changed successfully"}
@@ -387,7 +387,7 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
     await users_col.update_one(
         {"_id": user["_id"]},
         {
-            "$set": {"password": hash_password(new_pw), "updated_at": datetime.utcnow().isoformat()},
+            "$set": {"password": hash_password(new_pw), "updated_at": datetime.utcnow()},
             "$unset": {"reset_token_hash": "", "reset_token_expires": ""},
         },
     )
@@ -406,7 +406,7 @@ async def update_me(request: Request, body: UserUpdate, user=Depends(get_current
             update_data["name"] = sanitize_input(update_data["name"])
         if "address" in update_data:
             update_data["address"] = sanitize_input(update_data["address"])
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data["updated_at"] = datetime.utcnow()
 
         # Determine collection based on role
         role = user.get("role")

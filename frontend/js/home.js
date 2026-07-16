@@ -399,7 +399,7 @@ async function searchOrder() {
     const label1 = document.createElement('label');
     label1.textContent = 'Order Number';
     const p1 = document.createElement('p');
-    p1.textContent = sanitizeString(order.id);
+    safeText(p1, order.id);
     orderNumberDiv.appendChild(label1);
     orderNumberDiv.appendChild(p1);
 
@@ -463,7 +463,7 @@ async function searchOrder() {
     if (Array.isArray(order.items)) {
       order.items.forEach(item => {
         const li = document.createElement('li');
-        li.textContent = sanitizeString(item);
+        safeText(li, item);
         itemsList.appendChild(li);
       });
     }
@@ -497,10 +497,10 @@ async function searchOrder() {
         content.className = 'timeline-content';
 
         const stageStrong = document.createElement('strong');
-        stageStrong.textContent = sanitizeString(item.stage);
+        safeText(stageStrong, item.stage);
 
         const dateSpan = document.createElement('span');
-        dateSpan.textContent = sanitizeString(item.date);
+        safeText(dateSpan, item.date);
 
         content.appendChild(stageStrong);
         content.appendChild(dateSpan);
@@ -526,17 +526,6 @@ async function searchOrder() {
 // ════════════════════════════════════════════════════
 // SANITIZATION FUNCTIONS
 // ════════════════════════════════════════════════════
-function sanitizeString(str) {
-  if (typeof str !== 'string') return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .substring(0, 500); // Limit length
-}
-
 function sanitizeNumber(num) {
   const parsed = parseFloat(num);
   return isNaN(parsed) ? 0 : parsed;

@@ -31,7 +31,7 @@ async def add_review(request: Request, body: ReviewCreate, user=Depends(get_curr
         **body.dict(),
         "user_id":    str(user["_id"]),
         "user_name":  user["name"],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow(),
     }
     await reviews_col.insert_one(doc)
 
