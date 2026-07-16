@@ -24,6 +24,7 @@ import asyncio  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 import database  # noqa: E402
 from main import app  # noqa: E402
+from utils.limiter import limiter  # noqa: E402
 
 
 async def _clear_all_collections():
@@ -37,8 +38,15 @@ async def _clear_all_collections():
 
 @pytest.fixture()
 def client():
-    """A TestClient against the real app, with every collection cleared before each test."""
+    """A TestClient against the real app, with every collection cleared before each test.
+
+    Also resets slowapi's in-memory rate-limit storage — it's process-global state (the same
+    limitation tracked in NOTES_schema_audit.md §7/task 6), so without a reset, tests that hit a
+    tightly-limited endpoint (e.g. /auth/register at 3/minute) start failing once enough tests in
+    the same pytest run have exercised it, regardless of test order.
+    """
     asyncio.run(_clear_all_collections())
+    limiter.reset()
     with TestClient(app) as c:
         yield c
 

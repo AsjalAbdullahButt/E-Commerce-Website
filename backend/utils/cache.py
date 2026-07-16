@@ -2,7 +2,10 @@ import asyncio
 import time
 from typing import Any, Optional
 
-
+# Process-local in-memory cache — no Redis or other shared backend. Safe only for a
+# single-worker deployment (see config/settings.py::web_concurrency and main.py's startup
+# check); with multiple worker processes, each has its own independent cache, so a write in one
+# worker does not invalidate stale entries cached by another. See NOTES_schema_audit.md §7.
 _cache: dict[str, tuple[float, Any]] = {}
 _lock = asyncio.Lock()
 

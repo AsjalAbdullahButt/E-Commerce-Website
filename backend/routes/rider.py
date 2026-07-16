@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import orders_col
 from models.order import OrderStatusUpdate
+from schemas.rider import RiderProfileUpdate
 from middleware.auth_middleware import require_rider
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
@@ -67,12 +68,12 @@ async def get_profile(request: Request, user=Depends(require_rider)):
 
 @router.patch("/profile")
 @limiter.limit("20/minute")
-async def update_profile(request: Request, name: str = None, phone: str = None, user=Depends(require_rider)):
+async def update_profile(request: Request, body: RiderProfileUpdate, user=Depends(require_rider)):
     updates = {}
-    if name:
-        updates["name"] = name
-    if phone:
-        updates["phone"] = phone
+    if body.name:
+        updates["name"] = body.name
+    if body.phone:
+        updates["phone"] = body.phone
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
     updates["updated_at"] = datetime.utcnow().isoformat()

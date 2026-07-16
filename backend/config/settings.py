@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # ── Security ───────────────────────────────────────────────────────────
     cookie_secure: bool = False                    # Set True in production (HTTPS)
     docs_enabled: bool = False                     # Enable explicitly in development
+
+    # ── Deployment ─────────────────────────────────────────────────────────
+    # utils/cache.py and utils/limiter.py are process-local (in-memory dict / slowapi default
+    # storage) — there is no Redis or other shared backend. Running more than one worker process
+    # means each worker has its own independent cache and rate-limit counters, so cache
+    # invalidation and rate limits silently stop being consistent across requests. Set this to
+    # match whatever --workers/-w value actually launches the app so main.py can fail fast
+    # instead of degrading silently. See NOTES_schema_audit.md §7 / README "Deployment".
+    web_concurrency: int = 1
     
     # ── Rate Limiting (requests/minute) ────────────────────────────────────
     rate_login: str = "5/minute"

@@ -8,7 +8,7 @@ from config import settings
 from database import client, users_col, products_col, orders_col, reviews_col, wishlist_col, promos_col, admin_users_col, riders_col, audit_logs_col
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
-from routes import auth, products, orders, reviews, wishlist, promos, users, rider, admin
+from routes import auth, products, orders, reviews, wishlist, promos, rider, admin
 from middleware.admin_auth import AdminAuthMiddleware
 import time
 
@@ -93,8 +93,28 @@ async def add_request_id(request: Request, call_next):
     return response
 
 # ── Startup ────────────────────────────────────────────────────────────────────
+def check_single_worker_deployment() -> None:
+    """utils/cache.py and utils/limiter.py are process-local in-memory stores (no Redis or other
+    shared backend). Running more than one worker process means each worker has its own
+    independent cache and rate-limit counters, so cache invalidation and rate limits silently
+    stop being consistent across requests. Fail fast in production rather than degrade silently;
+    warn loudly elsewhere so local perf testing with multiple workers isn't blocked outright."""
+    if settings.web_concurrency <= 1:
+        return
+    message = (
+        f"web_concurrency={settings.web_concurrency} but utils/cache.py and utils/limiter.py "
+        "are process-local (no Redis backend) — cache invalidation and rate limits will be "
+        "inconsistent across workers. Set WEB_CONCURRENCY=1 (single worker) or wire up a shared "
+        "Redis-backed cache/limiter before scaling horizontally."
+    )
+    if settings.is_production:
+        raise RuntimeError(message)
+    print(f"    ⚠️  {message}\n")
+
+
 @app.on_event("startup")
 async def startup_db_check():
+    check_single_worker_deployment()
     print("\n    ╔════════════════════════════════════╗")
     print("    ║   🛍️  E-COMMERCE API v2.0  🛍️      ║")
     print("    ╠════════════════════════════════════╣")
@@ -158,10 +178,12 @@ app.include_router(orders.router,   prefix="/orders",   tags=["Orders"])
 app.include_router(reviews.router,  prefix="/reviews",  tags=["Reviews"])
 app.include_router(wishlist.router, prefix="/wishlist", tags=["Wishlist"])
 app.include_router(promos.router,   prefix="/promos",   tags=["Promos"])
-app.include_router(users.router,    prefix="/users",    tags=["Users"])
 app.include_router(rider.router,    prefix="/rider",    tags=["Rider"])
 app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
 # Note: admin_new merged into admin.py — only the canonical admin router is mounted.
+# Note: routes/users.py (duplicate ban/unban/delete gated only by role membership, not the
+# granular permission matrix) was deleted — /admin/users/* is the single path for user
+# management. See NOTES_schema_audit.md §5.
 
 @app.get("/", tags=["Health"])
 async def root():
