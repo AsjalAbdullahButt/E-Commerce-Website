@@ -46,14 +46,14 @@ class OrderService:
 
         history_entry = {
             "status": new_status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow(),
             "note": note or "",
         }
 
         await orders_col.update_one(
             {"_id": ObjectId(order_id)},
             {
-                "$set": {"status": new_status, "updated_at": datetime.utcnow().isoformat()},
+                "$set": {"status": new_status, "updated_at": datetime.utcnow()},
                 "$push": {"status_history": history_entry}
             }
         )

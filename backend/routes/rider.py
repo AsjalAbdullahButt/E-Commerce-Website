@@ -48,10 +48,10 @@ async def update_delivery_status(request: Request, order_id: str, body: OrderSta
         raise HTTPException(status_code=403, detail="Not assigned to this order")
     assert_valid_transition(order["status"], body.status)
 
-    history_entry = {"status": body.status, "timestamp": datetime.utcnow().isoformat(), "note": body.note or ""}
+    history_entry = {"status": body.status, "timestamp": datetime.utcnow(), "note": body.note or ""}
     await orders_col.update_one(
         {"_id": oid},
-        {"$set": {"status": body.status, "updated_at": datetime.utcnow().isoformat()}, "$push": {"status_history": history_entry}},
+        {"$set": {"status": body.status, "updated_at": datetime.utcnow()}, "$push": {"status_history": history_entry}},
     )
     return {"message": "Status updated"}
 
@@ -114,7 +114,7 @@ async def get_earnings(request: Request, user=Depends(require_rider)):
         this_month = await orders_col.count_documents({
             "rider_id": str(user["_id"]),
             "status": "delivered",
-            "created_at": {"$gte": month_start.isoformat()}
+            "created_at": {"$gte": month_start}
         })
         
         this_month_earnings = this_month * delivery_fee
@@ -162,15 +162,15 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
     try:
         history_entry = {
             "status": "delivered",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow(),
             "note": "Delivered by rider",
             "proof_image": proof_image_url
         }
-        
+
         await orders_col.update_one(
             {"_id": oid},
             {
-                "$set": {"status": "delivered", "updated_at": datetime.utcnow().isoformat()},
+                "$set": {"status": "delivered", "updated_at": datetime.utcnow()},
                 "$push": {"status_history": history_entry}
             }
         )

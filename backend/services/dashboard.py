@@ -5,12 +5,6 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# NOTE: `created_at` on orders is currently stored as an ISO string (routes/orders.py) while
-# this module compares against native `datetime` objects. Comparing a BSON string field to a
-# datetime in a Mongo query silently matches nothing. Tracked and fixed in NOTES_schema_audit.md
-# §7 / task 9 (timestamp standardization) — left as-is here since fixing it requires touching
-# every order write path in one coordinated pass, not just the read side.
-
 class DashboardService:
     """Dashboard analytics service"""
 

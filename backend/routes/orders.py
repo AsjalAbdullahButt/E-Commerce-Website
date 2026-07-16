@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from database import orders_col, promos_col, products_col
+from database import orders_col, promos_col, products_col, client as mongo_client
 from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, require_admin
 from services.product import InventoryService
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
+from utils.db_transaction import maybe_transaction
 from datetime import datetime
 from bson import ObjectId
 from fastapi import Query
@@ -32,128 +33,140 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     A client sending price=1 for a Rs5000 item will be charged the real price.
     """
     resolved_items = []
-    decremented = []  # [(product_id, size, color, quantity)] — for compensating rollback on failure
+    decremented = []  # [(product_id, size, color, quantity)] — for compensating rollback when no
+                       # DB transaction is available (see utils/db_transaction.py)
     subtotal = 0.0
-
-    try:
-        for item in body.items:
-            # ── CRITICAL: fetch real price from DB ──────────────────────────────
-            try:
-                oid = ObjectId(item.product_id)
-            except Exception as e:
-                await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": str(e), "user_id": str(user["_id"])})
-                raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
-
-            product = await products_col.find_one({"_id": oid, "is_active": True})
-            if not product:
-                raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
-
-            variant = next(
-                (v for v in product.get("variants", []) if v.get("size") == item.size and v.get("color") == item.color),
-                None,
-            )
-            if not variant:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"'{product['name']}' has no {item.size}/{item.color} variant",
-                )
-            if int(variant.get("stock", 0)) < item.quantity:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Insufficient stock for '{product['name']}' ({item.size}/{item.color}). Available: {variant.get('stock', 0)}",
-                )
-
-            # Atomically decrement the matching variant's stock to avoid race conditions
-            decremented_ok = await InventoryService.decrement_variant_stock(
-                item.product_id, item.size, item.color, item.quantity
-            )
-            if not decremented_ok:
-                raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product['name']}'. Please refresh.")
-            decremented.append((item.product_id, item.size, item.color, item.quantity))
-
-            real_price = float(product["price"])
-            line_total = real_price * item.quantity
-            subtotal  += line_total
-
-            resolved_items.append({
-                "product_id": item.product_id,
-                "name":       product["name"],
-                "price":      real_price,          # ← always server price
-                "quantity":   item.quantity,
-                "size":       item.size,
-                "color":      item.color,
-                "image":      item.image,
-            })
-    except HTTPException:
-        # Compensating rollback: restore any variant stock already decremented earlier in this loop.
-        for product_id, size, color, quantity in decremented:
-            await InventoryService.restore_variant_stock(product_id, size, color, quantity)
-        raise
-
     discount = 0.0
 
-    # Apply promo code if provided
-    if body.promo_code:
-        promo = await promos_col.find_one({
-            "code": body.promo_code.upper(),
-            "is_active": True,
-        })
-        if not promo:
-            raise HTTPException(status_code=400, detail="Invalid or expired promo code")
-
-        # Robust expiry check: promo.expires_at may be stored as datetime
-        expires = promo.get("expires_at")
-        if expires:
-            if isinstance(expires, str):
+    # Stock decrement, promo increment, and the order insert must all succeed or all fail
+    # together — a promo code rejected *after* stock was already decremented (or a crash between
+    # the two) used to leave stock permanently decremented with no order to show for it. Wrapped
+    # in a real MongoDB transaction where the deployment supports it (replica set/Atlas); falls
+    # back to the compensating rollback below under mongomock (this repo's test environment,
+    # which cannot create sessions at all). See NOTES_schema_audit.md §9.
+    async with maybe_transaction(mongo_client) as session:
+        try:
+            for item in body.items:
+                # ── CRITICAL: fetch real price from DB ──────────────────────────────
                 try:
-                    expires = datetime.fromisoformat(expires)
-                except Exception:
-                    expires = None
-        if expires and expires < datetime.utcnow():
-            raise HTTPException(status_code=400, detail="Promo code has expired")
+                    oid = ObjectId(item.product_id)
+                except Exception as e:
+                    await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": str(e), "user_id": str(user["_id"])})
+                    raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
 
-        if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
-            raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+                product = await products_col.find_one({"_id": oid, "is_active": True}, session=session)
+                if not product:
+                    raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
 
-        min_order = float(promo.get("min_order", 0) or 0)
-        if subtotal < min_order:
-            raise HTTPException(status_code=400, detail=f"Minimum order of Rs {min_order} required")
+                variant = next(
+                    (v for v in product.get("variants", []) if v.get("size") == item.size and v.get("color") == item.color),
+                    None,
+                )
+                if not variant:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"'{product['name']}' has no {item.size}/{item.color} variant",
+                    )
+                if int(variant.get("stock", 0)) < item.quantity:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient stock for '{product['name']}' ({item.size}/{item.color}). Available: {variant.get('stock', 0)}",
+                    )
 
-        if promo["discount_type"] == "percentage":
-            discount = subtotal * (promo["discount_value"] / 100)
-        else:
-            discount = float(promo["discount_value"])
+                # Atomically decrement the matching variant's stock to avoid race conditions
+                decremented_ok = await InventoryService.decrement_variant_stock(
+                    item.product_id, item.size, item.color, item.quantity, session=session
+                )
+                if not decremented_ok:
+                    raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product['name']}'. Please refresh.")
+                decremented.append((item.product_id, item.size, item.color, item.quantity))
 
-        await promos_col.update_one({"_id": promo["_id"]}, {"$inc": {"uses": 1}})
+                real_price = float(product["price"])
+                line_total = real_price * item.quantity
+                subtotal  += line_total
 
-    after_discount = subtotal - discount
-    tax            = after_discount * TAX_RATE
-    total          = after_discount + tax + DELIVERY_FEE
+                resolved_items.append({
+                    "product_id": item.product_id,
+                    "name":       product["name"],
+                    "price":      real_price,          # ← always server price
+                    "quantity":   item.quantity,
+                    "size":       item.size,
+                    "color":      item.color,
+                    "image":      item.image,
+                })
 
-    doc = {
-        "user_id":           str(user["_id"]),
-        "items":             resolved_items,
-        "shipping_address":  body.shipping_address.dict(),
-        "payment_method":    (body.payment_method or "cod").lower(),
-        "payment_reference": body.payment_reference or None,
-        "promo_code":        body.promo_code or None,
-        "subtotal":          round(subtotal, 2),
-        "discount":          round(discount, 2),
-        "tax":               round(tax, 2),
-        "delivery_fee":      DELIVERY_FEE,
-        "total":             round(total, 2),
-        "status":            "pending",
-        "rider_id":          None,
-        "status_history":    [{
-            "status":    "pending",
-            "timestamp": datetime.utcnow().isoformat(),
-            "note":      "Order placed",
-        }],
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-    }
-    result = await orders_col.insert_one(doc)
-    order  = await orders_col.find_one({"_id": result.inserted_id})
+            # Apply promo code if provided
+            if body.promo_code:
+                promo = await promos_col.find_one({
+                    "code": body.promo_code.upper(),
+                    "is_active": True,
+                }, session=session)
+                if not promo:
+                    raise HTTPException(status_code=400, detail="Invalid or expired promo code")
+
+                # Robust expiry check: promo.expires_at may be stored as datetime
+                expires = promo.get("expires_at")
+                if expires:
+                    if isinstance(expires, str):
+                        try:
+                            expires = datetime.fromisoformat(expires)
+                        except Exception:
+                            expires = None
+                if expires and expires < datetime.utcnow():
+                    raise HTTPException(status_code=400, detail="Promo code has expired")
+
+                if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
+                    raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+
+                min_order = float(promo.get("min_order", 0) or 0)
+                if subtotal < min_order:
+                    raise HTTPException(status_code=400, detail=f"Minimum order of Rs {min_order} required")
+
+                if promo["discount_type"] == "percentage":
+                    discount = subtotal * (promo["discount_value"] / 100)
+                else:
+                    discount = float(promo["discount_value"])
+
+                await promos_col.update_one({"_id": promo["_id"]}, {"$inc": {"uses": 1}}, session=session)
+
+            after_discount = subtotal - discount
+            tax            = after_discount * TAX_RATE
+            total          = after_discount + tax + DELIVERY_FEE
+
+            doc = {
+                "user_id":           str(user["_id"]),
+                "items":             resolved_items,
+                "shipping_address":  body.shipping_address.dict(),
+                "payment_method":    (body.payment_method or "cod").lower(),
+                "payment_reference": body.payment_reference or None,
+                "promo_code":        body.promo_code or None,
+                "subtotal":          round(subtotal, 2),
+                "discount":          round(discount, 2),
+                "tax":               round(tax, 2),
+                "delivery_fee":      DELIVERY_FEE,
+                "total":             round(total, 2),
+                "status":            "pending",
+                "rider_id":          None,
+                "status_history":    [{
+                    "status":    "pending",
+                    "timestamp": datetime.utcnow(),
+                    "note":      "Order placed",
+                }],
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+            result = await orders_col.insert_one(doc, session=session)
+            order  = await orders_col.find_one({"_id": result.inserted_id}, session=session)
+        except HTTPException:
+            if session is None:
+                # No transaction support in this deployment (mongomock in tests) — manually
+                # undo the stock already decremented earlier in this request. When a real
+                # transaction IS active, exiting session.start_transaction() on this exception
+                # already aborted every write above atomically, so no manual undo is needed.
+                for product_id, size, color, quantity in decremented:
+                    await InventoryService.restore_variant_stock(product_id, size, color, quantity)
+            raise
+
     return serialize(order)
 
 @router.get("/me", response_model=OrderListResponse)
@@ -211,12 +224,12 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
 
     history_entry = {
         "status":    body.status,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow(),
         "note":      body.note or "",
     }
     await orders_col.update_one(
         {"_id": oid},
-        {"$set": {"status": body.status, "updated_at": datetime.utcnow().isoformat()}, "$push": {"status_history": history_entry}},
+        {"$set": {"status": body.status, "updated_at": datetime.utcnow()}, "$push": {"status_history": history_entry}},
     )
     return {"message": "Status updated"}
 
@@ -250,12 +263,12 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
     try:
         history_entry = {
             "status": "cancelled",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow(),
             "note": "Cancelled by user",
         }
         await orders_col.update_one(
             {"_id": oid},
-            {"$set": {"status": "cancelled", "updated_at": datetime.utcnow().isoformat()}, "$push": {"status_history": history_entry}}
+            {"$set": {"status": "cancelled", "updated_at": datetime.utcnow()}, "$push": {"status_history": history_entry}}
         )
         # Restore variant stock for items in cancelled order
         for it in order.get("items", []):

@@ -34,7 +34,10 @@ async def legacy_stats(request: Request, _=Depends(verify_admin_token)):
         total_orders = await orders_col.count_documents({})
         total_users = await users_col.count_documents({"role": "customer"})
 
+        # Named explicitly: revenue excluding cancelled orders (a cancelled order was never
+        # actually fulfilled/paid for, so it shouldn't inflate revenue). See NOTES_schema_audit.md §9.
         revenue_agg = await orders_col.aggregate([
+            {"$match": {"status": {"$ne": "cancelled"}}},
             {"$group": {"_id": None, "total_revenue": {"$sum": "$total"}}}
         ]).to_list(length=1)
         total_revenue = revenue_agg[0]["total_revenue"] if revenue_agg else 0
@@ -88,7 +91,13 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token)):
                 }
             }
         ]).to_list(length=20)
-        total_revenue = round(sum(float(item["revenue"] or 0) for item in status_agg), 2)
+        # status_agg (and the orders_by_status/revenue_by_status chart data built from it below)
+        # intentionally keeps every status, including cancelled — that breakdown is exactly where
+        # an admin would want to see cancelled-order revenue. The single total_revenue KPI is a
+        # different question ("how much did we actually make") and must exclude it.
+        total_revenue = round(
+            sum(float(item["revenue"] or 0) for item in status_agg if item["_id"] != "cancelled"), 2
+        )
 
         product_agg = await orders_col.aggregate([
             {"$unwind": "$items"},
@@ -192,8 +201,10 @@ async def revenue_analytics(request: Request, _=Depends(verify_admin_token)):
             {"$sort": {"revenue": -1}}
         ]
         status_revenue = await orders_col.aggregate(pipeline).to_list(length=10)
-        
+
+        # Same "excludes cancelled" semantic as legacy_stats/dashboard_summary — see NOTES_schema_audit.md §9.
         total_revenue_agg = await orders_col.aggregate([
+            {"$match": {"status": {"$ne": "cancelled"}}},
             {"$group": {"_id": None, "total": {"$sum": "$total"}}}
         ]).to_list(length=1)
         total_revenue = total_revenue_agg[0]["total"] if total_revenue_agg else 0

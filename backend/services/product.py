@@ -178,13 +178,16 @@ class InventoryService:
     """Inventory management service"""
 
     @staticmethod
-    async def decrement_variant_stock(product_id: str, size: str, color: str, quantity: int) -> bool:
+    async def decrement_variant_stock(product_id: str, size: str, color: str, quantity: int, session=None) -> bool:
         """Atomically decrement stock for the variant matching (size, color).
 
         Uses a single `elemMatch` + positional-`$` update so concurrent checkouts can't both
         pass a stale read-then-write check (the race the old flat-schema decrement guarded
         against). Returns False if no variant with enough stock matched — caller should treat
         that as "insufficient stock" or "no such size/color".
+
+        `session`: pass the session from utils/db_transaction.py::maybe_transaction to make this
+        write part of a larger multi-document transaction (see routes/orders.py::place_order).
         """
         oid = ObjectId(product_id)
         result = await products_col.update_one(
@@ -200,12 +203,14 @@ class InventoryService:
                     "total_stock": -quantity,
                 }
             },
+            session=session,
         )
         return result.modified_count > 0
 
     @staticmethod
-    async def restore_variant_stock(product_id: str, size: str, color: str, quantity: int) -> bool:
-        """Atomically restore stock for the variant matching (size, color) — used on cancel."""
+    async def restore_variant_stock(product_id: str, size: str, color: str, quantity: int, session=None) -> bool:
+        """Atomically restore stock for the variant matching (size, color) — used on cancel and
+        as the compensating rollback when no DB transaction is available (see `session` above)."""
         try:
             oid = ObjectId(product_id)
         except Exception:
@@ -218,6 +223,7 @@ class InventoryService:
                     "total_stock": quantity,
                 }
             },
+            session=session,
         )
         return result.modified_count > 0
 
