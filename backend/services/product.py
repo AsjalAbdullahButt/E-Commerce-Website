@@ -1,18 +1,50 @@
-from fastapi import HTTPException, status
-from database import products_col, inventory_history_col, audit_logs_col, admin_users_col
-from models.admin import product_document, inventory_history_document, inventory_log_entry
-from bson import ObjectId
 from datetime import datetime
 from typing import List, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.product import InventoryHistoryEntry, Product, ProductVariant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _variant_to_dict(v: ProductVariant) -> dict:
+    return {"size": v.size, "color": v.color, "sku": v.sku, "stock": v.stock}
+
+
+async def _product_to_dict(db: AsyncSession, product: Product) -> dict:
+    result = await db.execute(select(ProductVariant).where(ProductVariant.product_id == product.id))
+    variants = [_variant_to_dict(v) for v in result.scalars().all()]
+    return {
+        "id": product.id,
+        "name": product.name,
+        "description": product.description,
+        "category": product.category,
+        "price": product.price,
+        "discount_percentage": product.discount_percentage,
+        "discount_price": product.price * (1 - product.discount_percentage / 100),
+        "variants": variants,
+        "tags": product.tags or [],
+        "images": product.images or [],
+        "total_stock": product.total_stock,
+        "is_active": product.is_active,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+        "created_by": product.created_by,
+        "rating": product.rating,
+        "review_count": product.review_count,
+    }
+
 
 class ProductService:
     """Product management service"""
 
     @staticmethod
     async def create_product(
+        db: AsyncSession,
         name: str,
         description: str,
         category: str,
@@ -24,211 +56,230 @@ class ProductService:
         admin_id: str,
     ) -> str:
         """Create new product"""
-        doc = product_document(
+        total_stock = sum(v.get("stock", 0) for v in variants)
+        product = Product(
             name=name,
             description=description,
             category=category,
             price=price,
             discount_percentage=discount_percentage,
-            variants=variants,
             tags=tags,
             images=images,
+            total_stock=total_stock,
+            is_active=True,
+            created_by=admin_id,
         )
-        doc["created_by"] = admin_id
-        
-        result = await products_col.insert_one(doc)
-        product_id = str(result.inserted_id)
-        
-        # Create inventory history document
-        inv_history = inventory_history_document(product_id)
-        inv_history["initial_variants"] = variants
-        await inventory_history_col.insert_one(inv_history)
-        
-        logger.info(f"Product created: {name} ({product_id}) by admin {admin_id}")
-        return product_id
+        db.add(product)
+        await db.flush()  # populate product.id before referencing it in variants
+
+        for v in variants:
+            db.add(ProductVariant(
+                product_id=product.id,
+                size=v["size"],
+                color=v["color"],
+                sku=v["sku"],
+                stock=v.get("stock", 0),
+            ))
+
+        logger.info(f"Product created: {name} ({product.id}) by admin {admin_id}")
+        return product.id
 
     @staticmethod
-    async def get_product(product_id: str) -> dict:
+    async def get_product(db: AsyncSession, product_id: str) -> dict:
         """Get product by ID"""
-        product = await products_col.find_one(
-            {"_id": ObjectId(product_id)}
-        )
-        
+        product = await db.get(Product, product_id)
+
         if not product:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Product not found"
             )
-        
-        product["id"] = str(product["_id"])
-        del product["_id"]
-        return product
+
+        return await _product_to_dict(db, product)
 
     @staticmethod
     async def update_product(
+        db: AsyncSession,
         product_id: str,
         updates: dict,
         admin_id: str,
     ) -> dict:
         """Update product"""
-        product = await ProductService.get_product(product_id)
-        
-        # Recalculate total stock if variants changed
-        if "variants" in updates:
-            updates["total_stock"] = sum(v.get('stock', 0) for v in updates["variants"])
-            updates["discount_price"] = updates.get("price", product["price"]) * (1 - updates.get("discount_percentage", product["discount_percentage"]) / 100)
-        
-        updates["updated_at"] = datetime.utcnow()
-        
-        await products_col.update_one(
-            {"_id": ObjectId(product_id)},
-            {"$set": updates}
-        )
-        
+        current = await ProductService.get_product(db, product_id)
+        product = await db.get(Product, product_id)
+
+        variants = updates.pop("variants", None)
+        if variants is not None:
+            updates["total_stock"] = sum(v.get("stock", 0) for v in variants)
+            # Replace the whole variant set (matches the old $set: {variants: [...]} semantics).
+            await db.execute(delete(ProductVariant).where(ProductVariant.product_id == product_id))
+            for v in variants:
+                db.add(ProductVariant(
+                    product_id=product_id,
+                    size=v["size"],
+                    color=v["color"],
+                    sku=v["sku"],
+                    stock=v.get("stock", 0),
+                ))
+
+        for key, value in updates.items():
+            setattr(product, key, value)
+        product.updated_at = datetime.utcnow()
+        await db.flush()
+
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
+            db,
             admin_id=admin_id,
             admin_name="System",
             action="update_product",
             entity_type="product",
             entity_id=product_id,
-            changes={k: {"old": product.get(k), "new": v} for k, v in updates.items() if k != "updated_at"},
+            changes={k: {"old": current.get(k), "new": v} for k, v in {**updates, "variants": variants}.items() if v is not None},
             ip_address="0.0.0.0"
         )
-        
+
         logger.info(f"Product updated: {product_id} by admin {admin_id}")
-        return await ProductService.get_product(product_id)
+        return await ProductService.get_product(db, product_id)
 
     @staticmethod
-    async def delete_product(product_id: str, admin_id: str) -> bool:
+    async def delete_product(db: AsyncSession, product_id: str, admin_id: str) -> bool:
         """Soft delete product. `is_active: False` is the single source of truth for
         visibility — there is no separate `is_deleted` flag."""
-        product = await ProductService.get_product(product_id)
+        current = await ProductService.get_product(db, product_id)
+        product = await db.get(Product, product_id)
 
-        await products_col.update_one(
-            {"_id": ObjectId(product_id)},
-            {
-                "$set": {
-                    "is_active": False,
-                    "updated_at": datetime.utcnow()
-                }
-            }
-        )
+        product.is_active = False
+        product.updated_at = datetime.utcnow()
 
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
+            db,
             admin_id=admin_id,
             admin_name="System",
             action="delete_product",
             entity_type="product",
             entity_id=product_id,
-            changes={"is_active": {"old": product.get("is_active", True), "new": False}},
+            changes={"is_active": {"old": current.get("is_active", True), "new": False}},
             ip_address="0.0.0.0"
         )
-        
+
         logger.info(f"Product soft deleted: {product_id} by admin {admin_id}")
         return True
 
     @staticmethod
     async def list_products(
+        db: AsyncSession,
         category: Optional[str] = None,
         is_active: Optional[bool] = None,
         limit: int = 50,
         skip: int = 0,
     ) -> tuple:
         """List products with filtering"""
-        query = {}
+        query = select(Product)
+        count_query = select(func.count()).select_from(Product)
 
         if category:
-            query["category"] = category
+            query = query.where(Product.category == category)
+            count_query = count_query.where(Product.category == category)
         if is_active is not None:
-            query["is_active"] = is_active
-        
-        cursor = products_col.find(query).sort("created_at", -1).skip(skip).limit(limit)
-        products = await cursor.to_list(length=limit)
-        
-        # Convert ObjectId
+            query = query.where(Product.is_active == is_active)
+            count_query = count_query.where(Product.is_active == is_active)
+
+        query = query.order_by(Product.created_at.desc()).offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        products = result.scalars().all()
+
+        if products:
+            ids = [p.id for p in products]
+            variant_result = await db.execute(select(ProductVariant).where(ProductVariant.product_id.in_(ids)))
+            variants_by_product: dict = {}
+            for v in variant_result.scalars().all():
+                variants_by_product.setdefault(v.product_id, []).append(_variant_to_dict(v))
+        else:
+            variants_by_product = {}
+
+        out = []
         for p in products:
-            p["id"] = str(p["_id"])
-            del p["_id"]
-        
-        total = await products_col.count_documents(query)
-        return products, total
+            out.append({
+                "id": p.id, "name": p.name, "description": p.description, "category": p.category,
+                "price": p.price, "discount_percentage": p.discount_percentage,
+                "discount_price": p.price * (1 - p.discount_percentage / 100),
+                "variants": variants_by_product.get(p.id, []),
+                "tags": p.tags or [], "images": p.images or [], "total_stock": p.total_stock,
+                "is_active": p.is_active, "created_at": p.created_at, "updated_at": p.updated_at,
+                "created_by": p.created_by, "rating": p.rating, "review_count": p.review_count,
+            })
+
+        total = (await db.execute(count_query)).scalar_one()
+        return out, total
 
     @staticmethod
-    async def get_low_stock_items(threshold: int = 10) -> List[dict]:
+    async def get_low_stock_items(db: AsyncSession, threshold: int = 10) -> List[dict]:
         """Get products with low stock"""
-        products = await products_col.find(
-            {
-                "is_active": True,
-                "total_stock": {"$lte": threshold}
-            }
-        ).to_list(length=100)
-        
-        for p in products:
-            p["id"] = str(p["_id"])
-            del p["_id"]
-        
-        return products
+        result = await db.execute(
+            select(Product).where(Product.is_active == True, Product.total_stock <= threshold)  # noqa: E712
+        )
+        products = result.scalars().all()
+        return [await _product_to_dict(db, p) for p in products]
 
 
 class InventoryService:
     """Inventory management service"""
 
     @staticmethod
-    async def decrement_variant_stock(product_id: str, size: str, color: str, quantity: int, session=None) -> bool:
+    async def decrement_variant_stock(db: AsyncSession, product_id: str, size: str, color: str, quantity: int) -> bool:
         """Atomically decrement stock for the variant matching (size, color).
 
-        Uses a single `elemMatch` + positional-`$` update so concurrent checkouts can't both
-        pass a stale read-then-write check (the race the old flat-schema decrement guarded
-        against). Returns False if no variant with enough stock matched — caller should treat
-        that as "insufficient stock" or "no such size/color".
-
-        `session`: pass the session from utils/db_transaction.py::maybe_transaction to make this
-        write part of a larger multi-document transaction (see routes/orders.py::place_order).
+        `UPDATE ... WHERE stock >= :qty` is always a locking read under InnoDB (even at
+        REPEATABLE READ), so concurrent checkouts of the same variant correctly serialize on
+        that row — same atomicity guarantee the old Mongo elemMatch+positional-$ update gave.
+        Returns False if no variant with enough stock matched.
         """
-        oid = ObjectId(product_id)
-        result = await products_col.update_one(
-            {
-                "_id": oid,
-                "variants": {
-                    "$elemMatch": {"size": size, "color": color, "stock": {"$gte": quantity}}
-                },
-            },
-            {
-                "$inc": {
-                    "variants.$.stock": -quantity,
-                    "total_stock": -quantity,
-                }
-            },
-            session=session,
+        result = await db.execute(
+            update(ProductVariant)
+            .where(
+                ProductVariant.product_id == product_id,
+                ProductVariant.size == size,
+                ProductVariant.color == color,
+                ProductVariant.stock >= quantity,
+            )
+            .values(stock=ProductVariant.stock - quantity)
         )
-        return result.modified_count > 0
+        if result.rowcount == 0:
+            return False
+        await db.execute(
+            update(Product).where(Product.id == product_id)
+            .values(total_stock=Product.total_stock - quantity)
+        )
+        return True
 
     @staticmethod
-    async def restore_variant_stock(product_id: str, size: str, color: str, quantity: int, session=None) -> bool:
-        """Atomically restore stock for the variant matching (size, color) — used on cancel and
-        as the compensating rollback when no DB transaction is available (see `session` above)."""
-        try:
-            oid = ObjectId(product_id)
-        except Exception:
-            return False
-        result = await products_col.update_one(
-            {"_id": oid, "variants": {"$elemMatch": {"size": size, "color": color}}},
-            {
-                "$inc": {
-                    "variants.$.stock": quantity,
-                    "total_stock": quantity,
-                }
-            },
-            session=session,
+    async def restore_variant_stock(db: AsyncSession, product_id: str, size: str, color: str, quantity: int) -> bool:
+        """Atomically restore stock for the variant matching (size, color) — used on cancel."""
+        result = await db.execute(
+            update(ProductVariant)
+            .where(
+                ProductVariant.product_id == product_id,
+                ProductVariant.size == size,
+                ProductVariant.color == color,
+            )
+            .values(stock=ProductVariant.stock + quantity)
         )
-        return result.modified_count > 0
+        if result.rowcount == 0:
+            return False
+        await db.execute(
+            update(Product).where(Product.id == product_id)
+            .values(total_stock=Product.total_stock + quantity)
+        )
+        return True
 
     @staticmethod
     async def adjust_stock(
+        db: AsyncSession,
         product_id: str,
         variant_sku: str,
         quantity_change: int,
@@ -236,78 +287,68 @@ class InventoryService:
         admin_id: str,
     ) -> bool:
         """Adjust stock for a variant"""
-        product = await ProductService.get_product(product_id)
-        
-        # Find variant
-        variant = next(
-            (v for v in product.get("variants", []) if v["sku"] == variant_sku),
-            None
+        result = await db.execute(
+            select(ProductVariant).where(ProductVariant.product_id == product_id, ProductVariant.sku == variant_sku)
         )
-        
+        variant = result.scalar_one_or_none()
+
         if not variant:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Variant not found"
             )
-        
-        new_stock = variant["stock"] + quantity_change
-        
+
+        new_stock = variant.stock + quantity_change
+
         if new_stock < 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot reduce stock below 0"
             )
-        
-        # Update variant stock
-        updated_variants = product["variants"]
-        for v in updated_variants:
-            if v["sku"] == variant_sku:
-                v["stock"] = new_stock
-        
-        total_stock = sum(v.get("stock", 0) for v in updated_variants)
-        
-        await products_col.update_one(
-            {"_id": ObjectId(product_id)},
-            {
-                "$set": {
-                    "variants": updated_variants,
-                    "total_stock": total_stock,
-                    "updated_at": datetime.utcnow()
-                }
-            }
+
+        variant.stock = new_stock
+
+        await db.execute(
+            update(Product).where(Product.id == product_id).values(
+                total_stock=Product.total_stock + quantity_change,
+                updated_at=datetime.utcnow(),
+            )
         )
-        
-        # Log to inventory history
-        log_entry = inventory_log_entry(
+
+        db.add(InventoryHistoryEntry(
             product_id=product_id,
             variant_sku=variant_sku,
             quantity_changed=quantity_change,
             reason=reason,
             admin_id=admin_id,
-        )
-        
-        await inventory_history_col.update_one(
-            {"product_id": product_id},
-            {"$push": {"logs": log_entry}, "$set": {"updated_at": datetime.utcnow()}},
-            upsert=True
-        )
-        
+            timestamp=datetime.utcnow(),
+        ))
+
         logger.info(f"Stock adjusted for {variant_sku}: {quantity_change} ({reason})")
         return True
 
     @staticmethod
-    async def get_inventory_history(product_id: str, limit: int = 100) -> dict:
+    async def get_inventory_history(db: AsyncSession, product_id: str, limit: int = 100) -> dict:
         """Get inventory history for product"""
-        history = await inventory_history_col.find_one({"product_id": product_id})
-        
-        if not history:
-            return {"product_id": product_id, "logs": []}
-        
-        # Get last N logs
-        logs = history.get("logs", [])[-limit:]
-        
-        return {
-            "product_id": product_id,
-            "logs": logs,
-            "total_logs": len(history.get("logs", [])),
-        }
+        result = await db.execute(
+            select(InventoryHistoryEntry)
+            .where(InventoryHistoryEntry.product_id == product_id)
+            .order_by(InventoryHistoryEntry.timestamp.desc())
+            .limit(limit)
+        )
+        entries = result.scalars().all()
+
+        total_result = await db.execute(
+            select(func.count()).select_from(InventoryHistoryEntry).where(InventoryHistoryEntry.product_id == product_id)
+        )
+        total = total_result.scalar_one()
+
+        logs = [
+            {
+                "product_id": e.product_id, "variant_sku": e.variant_sku,
+                "quantity_changed": e.quantity_changed, "reason": e.reason,
+                "admin_id": e.admin_id, "timestamp": e.timestamp,
+            }
+            for e in entries
+        ]
+        return {"product_id": product_id, "logs": logs, "total_logs": total}

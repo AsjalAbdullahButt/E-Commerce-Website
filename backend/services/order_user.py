@@ -1,12 +1,57 @@
-from fastapi import HTTPException, status
-from database import orders_col, users_col, products_col, admin_users_col
-from bson import ObjectId
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.order import Order, OrderItem, OrderNote, OrderStatusHistory
+from db.user import User
 from utils.logger import get_logger
 from utils.order_transitions import assert_valid_transition
 
 logger = get_logger(__name__)
+
+
+async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
+    items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))
+    items = [
+        {"product_id": i.product_id, "name": i.name, "price": i.price, "quantity": i.quantity,
+         "size": i.size, "color": i.color, "image": i.image}
+        for i in items_result.scalars().all()
+    ]
+
+    history_result = await db.execute(
+        select(OrderStatusHistory).where(OrderStatusHistory.order_id == order.id).order_by(OrderStatusHistory.timestamp)
+    )
+    status_history = [
+        {"status": h.status, "timestamp": h.timestamp, "note": h.note or ""}
+        for h in history_result.scalars().all()
+    ]
+
+    return {
+        "id": order.id,
+        "user_id": order.user_id,
+        "items": items,
+        "shipping_address": {
+            "full_name": order.full_name, "phone": order.phone, "address": order.address,
+            "city": order.city, "postal_code": order.postal_code,
+        },
+        "payment_method": order.payment_method,
+        "payment_reference": order.payment_reference,
+        "promo_code": order.promo_code,
+        "subtotal": order.subtotal,
+        "discount": order.discount,
+        "tax": order.tax,
+        "delivery_fee": order.delivery_fee,
+        "total": order.total,
+        "status": order.status,
+        "rider_id": order.rider_id,
+        "status_history": status_history,
+        "created_at": order.created_at,
+        "updated_at": order.updated_at,
+    }
+
 
 class OrderService:
     """Order management service.
@@ -17,9 +62,9 @@ class OrderService:
     """
 
     @staticmethod
-    async def get_order(order_id: str) -> dict:
+    async def get_order(db: AsyncSession, order_id: str) -> dict:
         """Get order by ID"""
-        order = await orders_col.find_one({"_id": ObjectId(order_id)})
+        order = await db.get(Order, order_id)
 
         if not order:
             raise HTTPException(
@@ -27,40 +72,34 @@ class OrderService:
                 detail="Order not found"
             )
 
-        order["id"] = str(order["_id"])
-        del order["_id"]
-        return order
+        return await _order_to_dict(db, order)
 
     @staticmethod
     async def update_order_status(
+        db: AsyncSession,
         order_id: str,
         new_status: str,
         note: Optional[str],
         admin_id: str,
     ) -> dict:
         """Update order status with validation"""
-        order = await OrderService.get_order(order_id)
-        current_status = order["status"]
+        order = await db.get(Order, order_id)
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        current_status = order.status
 
         assert_valid_transition(current_status, new_status)
 
-        history_entry = {
-            "status": new_status,
-            "timestamp": datetime.utcnow(),
-            "note": note or "",
-        }
-
-        await orders_col.update_one(
-            {"_id": ObjectId(order_id)},
-            {
-                "$set": {"status": new_status, "updated_at": datetime.utcnow()},
-                "$push": {"status_history": history_entry}
-            }
-        )
+        order.status = new_status
+        order.updated_at = datetime.utcnow()
+        db.add(OrderStatusHistory(
+            order_id=order_id, status=new_status, timestamp=datetime.utcnow(), note=note or "",
+        ))
 
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
+            db,
             admin_id=admin_id,
             admin_name="System",
             action="update_order_status",
@@ -71,116 +110,113 @@ class OrderService:
         )
 
         logger.info(f"Order {order_id} status updated: {current_status} -> {new_status}")
-        return await OrderService.get_order(order_id)
+        return await OrderService.get_order(db, order_id)
 
     @staticmethod
     async def list_orders(
+        db: AsyncSession,
         status: Optional[str] = None,
         user_id: Optional[str] = None,
         limit: int = 50,
         skip: int = 0,
     ) -> tuple:
         """List orders with filtering"""
-        query: dict = {}
+        query = select(Order)
+        count_query = select(func.count()).select_from(Order)
 
         if status:
-            query["status"] = status
+            query = query.where(Order.status == status)
+            count_query = count_query.where(Order.status == status)
         if user_id:
-            query["user_id"] = user_id
+            query = query.where(Order.user_id == user_id)
+            count_query = count_query.where(Order.user_id == user_id)
 
-        cursor = orders_col.find(query).sort("created_at", -1).skip(skip).limit(limit)
-        orders = await cursor.to_list(length=limit)
+        query = query.order_by(Order.created_at.desc()).offset(skip).limit(limit)
 
-        for o in orders:
-            o["id"] = str(o["_id"])
-            del o["_id"]
+        result = await db.execute(query)
+        orders = result.scalars().all()
+        out = [await _order_to_dict(db, o) for o in orders]
 
-        total = await orders_col.count_documents(query)
-        return orders, total
+        total = (await db.execute(count_query)).scalar_one()
+        return out, total
 
     @staticmethod
-    async def add_order_note(order_id: str, note: str, admin_id: str) -> dict:
+    async def add_order_note(db: AsyncSession, order_id: str, note: str, admin_id: str) -> dict:
         """Add note to order"""
-        order = await OrderService.get_order(order_id)
-        
-        await orders_col.update_one(
-            {"_id": ObjectId(order_id)},
-            {
-                "$push": {"notes": {"text": note, "added_by": admin_id, "timestamp": datetime.utcnow()}},
-                "$set": {"updated_at": datetime.utcnow()}
-            }
-        )
-        
+        order = await db.get(Order, order_id)
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+        db.add(OrderNote(order_id=order_id, text=note, added_by=admin_id, timestamp=datetime.utcnow()))
+        order.updated_at = datetime.utcnow()
+
         logger.info(f"Note added to order {order_id} by admin {admin_id}")
-        return await OrderService.get_order(order_id)
+        return await OrderService.get_order(db, order_id)
 
 
 class UserService:
     """User management service for admin"""
 
     @staticmethod
-    async def get_user(user_id: str) -> dict:
+    async def get_user(db: AsyncSession, user_id: str) -> dict:
         """Get user by ID"""
-        user = await users_col.find_one({"_id": ObjectId(user_id)})
-        
+        user = await db.get(User, user_id)
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-        
-        user["id"] = str(user["_id"])
-        del user["_id"]
-        user.pop("password", None)
-        user.pop("password_hash", None)
-        
-        return user
+
+        data = {c.name: getattr(user, c.name) for c in User.__table__.columns}
+        data.pop("password", None)
+        return data
 
     @staticmethod
     async def list_users(
+        db: AsyncSession,
         is_banned: Optional[bool] = None,
         limit: int = 50,
         skip: int = 0,
     ) -> tuple:
         """List users"""
-        query = {}
-        
+        query = select(User)
+        count_query = select(func.count()).select_from(User)
+
         if is_banned is not None:
-            query["is_banned"] = is_banned
-        
-        cursor = users_col.find(query).sort("created_at", -1).skip(skip).limit(limit)
-        users = await cursor.to_list(length=limit)
-        
+            query = query.where(User.is_banned == is_banned)
+            count_query = count_query.where(User.is_banned == is_banned)
+
+        query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        users = result.scalars().all()
+        out = []
         for u in users:
-            u["id"] = str(u["_id"])
-            del u["_id"]
-            u.pop("password", None)
-            u.pop("password_hash", None)
-        
-        total = await users_col.count_documents(query)
-        return users, total
+            data = {c.name: getattr(u, c.name) for c in User.__table__.columns}
+            data.pop("password", None)
+            out.append(data)
+
+        total = (await db.execute(count_query)).scalar_one()
+        return out, total
 
     @staticmethod
-    async def ban_user(user_id: str, reason: str, admin_id: str) -> dict:
+    async def ban_user(db: AsyncSession, user_id: str, reason: str, admin_id: str) -> dict:
         """Ban user account"""
-        user = await UserService.get_user(user_id)
-        
-        await users_col.update_one(
-            {"_id": ObjectId(user_id)},
-            {
-                "$set": {
-                    "is_banned": True,
-                    "ban_reason": reason,
-                    "banned_by": admin_id,
-                    "banned_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
-                }
-            }
-        )
-        
+        user = await db.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        user.is_banned = True
+        user.ban_reason = reason
+        user.banned_by = admin_id
+        user.banned_at = datetime.utcnow()
+        user.updated_at = datetime.utcnow()
+
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
+            db,
             admin_id=admin_id,
             admin_name="System",
             action="ban_user",
@@ -189,31 +225,27 @@ class UserService:
             changes={"is_banned": {"old": False, "new": True}, "ban_reason": {"old": None, "new": reason}},
             ip_address="0.0.0.0"
         )
-        
+
         logger.info(f"User {user_id} banned by admin {admin_id}: {reason}")
-        return await UserService.get_user(user_id)
+        return await UserService.get_user(db, user_id)
 
     @staticmethod
-    async def unban_user(user_id: str, admin_id: str) -> dict:
+    async def unban_user(db: AsyncSession, user_id: str, admin_id: str) -> dict:
         """Unban user account"""
-        user = await UserService.get_user(user_id)
-        
-        await users_col.update_one(
-            {"_id": ObjectId(user_id)},
-            {
-                "$set": {
-                    "is_banned": False,
-                    "ban_reason": None,
-                    "banned_by": None,
-                    "banned_at": None,
-                    "updated_at": datetime.utcnow(),
-                }
-            }
-        )
-        
+        user = await db.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        user.is_banned = False
+        user.ban_reason = None
+        user.banned_by = None
+        user.banned_at = None
+        user.updated_at = datetime.utcnow()
+
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
+            db,
             admin_id=admin_id,
             admin_name="System",
             action="unban_user",
@@ -222,19 +254,15 @@ class UserService:
             changes={"is_banned": {"old": True, "new": False}},
             ip_address="0.0.0.0"
         )
-        
+
         logger.info(f"User {user_id} unbanned by admin {admin_id}")
-        return await UserService.get_user(user_id)
+        return await UserService.get_user(db, user_id)
 
     @staticmethod
-    async def get_user_order_history(user_id: str, limit: int = 20) -> List[dict]:
+    async def get_user_order_history(db: AsyncSession, user_id: str, limit: int = 20) -> List[dict]:
         """Get user's order history"""
-        orders = await orders_col.find(
-            {"user_id": user_id}
-        ).sort("created_at", -1).limit(limit).to_list(length=limit)
-        
-        for o in orders:
-            o["id"] = str(o["_id"])
-            del o["_id"]
-        
-        return orders
+        result = await db.execute(
+            select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(limit)
+        )
+        orders = result.scalars().all()
+        return [await _order_to_dict(db, o) for o in orders]

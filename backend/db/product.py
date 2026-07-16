@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db.base import Base, IDMixin, TimestampMixin
+from db.base import ID_TYPE, Base, IDMixin, TimestampMixin
 
 
 class Product(Base, IDMixin, TimestampMixin):
@@ -34,7 +34,7 @@ class ProductVariant(Base, IDMixin):
         UniqueConstraint("product_id", "size", "color", name="uq_variant_product_size_color"),
     )
 
-    product_id: Mapped[str] = mapped_column(String(24), ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("products.id", ondelete="CASCADE"), index=True)
     size: Mapped[str] = mapped_column(String(20))
     color: Mapped[str] = mapped_column(String(50))
     sku: Mapped[str] = mapped_column(String(100))
@@ -47,7 +47,7 @@ class InventoryHistoryEntry(Base, IDMixin):
     had under Mongo despite being queried by product_id)."""
     __tablename__ = "inventory_history"
 
-    product_id: Mapped[str] = mapped_column(String(24), ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("products.id", ondelete="CASCADE"), index=True)
     variant_sku: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     quantity_changed: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String(100))

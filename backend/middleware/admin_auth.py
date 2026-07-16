@@ -1,16 +1,28 @@
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+from database import AsyncSessionLocal, get_db
+from db.admin import AdminUser
+from sqlalchemy.ext.asyncio import AsyncSession
 from utils.helpers import decode_token
-from utils.permissions import has_permission
-from database import admin_users_col
-from bson import ObjectId
 from utils.logger import get_logger, log_to_db
+from utils.permissions import has_permission
 
 logger = get_logger(__name__)
 
-async def verify_admin_token(request: Request) -> dict:
+
+def _admin_to_dict(admin: AdminUser) -> dict:
+    return {
+        "admin_id": admin.id,
+        "email": admin.email,
+        "name": admin.name,
+        "role": admin.role,
+    }
+
+
+async def verify_admin_token(request: Request, db: AsyncSession = Depends(get_db)) -> dict:
     """Verify admin JWT token.
 
     Prefer the admin object attached by AdminAuthMiddleware to avoid a second DB lookup.
@@ -38,18 +50,11 @@ async def verify_admin_token(request: Request) -> dict:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
         # Verify admin exists and is active
-        admin = await admin_users_col.find_one(
-            {"_id": ObjectId(admin_id), "is_active": True, "is_locked": False}
-        )
-        if not admin:
+        admin = await db.get(AdminUser, admin_id)
+        if not admin or not admin.is_active or admin.is_locked:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin not found or locked")
 
-        return {
-            "admin_id": str(admin["_id"]),
-            "email": admin["email"],
-            "name": admin["name"],
-            "role": admin["role"],
-        }
+        return _admin_to_dict(admin)
     except HTTPException:
         raise
     except Exception as e:
@@ -63,8 +68,13 @@ async def check_permission(admin_data: dict, required_permission: str) -> bool:
     return has_permission(role, required_permission)
 
 class AdminAuthMiddleware(BaseHTTPMiddleware):
-    """Middleware to verify admin authentication on protected routes"""
-    
+    """Middleware to verify admin authentication on protected routes.
+
+    Runs as raw ASGI middleware, outside FastAPI's Depends system, so it can't receive a
+    request-scoped session via Depends(get_db) — it opens its own short-lived session instead,
+    same pattern as utils/logger.py::log_to_db.
+    """
+
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
@@ -76,10 +86,10 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         public_paths = ["/docs", "/openapi.json", "/health"]
         if any(request.url.path.startswith(p) for p in public_paths):
             return await call_next(request)
-        
+
         if path.startswith("/admin/auth"):  # Skip admin auth endpoints
             return await call_next(request)
-        
+
         # Check for authorization header
         auth_header = request.headers.get("Authorization")
         if not auth_header:
@@ -87,7 +97,7 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"success": False, "message": "Missing authorization header"}
             )
-        
+
         try:
             scheme, credentials = auth_header.split(" ")
             if scheme.lower() != "bearer":
@@ -95,7 +105,7 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"success": False, "message": "Invalid authorization scheme"}
                 )
-            
+
             payload = decode_token(credentials)
             if payload.get("type") != "access":
                 return JSONResponse(
@@ -104,24 +114,19 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                 )
 
             admin_id = payload.get("sub")
-            admin = await admin_users_col.find_one(
-                {"_id": ObjectId(admin_id), "is_active": True, "is_locked": False}
-            )
-            if not admin:
+            async with AsyncSessionLocal() as session:
+                admin = await session.get(AdminUser, admin_id)
+
+            if not admin or not admin.is_active or admin.is_locked:
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"success": False, "message": "Admin not found or locked"}
                 )
 
             # Attach admin data to request
-            request.state.admin = {
-                "admin_id": str(admin["_id"]),
-                "email": admin["email"],
-                "name": admin["name"],
-                "role": admin["role"],
-            }
+            request.state.admin = _admin_to_dict(admin)
             request.state.ip_address = request.client.host if request.client else "0.0.0.0"
-            
+
         except Exception as e:
             await log_to_db("ERROR", __name__, f"Auth middleware error: {e}", {"path": path})
             logger.error(f"Auth middleware error: {str(e)}")
@@ -129,5 +134,5 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"success": False, "message": "Authentication failed"}
             )
-        
+
         return await call_next(request)

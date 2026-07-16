@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db.base import Base, IDMixin, TimestampMixin
+from db.base import ID_TYPE, Base, IDMixin, TimestampMixin
 
 
 class Order(Base, IDMixin, TimestampMixin):
@@ -40,7 +40,7 @@ class Order(Base, IDMixin, TimestampMixin):
 class OrderItem(Base, IDMixin):
     __tablename__ = "order_items"
 
-    order_id: Mapped[str] = mapped_column(String(24), ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    order_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[str] = mapped_column(String(24))
     name: Mapped[str] = mapped_column(String(200))
     price: Mapped[float] = mapped_column(Float)
@@ -53,7 +53,7 @@ class OrderItem(Base, IDMixin):
 class OrderStatusHistory(Base, IDMixin):
     __tablename__ = "order_status_history"
 
-    order_id: Mapped[str] = mapped_column(String(24), ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    order_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     status: Mapped[str] = mapped_column(String(20))
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -62,7 +62,7 @@ class OrderStatusHistory(Base, IDMixin):
 class OrderNote(Base, IDMixin):
     __tablename__ = "order_notes"
 
-    order_id: Mapped[str] = mapped_column(String(24), ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    order_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
     added_by: Mapped[str] = mapped_column(String(24))
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

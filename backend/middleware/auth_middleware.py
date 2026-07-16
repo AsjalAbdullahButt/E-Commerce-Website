@@ -1,13 +1,29 @@
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from bson import ObjectId
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from config import settings
-from database import users_col, admin_users_col, riders_col
+from database import get_db
+from db.admin import AdminUser
+from db.rider import Rider
+from db.user import User
 
 security = HTTPBearer()
 
-async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)):
+
+def _row_to_dict(obj) -> dict:
+    """ORM row -> plain dict, plus a Mongo-shaped `_id` alias (string, not ObjectId) so the many
+    existing `str(user["_id"])` call sites across routes/services keep working unchanged."""
+    data = {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+    data["_id"] = data["id"]
+    return data
+
+
+async def get_current_user(
+    creds: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+):
     """Extract and validate JWT token - works for all roles"""
     try:
         payload = jwt.decode(
@@ -17,23 +33,23 @@ async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(securit
         )
         user_id = payload.get("sub")
         role = payload.get("role")
-        
+
         if not user_id or not role:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
-        # Find user in appropriate collection based on role
-        user = None
+
+        # Find user in appropriate table based on role
+        user_obj = None
         if role == "admin":
-            user = await admin_users_col.find_one({"_id": ObjectId(user_id)})
+            user_obj = await db.get(AdminUser, user_id)
         elif role == "rider":
-            user = await riders_col.find_one({"_id": ObjectId(user_id)})
+            user_obj = await db.get(Rider, user_id)
         else:  # customer
-            user = await users_col.find_one({"_id": ObjectId(user_id)})
-        
-        if not user:
+            user_obj = await db.get(User, user_id)
+
+        if not user_obj:
             raise HTTPException(status_code=401, detail="User not found")
-        
-        user["id"] = str(user["_id"])
+
+        user = _row_to_dict(user_obj)
         user["role"] = role  # Ensure role is set from JWT
         return user
     except JWTError:

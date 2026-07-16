@@ -1,7 +1,8 @@
 import logging
 import logging.handlers
 from pathlib import Path
-from database import audit_logs_col
+from database import AsyncSessionLocal
+from db.admin import AuditLog
 from datetime import datetime
 
 LOG_DIR = Path(__file__).parent.parent / "logs"
@@ -34,14 +35,22 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 async def log_to_db(level: str, module: str, message: str, meta: dict = None):
-    """Write a log entry to MongoDB for admin viewing."""
+    """Write a log entry to the audit_logs table for admin viewing.
+
+    Opens its own independent session rather than the current request's — this must keep
+    working even when the request's own transaction has already failed/rolled back, matching
+    its original "never let logging crash the app" contract.
+    """
     try:
-        await audit_logs_col.insert_one({
-            "level": level,
-            "module": module,
-            "message": message,
-            "meta": meta or {},
-            "timestamp": datetime.utcnow()
-        })
+        async with AsyncSessionLocal() as session:
+            session.add(AuditLog(
+                entry_type="system_log",
+                level=level,
+                module=module,
+                message=message,
+                meta=meta or {},
+                timestamp=datetime.utcnow(),
+            ))
+            await session.commit()
     except Exception:
         pass  # Never let logging crash the app
