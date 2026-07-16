@@ -51,6 +51,11 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
   const options = { method, headers };
   // Prevent Chrome aggressive caching for API calls
   options.cache = 'no-store';
+  // Required for the browser to send/store the httpOnly refresh_token cookie set by
+  // /auth/login and /auth/refresh — frontend (:5500) and backend (:8000) are different origins,
+  // and fetch's default credentials mode ("same-origin") silently drops cross-origin cookies.
+  // See NOTES_schema_audit.md §7.
+  options.credentials = 'include';
   if (body) options.body = JSON.stringify(body);
 
   try {

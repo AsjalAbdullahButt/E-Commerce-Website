@@ -218,7 +218,7 @@ async def refresh(request: Request, response: Response):
             "token_type": "bearer"
         }
     except JWTError as e:
-        await log_to_db("JWT_DECODE_ERROR", "refresh token validation failed", {"error": str(e)})
+        await log_to_db("JWT_DECODE_ERROR", __name__, "refresh token validation failed", {"error": str(e)})
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
 @router.post("/logout")
@@ -258,14 +258,14 @@ async def update_profile(request: Request, body: UserUpdate, user=Depends(get_cu
             {"$set": updates}
         )
         updated_user = await users_col.find_one({"_id": ObjectId(user["_id"])})
-        await log_to_db("PROFILE_UPDATE", f"user {str(user['_id'])} updated profile", {"user_id": str(user["_id"]), "fields": list(updates.keys())})
+        await log_to_db("PROFILE_UPDATE", __name__, f"user {str(user['_id'])} updated profile", {"user_id": str(user["_id"]), "fields": list(updates.keys())})
         return {
             "success": True,
             "message": "Profile updated successfully",
             "user": serialize_user(updated_user)
         }
     except Exception as e:
-        await log_to_db("PROFILE_UPDATE_ERROR", f"failed to update user profile", {"error": str(e), "user_id": str(user["_id"])})
+        await log_to_db("PROFILE_UPDATE_ERROR", __name__, f"failed to update user profile", {"error": str(e), "user_id": str(user["_id"])})
         logger.error(f"Profile update error: {e}")
         raise HTTPException(status_code=500, detail="Failed to update profile")
 
@@ -291,7 +291,7 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
             current_user = await users_col.find_one({"_id": uid})
 
         if not current_user or not verify_password(body.old_password, current_user.get("password")):
-            await log_to_db("PASSWORD_CHANGE_FAILED", "invalid old password", {"user_id": str(uid)})
+            await log_to_db("PASSWORD_CHANGE_FAILED", __name__, "invalid old password", {"user_id": str(uid)})
             raise HTTPException(status_code=401, detail="Current password is incorrect")
 
         # Validate new password strength
@@ -309,12 +309,12 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
         else:
             await users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow().isoformat()}})
 
-        await log_to_db("PASSWORD_CHANGED", f"user {str(uid)} changed password", {"user_id": str(uid)})
+        await log_to_db("PASSWORD_CHANGED", __name__, f"user {str(uid)} changed password", {"user_id": str(uid)})
         return {"success": True, "message": "Password changed successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        await log_to_db("PASSWORD_CHANGE_ERROR", "failed to change password", {"error": str(e), "user_id": str(user.get("_id") or user.get("id"))})
+        await log_to_db("PASSWORD_CHANGE_ERROR", __name__, "failed to change password", {"error": str(e), "user_id": str(user.get("_id") or user.get("id"))})
         logger.error(f"Password change error: {e}")
         raise HTTPException(status_code=500, detail="Failed to change password")
 
@@ -354,7 +354,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
         # it, so the flow is still fully testable end-to-end. Wire up a real provider here
         # (e.g. SendGrid/SES) before relying on this in production.
         logger.info(f"[DEV] Password reset link for {email}: {reset_link}")
-        await log_to_db("PASSWORD_RESET_REQUESTED", f"password reset requested for {email}", {
+        await log_to_db("PASSWORD_RESET_REQUESTED", __name__, f"password reset requested for {email}", {
             "user_id": str(user["_id"]), "reset_link": reset_link,
         })
 
@@ -391,7 +391,7 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
             "$unset": {"reset_token_hash": "", "reset_token_expires": ""},
         },
     )
-    await log_to_db("PASSWORD_RESET_COMPLETED", f"password reset completed for user {str(user['_id'])}", {"user_id": str(user["_id"])})
+    await log_to_db("PASSWORD_RESET_COMPLETED", __name__, f"password reset completed for user {str(user['_id'])}", {"user_id": str(user["_id"])})
     return {"message": "Password reset successfully. You can now log in with your new password."}
 
 

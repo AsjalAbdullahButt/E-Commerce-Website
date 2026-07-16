@@ -4,7 +4,9 @@ class AdminAPI {
     constructor() {
         this.baseURL = ADMIN_CONFIG.API_URL;
         this.accessToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        this.refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+        // The refresh token itself lives only in an httpOnly cookie set by the server
+        // (POST /admin/auth/login and /admin/auth/refresh) — never in localStorage/JS-readable
+        // storage. Matches the customer flow in shared/js/api.js. See NOTES_schema_audit.md §7.
     }
 
     /**
@@ -12,9 +14,8 @@ class AdminAPI {
      */
     async request(endpoint, method = 'GET', data = null) {
         try {
-            // Always read latest tokens from storage in case they changed during runtime
+            // Always read latest token from storage in case it changed during runtime
             this.accessToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-            this.refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -28,6 +29,7 @@ class AdminAPI {
                 method,
                 headers,
                 cache: 'no-store', // avoid cached admin API responses in browser
+                credentials: 'include', // send/receive the httpOnly admin_refresh_token cookie
             };
 
             if (data && (method === 'POST' || method === 'PUT')) {
@@ -55,15 +57,13 @@ class AdminAPI {
     }
 
     /**
-     * Refresh access token
+     * Refresh access token using the httpOnly refresh cookie (no token read/sent from JS)
      */
     async refreshAccessToken() {
         try {
             const response = await fetch(`${this.baseURL}${ADMIN_CONFIG.ENDPOINTS.AUTH.REFRESH}`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.refreshToken}`,
-                },
+                credentials: 'include',
             });
 
             if (response.ok) {

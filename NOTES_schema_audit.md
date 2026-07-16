@@ -254,6 +254,20 @@ admin flow)
   unified this still works since it only reads `status`/`items.product_id`, both present in the
   real order shape.)
 
+## 7b. Found during implementation (not in original STEP 0 pass) — `log_to_db` call signature
+`utils/logger.py::log_to_db(level, module, message, meta=None)` requires `module` as its 2nd
+positional arg. `routes/admin.py`, `main.py`, `middleware/admin_auth.py`, and
+`services/admin_auth.py` call it correctly with `__name__` as that argument. But
+`routes/orders.py`, `routes/rider.py`, `routes/products.py`, `routes/promos.py`,
+`routes/reviews.py`, and `routes/auth.py` all called it with only 3 positional args
+(`level, message_text, meta_dict`) — so `message_text` landed in the `module` param and the meta
+dict landed in the `message` param, silently discarding the intended `meta` (always `{}`). Every
+audit-log entry written by those ~24 call sites had garbled `module`/`message` fields and no
+`meta`, which is what the admin Logs page (`frontend/admin/logs.html`) reads. Fixed by inserting
+`__name__` as the 2nd argument at every Pattern-B call site (mechanical, no behavior change to
+the calling code otherwise) — found while implementing task 8's forgot-password logging, whose
+own test needed to read `meta.reset_link` back out of `audit_logs_col`.
+
 ## 8. Fields NOT touched by this audit (confirmed consistent, no divergence found)
 `wishlist_col`, `promos_col` (both `routes/promos.py` and `services/discount.py` write compatible
 `code/discount_type/discount_value/min_order/max_uses/uses/is_active/expires_at` shapes — the admin

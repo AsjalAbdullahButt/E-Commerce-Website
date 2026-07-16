@@ -67,7 +67,7 @@ async def delete_promo(request: Request, promo_id: str, _=Depends(require_admin)
     try:
         oid = ObjectId(promo_id)
     except Exception as e:
-        await log_to_db("INVALID_PROMO_ID", f"admin tried invalid promo ID {promo_id}", {"error": str(e)})
+        await log_to_db("INVALID_PROMO_ID", __name__, f"admin tried invalid promo ID {promo_id}", {"error": str(e)})
         raise HTTPException(status_code=400, detail="Invalid promo ID")
     await promos_col.delete_one({"_id": oid})
     return {"message": "Promo deleted"}

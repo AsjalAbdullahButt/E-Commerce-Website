@@ -128,11 +128,15 @@ class AdminAuthService:
                     detail="Admin not found"
                 )
             
-            # Create new access token
+            # Create new access token, and rotate the refresh token (same pattern as
+            # routes/auth.py's customer /auth/refresh) so a leaked refresh token has a limited
+            # window before it's superseded.
             access_token = create_access_token(str(admin["_id"]), admin.get("role", "admin"))
-            
+            new_refresh_token = create_refresh_token(str(admin["_id"]), admin.get("role", "admin"))
+
             return {
                 "access_token": access_token,
+                "refresh_token": new_refresh_token,
                 "token_type": "bearer",
             }
         except Exception as e:

@@ -38,7 +38,7 @@ async def update_delivery_status(request: Request, order_id: str, body: OrderSta
     try:
         oid = ObjectId(order_id)
     except Exception as e:
-        await log_to_db("INVALID_ORDER_ID", f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": str(e), "user_id": str(user["_id"])})
+        await log_to_db("INVALID_ORDER_ID", __name__, f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": str(e), "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
     order = await orders_col.find_one({"_id": oid})
@@ -119,7 +119,7 @@ async def get_earnings(request: Request, user=Depends(require_rider)):
         
         this_month_earnings = this_month * delivery_fee
         
-        await log_to_db("EARNINGS_VIEW", f"rider {str(user['_id'])} viewed earnings", {"user_id": str(user["_id"])})
+        await log_to_db("EARNINGS_VIEW", __name__, f"rider {str(user['_id'])} viewed earnings", {"user_id": str(user["_id"])})
         
         return {
             "success": True,
@@ -133,7 +133,7 @@ async def get_earnings(request: Request, user=Depends(require_rider)):
             }
         }
     except Exception as e:
-        await log_to_db("EARNINGS_ERROR", f"failed to fetch earnings for rider {str(user['_id'])}", {"error": str(e), "user_id": str(user["_id"])})
+        await log_to_db("EARNINGS_ERROR", __name__, f"failed to fetch earnings for rider {str(user['_id'])}", {"error": str(e), "user_id": str(user["_id"])})
         logger.error(f"Earnings fetch error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch earnings")
 
@@ -144,17 +144,17 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
     try:
         oid = ObjectId(order_id)
     except Exception as e:
-        await log_to_db("INVALID_ORDER_ID", f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": str(e), "user_id": str(user["_id"])})
+        await log_to_db("INVALID_ORDER_ID", __name__, f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": str(e), "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
     
     order = await orders_col.find_one({"_id": oid})
     if not order:
-        await log_to_db("ORDER_NOT_FOUND", f"delivery completion order not found {order_id}", {"user_id": str(user["_id"])})
+        await log_to_db("ORDER_NOT_FOUND", __name__, f"delivery completion order not found {order_id}", {"user_id": str(user["_id"])})
         raise HTTPException(status_code=404, detail="Order not found")
     
     # Only rider assigned to this order can complete it
     if order.get("rider_id") != str(user["_id"]):
-        await log_to_db("UNAUTHORIZED_DELIVERY", f"rider {str(user['_id'])} tried to complete order {order_id} assigned to {order.get('rider_id')}", {"order_id": order_id, "user_id": str(user["_id"])})
+        await log_to_db("UNAUTHORIZED_DELIVERY", __name__, f"rider {str(user['_id'])} tried to complete order {order_id} assigned to {order.get('rider_id')}", {"order_id": order_id, "user_id": str(user["_id"])})
         raise HTTPException(status_code=403, detail="Not assigned to this order")
     
     assert_valid_transition(order.get("status"), "delivered")
@@ -175,14 +175,14 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
             }
         )
         
-        await log_to_db("DELIVERY_COMPLETED", f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": str(oid), "user_id": str(user["_id"])})
+        await log_to_db("DELIVERY_COMPLETED", __name__, f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": str(oid), "user_id": str(user["_id"])})
         
         return {
             "success": True,
             "message": "Delivery marked as completed"
         }
     except Exception as e:
-        await log_to_db("DELIVERY_COMPLETE_ERROR", f"failed to complete delivery {order_id}", {"error": str(e), "order_id": str(oid), "user_id": str(user["_id"])})
+        await log_to_db("DELIVERY_COMPLETE_ERROR", __name__, f"failed to complete delivery {order_id}", {"error": str(e), "order_id": str(oid), "user_id": str(user["_id"])})
         logger.error(f"Delivery completion error: {e}")
         raise HTTPException(status_code=500, detail="Failed to complete delivery")
 

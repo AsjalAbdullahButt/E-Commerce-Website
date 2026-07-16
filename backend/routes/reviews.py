@@ -44,7 +44,7 @@ async def add_review(request: Request, body: ReviewCreate, user=Depends(get_curr
                 {"$set": {"rating": round(avg, 1), "review_count": len(all_reviews)}},
             )
         except Exception as e:
-            await log_to_db("REVIEW_RATING_UPDATE_ERROR", f"failed to update product rating for {body.product_id}", {"error": str(e), "user_id": str(user["_id"])})
+            await log_to_db("REVIEW_RATING_UPDATE_ERROR", __name__, f"failed to update product rating for {body.product_id}", {"error": str(e), "user_id": str(user["_id"])})
 
     return {"message": "Review submitted"}
 

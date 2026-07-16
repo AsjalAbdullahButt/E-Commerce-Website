@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from middleware.admin_auth import verify_admin_token, check_permission
 from schemas.admin import *
 from services.admin_auth import AdminAuthService, AdminAuditService
@@ -16,13 +15,13 @@ from utils.order_transitions import assert_valid_transition
 from database import products_col, orders_col, users_col
 from bson import ObjectId
 from datetime import datetime
+from config import settings
 from utils.limiter import limiter
 
 logger = get_logger(__name__)
 
 # Router intentionally has no internal prefix — main.py mounts it with prefix="/admin"
 router = APIRouter(tags=["Admin"])
-security = HTTPBearer()
 
 
 # Simple stats endpoint (kept from legacy admin module) mounted at /admin/stats
@@ -318,15 +317,39 @@ async def user_analytics(request: Request, _=Depends(verify_admin_token)):
 # AUTHENTICATION ROUTES
 # ════════════════════════════════════════════════════════════════════════════
 
+REFRESH_COOKIE_NAME = "admin_refresh_token"
+REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches jwt_refresh_expire_minutes default
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        max_age=REFRESH_COOKIE_MAX_AGE,
+    )
+
+
 @router.post("/auth/login")
-async def login(credentials: AdminLogin, request: Request):
-    """Admin login"""
+async def login(credentials: AdminLogin, request: Request, response: Response):
+    """Admin login.
+
+    Refresh token contract matches the customer flow (routes/auth.py): httpOnly cookie, never
+    exposed to JS, rather than the old admin-only pattern of returning it in the JSON body for
+    localStorage storage (which was reachable by any XSS on the page). A distinct cookie name
+    ("admin_refresh_token" vs "refresh_token") avoids the two sessions clobbering each other when
+    both the admin panel and customer site are open in the same browser on the same origin. See
+    NOTES_schema_audit.md §7.
+    """
     try:
         result = await AdminAuthService.authenticate(
             email=credentials.email,
             password=credentials.password,
             ip_address=request.client.host if request.client else "0.0.0.0"
         )
+        _set_refresh_cookie(response, result.pop("refresh_token"))
         return {
             "success": True,
             "message": "Login successful",
@@ -341,10 +364,14 @@ async def login(credentials: AdminLogin, request: Request):
         raise HTTPException(status_code=500, detail="Login failed")
 
 @router.post("/auth/refresh")
-async def refresh(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Refresh access token"""
+async def refresh(request: Request, response: Response):
+    """Refresh access token using the httpOnly refresh cookie set at login."""
+    refresh_token_str = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_token_str:
+        raise HTTPException(status_code=401, detail="No refresh token")
     try:
-        result = await AdminAuthService.refresh_token(credentials.credentials)
+        result = await AdminAuthService.refresh_token(refresh_token_str)
+        _set_refresh_cookie(response, result.pop("refresh_token"))
         return {
             "success": True,
             "message": "Token refreshed",
@@ -355,16 +382,17 @@ async def refresh(credentials: HTTPAuthorizationCredentials = Depends(security))
     except Exception as e:
         await log_to_db("ERROR", __name__, f"Refresh error: {e}")
         logger.error(f"Refresh error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Token refresh failed")
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
 @router.post("/auth/logout")
-async def logout(request: Request, admin_data: dict = Depends(verify_admin_token)):
+async def logout(request: Request, response: Response, admin_data: dict = Depends(verify_admin_token)):
     """Admin logout"""
     try:
         await AdminAuthService.logout(
             admin_id=admin_data["admin_id"],
             ip_address=request.state.ip_address
         )
+        response.delete_cookie(REFRESH_COOKIE_NAME, httponly=True, secure=settings.cookie_secure, samesite="strict")
         return {
             "success": True,
             "message": "Logout successful"

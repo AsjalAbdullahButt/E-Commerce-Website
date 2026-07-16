@@ -90,7 +90,7 @@ async def get_product(request: Request, product_id: str):
     try:
         p = await products_col.find_one({"_id": ObjectId(product_id)})
     except Exception as e:
-        await log_to_db("INVALID_PRODUCT_ID", f"invalid product ID {product_id}", {"error": str(e)})
+        await log_to_db("INVALID_PRODUCT_ID", __name__, f"invalid product ID {product_id}", {"error": str(e)})
         raise HTTPException(status_code=400, detail="Invalid product ID")
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")

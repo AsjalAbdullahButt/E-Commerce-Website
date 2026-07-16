@@ -195,9 +195,10 @@
                 const response = await adminAPI.login(email, password);
 
                 if (response.success) {
-                    // Store tokens and admin data
+                    // Store the access token + profile; the refresh token lives only in the
+                    // httpOnly admin_refresh_token cookie the server just set (never readable
+                    // from JS) — see NOTES_schema_audit.md §7.
                     localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, response.data.access_token);
-                    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refresh_token);
                     localStorage.setItem(STORAGE_KEYS.ADMIN_DATA, JSON.stringify(response.data.admin));
 
                     // Redirect to dashboard
