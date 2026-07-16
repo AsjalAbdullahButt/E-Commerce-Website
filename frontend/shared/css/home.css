@@ -145,7 +145,6 @@ main {
   max-width: 1280px;
   margin: 6rem auto 2rem;
   padding: 0 2rem;
-  animation: fadeInUp 0.8s ease-out;
 }
 
 .section-title {
@@ -180,9 +179,9 @@ main {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease), background var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
   cursor: pointer;
-  animation: fadeInUp 0.6s ease-out;
+  position: relative;
 }
 
 .product-card:hover {
@@ -266,8 +265,7 @@ main {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: fadeInUp 0.6s ease-out;
+  transition: transform var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease), background var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
 }
 
 .why-card:hover {

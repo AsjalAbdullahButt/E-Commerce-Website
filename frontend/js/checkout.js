@@ -43,6 +43,83 @@ async function initializeCheckout() {
 
   setupPromoCode();
   initPaymentToggle();
+  initCheckoutProgress();
+  initFieldValidation();
+}
+
+// Purely visual scrollspy — highlights the current step as the shopper scrolls
+// through the single-page form. Does not gate or reorder the actual submit flow.
+function initCheckoutProgress() {
+  const steps = Array.from(document.querySelectorAll('.progress-step'));
+  const sectionIds = { shipping: 'checkout-section-shipping', payment: 'checkout-section-payment', review: 'checkout-section-review' };
+  const sections = Object.entries(sectionIds)
+    .map(([step, id]) => ({ step, el: document.getElementById(id) }))
+    .filter(s => s.el);
+
+  if (!steps.length || !sections.length || !('IntersectionObserver' in window)) return;
+
+  function setActive(activeStep) {
+    const order = ['shipping', 'payment', 'review'];
+    const activeIdx = order.indexOf(activeStep);
+    steps.forEach(step => {
+      const idx = order.indexOf(step.dataset.step);
+      step.classList.toggle('active', idx === activeIdx);
+      step.classList.toggle('completed', idx < activeIdx);
+      const line = step.nextElementSibling;
+      if (line && line.classList.contains('progress-line')) {
+        const fill = line.querySelector('.progress-line-fill');
+        if (fill) fill.style.width = idx < activeIdx ? '100%' : '0%';
+      }
+    });
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const match = sections.find(s => s.el === entry.target);
+        if (match) setActive(match.step);
+      }
+    });
+  }, { threshold: 0.4, rootMargin: '-15% 0px -35% 0px' });
+
+  sections.forEach(s => observer.observe(s.el));
+  setActive('shipping');
+}
+
+// Inline validation: checkmark on valid blur, shake + scroll-into-view on submit if empty.
+function initFieldValidation() {
+  const requiredFields = ['fullName', 'phone', 'address', 'city', 'postal'];
+  requiredFields.forEach(name => {
+    const input = document.querySelector(`[name="${name}"]`);
+    const group = input?.closest('.form-group');
+    if (!input || !group) return;
+
+    if (!group.querySelector('.field-check')) {
+      const check = document.createElement('i');
+      check.className = 'fas fa-check-circle field-check';
+      group.appendChild(check);
+    }
+
+    input.addEventListener('blur', () => {
+      group.classList.toggle('field-valid', Boolean(input.value.trim()));
+    });
+    input.addEventListener('input', () => {
+      if (input.value.trim()) group.classList.remove('shake');
+    });
+  });
+}
+
+function shakeInvalidFields(missingNames) {
+  missingNames.forEach((name, idx) => {
+    const input = document.querySelector(`[name="${name}"]`);
+    const group = input?.closest('.form-group');
+    if (!group) return;
+    group.classList.remove('shake');
+    void group.offsetWidth;
+    group.classList.add('shake');
+    if (idx === 0) input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    group.addEventListener('animationend', () => group.classList.remove('shake'), { once: true });
+  });
 }
 
 async function refreshCartPrices(cart) {
@@ -212,13 +289,16 @@ async function placeOrder() {
     return;
   }
 
-  const fullName = document.querySelector('[name="fullName"]')?.value;
-  const phone = document.querySelector('[name="phone"]')?.value;
-  const address = document.querySelector('[name="address"]')?.value;
-  const city = document.querySelector('[name="city"]')?.value;
-  const postal = document.querySelector('[name="postal"]')?.value;
+  const fields = { fullName: 'fullName', phone: 'phone', address: 'address', city: 'city', postal: 'postal' };
+  const values = {};
+  Object.keys(fields).forEach(key => {
+    values[key] = document.querySelector(`[name="${fields[key]}"]`)?.value;
+  });
+  const { fullName, phone, address, city, postal } = values;
 
   if (!fullName || !phone || !address || !city || !postal) {
+    const missing = Object.keys(fields).filter(key => !values[key]);
+    shakeInvalidFields(missing);
     showToast('Please fill all shipping details', 'warning');
     return;
   }
@@ -255,6 +335,13 @@ async function placeOrder() {
     clearCart();
     updateCartBadge();
     showToast('Order placed successfully!');
+
+    const btn = document.querySelector('.checkout-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add('success');
+    }
+    document.querySelectorAll('.progress-step').forEach(step => step.classList.add('completed'));
 
     setTimeout(() => {
       window.location.href = `./tracking.html?id=${order.id}`;

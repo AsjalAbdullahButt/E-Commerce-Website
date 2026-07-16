@@ -28,12 +28,29 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  cursor: zoom-in;
 }
 
 .main-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity var(--duration-base) var(--ease), transform var(--duration-fast) var(--ease);
+  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+}
+
+.main-image.zoomed img {
+  transform: scale(1.8);
+}
+
+.main-image img.fading {
+  opacity: 0;
+}
+
+@media (pointer: coarse) {
+  .main-image { cursor: default; }
+  .main-image.zoomed img { transform: none; }
 }
 
 .thumbnails {
@@ -119,7 +136,7 @@ main {
   color: var(--text-primary);
   cursor: pointer;
   font-weight: 600;
-  transition: var(--transition);
+  transition: transform var(--duration-fast) var(--ease-out-back), border-color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
 .size-btn:hover {
@@ -130,11 +147,60 @@ main {
   background: var(--gold);
   color: #000;
   border-color: var(--gold);
+  animation: variant-pop var(--duration-slow) var(--ease-out-back);
+  box-shadow: var(--shadow-gold);
+}
+
+@keyframes variant-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
 }
 
 .size-btn.out-of-stock {
   opacity: 0.4;
   text-decoration: line-through;
+}
+
+.color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-btn-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.stock-indicator {
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-height: 1.2em;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color var(--duration-base) var(--ease);
+}
+
+.stock-indicator.in-stock { color: var(--success); }
+.stock-indicator.low-stock { color: var(--warning); }
+.stock-indicator.out-of-stock-msg { color: var(--error); }
+
+.stock-indicator .stock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: stock-dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes stock-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
 }
 
 .color-select {

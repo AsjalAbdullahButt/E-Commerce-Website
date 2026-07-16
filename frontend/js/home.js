@@ -1,6 +1,27 @@
 // === HOME.JS ===
 let activeCategory = '';
 
+function homeSwatchColor(name) {
+  const map = { black: '#111111', white: '#f5f5f5', grey: '#888888', gray: '#888888', navy: '#1b2a4a', beige: '#d8c7a1', olive: '#5c5c33', maroon: '#5c1f2e' };
+  const key = String(name || '').trim().toLowerCase();
+  return map[key] || key || '#888';
+}
+
+function renderFeaturedSkeleton(container, count) {
+  container.textContent = '';
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const card = document.createElement('div');
+    card.className = 'product-card-skeleton';
+    const img = document.createElement('div'); img.className = 'skel-image skeleton';
+    const line1 = document.createElement('div'); line1.className = 'skel-line skeleton';
+    const line2 = document.createElement('div'); line2.className = 'skel-line price skeleton';
+    card.appendChild(img); card.appendChild(line1); card.appendChild(line2);
+    frag.appendChild(card);
+  }
+  container.appendChild(frag);
+}
+
 const defaultCategories = ['All', 'T-Shirts', 'Hoodies', 'Pants', 'Accessories'];
 
 function renderCategoryItems(container, categories) {
@@ -31,9 +52,12 @@ async function loadFeaturedProducts(category = '') {
       params.set('category', category);
     }
 
-    const data = await api.get(`/products?${params}`);
     const container = document.querySelector('.product-grid');
     if (!container) return;
+
+    renderFeaturedSkeleton(container, 4);
+
+    const data = await api.get(`/products?${params}`);
 
     container.textContent = '';
     if (!data.products || data.products.length === 0) {
@@ -44,17 +68,47 @@ async function loadFeaturedProducts(category = '') {
       return;
     }
 
-    data.products.forEach(p => {
+    const frag = document.createDocumentFragment();
+    data.products.forEach((p, idx) => {
       const a = document.createElement('a'); a.className = 'product-card'; a.href = `./product.html?id=${encodeURIComponent(p.id)}`;
       const imgWrap = document.createElement('div'); imgWrap.className = 'product-image';
       const img = document.createElement('img'); img.src = p.images?.[0] || '../images/fallback.jpg'; img.alt = p.name || '-'; img.onerror = () => img.src = '../images/fallback.jpg';
       imgWrap.appendChild(img);
+
+      if (p.images?.[1]) {
+        const altImg = document.createElement('img'); altImg.className = 'product-image-alt'; altImg.src = p.images[1]; altImg.alt = ''; altImg.loading = 'lazy';
+        imgWrap.appendChild(altImg);
+      }
+
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const colors = [...new Set(variants.map(v => v.color).filter(Boolean))];
+      if (colors.length > 1) {
+        const swatches = document.createElement('div'); swatches.className = 'color-swatches';
+        colors.slice(0, 5).forEach(color => {
+          const sw = document.createElement('span'); sw.className = 'swatch'; sw.title = color;
+          sw.style.background = homeSwatchColor(color);
+          swatches.appendChild(sw);
+        });
+        imgWrap.appendChild(swatches);
+      }
+
       const info = document.createElement('div'); info.className = 'product-info';
       const nameP = document.createElement('p'); nameP.className = 'product-name'; nameP.textContent = p.name || '-';
       const priceP = document.createElement('p'); priceP.className = 'product-price'; priceP.textContent = `Rs ${Number(p.price||0).toLocaleString()}`;
       info.appendChild(nameP); info.appendChild(priceP);
       a.appendChild(imgWrap); a.appendChild(info);
-      container.appendChild(a);
+      a.style.opacity = '0';
+      a.style.transform = 'translateY(16px)';
+      frag.appendChild(a);
+    });
+    container.appendChild(frag);
+
+    requestAnimationFrame(() => {
+      Array.from(container.children).forEach((card, idx) => {
+        card.style.transition = `opacity var(--duration-slow) var(--ease) ${idx * 60}ms, transform var(--duration-slow) var(--ease) ${idx * 60}ms`;
+        card.style.opacity = '1';
+        card.style.transform = 'none';
+      });
     });
   } catch (err) {
     console.error('Failed to load featured products', err);

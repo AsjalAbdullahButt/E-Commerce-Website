@@ -1,4 +1,10 @@
 // === PRODUCT.JS ===
+function swatchColorMap(name) {
+  const map = { black: '#111111', white: '#f5f5f5', grey: '#888888', gray: '#888888', navy: '#1b2a4a', beige: '#d8c7a1', olive: '#5c5c33', maroon: '#5c1f2e' };
+  const key = String(name || '').trim().toLowerCase();
+  return map[key] || key || '#888';
+}
+
 async function loadProduct() {
   const id = new URLSearchParams(window.location.search).get('id');
   
@@ -67,6 +73,7 @@ function setupVariantSelectors(product) {
   const qtyMinus = document.querySelector('.quantity-input button:first-child');
   const qtyPlus = document.querySelector('.quantity-input button:last-child');
   const addBtn = document.querySelector('.add-to-cart-btn');
+  const stockIndicator = document.querySelector('.stock-indicator');
 
   const sizes = [...new Set(variants.map(v => v.size))];
   const colors = [...new Set(variants.map(v => v.color))];
@@ -99,6 +106,28 @@ function setupVariantSelectors(product) {
         addBtn.textContent = 'Add to Cart';
       }
     }
+
+    if (stockIndicator) {
+      stockIndicator.classList.remove('in-stock', 'low-stock', 'out-of-stock-msg');
+      if (!state.size || !state.color) {
+        stockIndicator.textContent = '';
+      } else if (!variant || stock === 0) {
+        stockIndicator.classList.add('out-of-stock-msg');
+        stockIndicator.textContent = 'Out of stock in this size/color';
+      } else if (stock <= 5) {
+        stockIndicator.classList.add('low-stock');
+        stockIndicator.textContent = '';
+        const dot = document.createElement('span'); dot.className = 'stock-dot';
+        stockIndicator.appendChild(dot);
+        stockIndicator.appendChild(document.createTextNode(`Only ${stock} left in stock`));
+      } else {
+        stockIndicator.classList.add('in-stock');
+        stockIndicator.textContent = '';
+        const dot = document.createElement('span'); dot.className = 'stock-dot';
+        stockIndicator.appendChild(dot);
+        stockIndicator.appendChild(document.createTextNode('In stock'));
+      }
+    }
   }
 
   if (sizeContainer) {
@@ -126,8 +155,12 @@ function setupVariantSelectors(product) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'size-btn color-btn';
-      btn.textContent = color;
       btn.setAttribute('data-color', color);
+      const dot = document.createElement('span');
+      dot.className = 'color-btn-dot';
+      dot.style.background = swatchColorMap(color);
+      btn.appendChild(dot);
+      btn.appendChild(document.createTextNode(color));
       const hasStock = variants.some(v => v.color === color && v.stock > 0);
       if (!hasStock) btn.classList.add('out-of-stock');
       btn.addEventListener('click', () => {
@@ -183,9 +216,38 @@ function setupVariantSelectors(product) {
 }
 
 function changeImage(imageSrc, element) {
-  document.querySelector('.main-image img').src = imageSrc;
+  const mainImg = document.querySelector('.main-image img');
+  if (mainImg) {
+    if (mainImg.src === imageSrc) return;
+    mainImg.classList.add('fading');
+    setTimeout(() => {
+      mainImg.src = imageSrc;
+      mainImg.classList.remove('fading');
+    }, 180);
+  }
   document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
   element.classList.add('active');
+}
+
+function setupImageZoom() {
+  const wrapper = document.querySelector('.main-image');
+  const img = wrapper?.querySelector('img');
+  if (!wrapper || !img) return;
+  const fine = window.matchMedia('(pointer: fine)').matches;
+  if (!fine) return;
+
+  wrapper.addEventListener('mousemove', (e) => {
+    const rect = wrapper.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    wrapper.style.setProperty('--zoom-x', `${x}%`);
+    wrapper.style.setProperty('--zoom-y', `${y}%`);
+    wrapper.classList.add('zoomed');
+  });
+
+  wrapper.addEventListener('mouseleave', () => {
+    wrapper.classList.remove('zoomed');
+  });
 }
 
 async function loadReviews(productId) {
@@ -218,5 +280,8 @@ async function loadReviews(productId) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadProduct);
+document.addEventListener('DOMContentLoaded', () => {
+  loadProduct();
+  setupImageZoom();
+});
 

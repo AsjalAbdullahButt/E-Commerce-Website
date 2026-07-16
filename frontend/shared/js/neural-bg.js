@@ -9,6 +9,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let width = canvas.width = window.innerWidth;
   let height = canvas.height = window.innerHeight;
 
+  // Read the live --gold design token instead of a hardcoded color, so the
+  // background always matches whatever the theme currently defines.
+  const goldHex = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim() || '#FFD700';
+  const goldRgb = hexToRgb(goldHex);
+  const strokeColor = `rgba(${goldRgb}, 0.3)`;
+  const fillColor = `rgba(${goldRgb}, 0.5)`;
+
+  function hexToRgb(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return m ? `${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}` : '255, 215, 0';
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const nodes = [];
   const nodeCount = Math.floor(Math.sqrt(width * height / 10000));
 
@@ -24,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function draw() {
     ctx.clearRect(0, 0, width, height);
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
+    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = fillColor;
 
     // Update and draw nodes
     nodes.forEach(node => {
@@ -61,13 +75,18 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    requestAnimationFrame(draw);
+    if (!reducedMotion) requestAnimationFrame(draw);
   }
 
   window.addEventListener('resize', () => {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
   });
+
+  // Motion-safe: render one static frame instead of an endless particle drift.
+  if (reducedMotion) {
+    nodes.forEach(node => { node.vx = 0; node.vy = 0; });
+  }
 
   draw();
 });
