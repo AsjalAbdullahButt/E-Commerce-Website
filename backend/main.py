@@ -27,11 +27,14 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── Trusted Hosts (prevents Host-header injection) ────────────────────────────
-# Disabled in development to allow cross-origin requests from frontend
-# app.add_middleware(
-#     TrustedHostMiddleware,
-#     allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
-# )
+# Only enforced in production — settings.trusted_hosts must be set to the real production
+# hostname(s) via env var (comma-separated). Left off in development since local hostnames vary
+# (localhost, 127.0.0.1, LAN IPs) and there's no attacker-reachable surface to protect.
+if settings.is_production:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[h.strip() for h in settings.trusted_hosts.split(",") if h.strip()],
+    )
 
 # ── Admin Auth Middleware ─────────────────────────────────────────────────────
 app.add_middleware(AdminAuthMiddleware)

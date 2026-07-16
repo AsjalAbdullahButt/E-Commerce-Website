@@ -327,6 +327,10 @@ class AdminLogin(BaseModel):
     email: EmailStr
     password: str
 
+class AdminChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

@@ -376,16 +376,15 @@ async def logout(request: Request, admin_data: dict = Depends(verify_admin_token
 
 @router.post("/auth/change-password")
 async def change_password(
-    old_password: str,
-    new_password: str,
+    body: AdminChangePasswordRequest,
     admin_data: dict = Depends(verify_admin_token)
 ):
-    """Change admin password"""
+    """Change admin password. Body, not query params — mirrors routes/auth.py's ChangePasswordRequest."""
     try:
         await AdminAuthService.change_password(
             admin_id=admin_data["admin_id"],
-            old_password=old_password,
-            new_password=new_password
+            old_password=body.old_password,
+            new_password=body.new_password
         )
         return {
             "success": True,
@@ -397,6 +396,23 @@ async def change_password(
         await log_to_db("ERROR", __name__, f"Password change error: {e}", {"admin_id": admin_data.get("admin_id") if isinstance(admin_data, dict) else None})
         logger.error(f"Password change error: {str(e)}")
         raise HTTPException(status_code=500, detail="Password change failed")
+
+@router.post("/auth/unlock/{admin_id}")
+async def unlock_admin_account(admin_id: str, admin_data: dict = Depends(verify_admin_token)):
+    """Unlock a locked admin account. Super-admin only — "admin:update" is reserved for
+    super_admin in utils/permissions.py. AdminAuthService.unlock_account already existed but had
+    no route calling it. See NOTES_schema_audit.md §7."""
+    if not await check_permission(admin_data, "admin:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        await AdminAuthService.unlock_account(admin_id=admin_id, super_admin_id=admin_data["admin_id"])
+        return {"success": True, "message": "Account unlocked"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await log_to_db("ERROR", __name__, f"Unlock account error: {e}", {"target_admin_id": admin_id})
+        logger.error(f"Unlock account error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to unlock account")
 
 # ════════════════════════════════════════════════════════════════════════════
 # PRODUCT ROUTES

@@ -6,10 +6,12 @@ from middleware.auth_middleware import get_current_user
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from config import settings
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+import hashlib
 import re
+import secrets
 
 logger = get_logger(__name__)
 
@@ -315,6 +317,83 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
         await log_to_db("PASSWORD_CHANGE_ERROR", "failed to change password", {"error": str(e), "user_id": str(user.get("_id") or user.get("id"))})
         logger.error(f"Password change error: {e}")
         raise HTTPException(status_code=500, detail="Failed to change password")
+
+RESET_TOKEN_EXPIRE_MINUTES = 30
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, body: ForgotPasswordRequest):
+    """Request a password reset link. Customers only (admin/rider passwords are managed by an
+    admin). Always returns the same generic message regardless of whether the email exists, to
+    avoid leaking which emails are registered."""
+    email = sanitize_input(body.email)
+    user = await users_col.find_one({"email": email})
+
+    if user:
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        expires_at = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+
+        await users_col.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"reset_token_hash": token_hash, "reset_token_expires": expires_at.isoformat()}},
+        )
+
+        reset_link = f"{settings.frontend_url}/auth/reset-password.html?token={raw_token}"
+        # No SMTP/email provider is configured for this app — log the link instead of emailing
+        # it, so the flow is still fully testable end-to-end. Wire up a real provider here
+        # (e.g. SendGrid/SES) before relying on this in production.
+        logger.info(f"[DEV] Password reset link for {email}: {reset_link}")
+        await log_to_db("PASSWORD_RESET_REQUESTED", f"password reset requested for {email}", {
+            "user_id": str(user["_id"]), "reset_link": reset_link,
+        })
+
+    return {"message": "If an account with that email exists, a password reset link has been sent."}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, body: ResetPasswordRequest):
+    """Complete a password reset with the token from /forgot-password. Single-use: the token
+    fields are cleared on success, so replaying the same token fails."""
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    user = await users_col.find_one({"reset_token_hash": token_hash})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    expires_at = user.get("reset_token_expires")
+    if isinstance(expires_at, str):
+        try:
+            expires_at = datetime.fromisoformat(expires_at)
+        except Exception:
+            expires_at = None
+    if not expires_at or expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    new_pw = body.new_password
+    if len(new_pw) < 8 or not re.search(r"[A-Z]", new_pw) or not re.search(r"\d", new_pw):
+        raise HTTPException(status_code=422, detail="New password must be at least 8 characters, include an uppercase letter and a digit")
+
+    await users_col.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {"password": hash_password(new_pw), "updated_at": datetime.utcnow().isoformat()},
+            "$unset": {"reset_token_hash": "", "reset_token_expires": ""},
+        },
+    )
+    await log_to_db("PASSWORD_RESET_COMPLETED", f"password reset completed for user {str(user['_id'])}", {"user_id": str(user["_id"])})
+    return {"message": "Password reset successfully. You can now log in with your new password."}
+
 
 @router.patch("/me")
 @limiter.limit("10/minute")

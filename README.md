@@ -25,8 +25,9 @@ python -m http.server 5500 --directory frontend
 ```
 
 ### Access the App
-- **Frontend:** http://localhost:5500/customer/index.html
-- **Admin:** http://localhost:5500/admin/login.html
+- **Single entry point:** http://localhost:5500/ — routes to the right home page (customer/admin/rider) based on your session, or to login/register if you're not signed in
+- **Customer shop directly:** http://localhost:5500/customer/index.html
+- **Admin login directly:** http://localhost:5500/admin/login.html
 - **API Docs:** http://localhost:8000/docs
 
 ## Project Structure
@@ -136,9 +137,16 @@ pytest tests/ -v
 
 ## Deployment
 
+> **Single worker only.** The in-memory cache (`utils/cache.py`) and rate limiter
+> (`utils/limiter.py`) have no Redis or other shared backend — each worker process keeps its own
+> independent cache and rate-limit counters. Running more than one worker means cache
+> invalidation and rate limits are no longer consistent across requests. Set `WEB_CONCURRENCY=1`
+> (the app fails fast on startup in production if this isn't 1). Scaling horizontally requires
+> wiring up a shared Redis-backed cache/limiter first.
+
 ### Using Gunicorn
 ```bash
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker backend.main:app
+WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app
 ```
 
 ### Using Docker
@@ -316,6 +324,8 @@ curl -X POST "http://localhost:8000/orders" \
 - [ ] Use production MongoDB Atlas cluster with IP whitelisting
 - [ ] Configure rate limits based on expected traffic
 - [ ] Set up monitoring and alerting for errors
+- [ ] Deploy with exactly one worker process (`WEB_CONCURRENCY=1`) — the in-memory cache and
+      rate limiter are not shared across workers (see "Deployment" note above)
 
 ### Using Docker (Optional)
 

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-COM</title>
+  <link rel="stylesheet" href="./shared/css/global.css">
+  <style>
+    .entry-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 1rem;
+      color: var(--text-secondary, #888);
+      font-family: var(--font-body, sans-serif);
+    }
+    .entry-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(128,128,128,0.25);
+      border-top-color: var(--gold, #D4AF37);
+      border-radius: 50%;
+      animation: entry-spin 0.8s linear infinite;
+    }
+    @keyframes entry-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="entry-loading">
+    <div class="entry-spinner"></div>
+    <p>Loading E-COM...</p>
+  </div>
+
+  <script src="./shared/js/config.js"></script>
+  <script src="./shared/js/api.js"></script>
+  <script src="./shared/js/auth.js"></script>
+  <script>
+    // Single entry point: same site, different home per role. Reuses the token/role helpers
+    // from shared/js/auth.js rather than re-deriving session state — see NOTES_schema_audit.md.
+    (async function routeToHome() {
+      const HOME_BY_ROLE = {
+        customer: './customer/index.html',
+        admin: './admin/dashboard.html',
+        rider: './rider/dashboard.html',
+      };
+
+      if (!isLoggedIn()) {
+        window.location.replace('./auth/login.html');
+        return;
+      }
+
+      try {
+        // Validates the token against the server (not just localStorage presence) and returns
+        // the authoritative current role. api.js's apiRequest already handles a 401 here by
+        // clearing the session and redirecting to ./auth/login.html, so we only need the
+        // success path.
+        const profile = await api.get('/auth/me', true);
+        if (!profile) return; // apiRequest already redirected on 401
+
+        localStorage.setItem('ecom_role', profile.role);
+        window.location.replace(HOME_BY_ROLE[profile.role] || './customer/index.html');
+      } catch (err) {
+        console.error('Session check failed:', err);
+        clearAuth();
+        window.location.replace('./auth/login.html');
+      }
+    })();
+  </script>
+</body>
+</html>
