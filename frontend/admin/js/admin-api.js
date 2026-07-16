@@ -57,13 +57,18 @@ class AdminAPI {
     }
 
     /**
-     * Refresh access token using the httpOnly refresh cookie (no token read/sent from JS)
+     * Refresh access token using the httpOnly refresh cookie (no token read/sent from JS).
+     * The double-submit admin_csrf_token cookie (readable, unlike the refresh cookie itself)
+     * must be echoed back as a header — see backend/utils/csrf.py.
      */
     async refreshAccessToken() {
         try {
+            const csrfMatch = document.cookie.match(/(?:^|; )admin_csrf_token=([^;]*)/);
+            const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : null;
             const response = await fetch(`${this.baseURL}${ADMIN_CONFIG.ENDPOINTS.AUTH.REFRESH}`, {
                 method: 'POST',
                 credentials: 'include',
+                headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
             });
 
             if (response.ok) {

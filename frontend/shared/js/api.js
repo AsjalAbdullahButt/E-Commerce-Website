@@ -20,6 +20,40 @@ function clearAuthSession() {
   localStorage.removeItem('ecom_role');
 }
 
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Dedupes concurrent refresh attempts (e.g. several API calls 401-ing at once) into one request.
+let _refreshPromise = null;
+
+async function refreshAccessToken() {
+  if (!_refreshPromise) {
+    _refreshPromise = (async () => {
+      try {
+        const csrfToken = getCookie('csrf_token');
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        localStorage.setItem('ecom_token', data.access_token);
+        return true;
+      } catch (err) {
+        console.error('[API] Token refresh failed:', err.message);
+        return false;
+      } finally {
+        _refreshPromise = null;
+      }
+    })();
+  }
+  return _refreshPromise;
+}
+
 function showToast(message, type = 'success', duration = 3000) {
   let toast = document.getElementById('global-toast');
   if (!toast) {
@@ -36,7 +70,7 @@ function showToast(message, type = 'success', duration = 3000) {
   }, duration);
 }
 
-async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
+async function apiRequest(method, endpoint, body = null, requiresAuth = false, _isRetry = false) {
   const headers = { 'Content-Type': 'application/json' };
 
   if (requiresAuth) {
@@ -68,6 +102,14 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false) {
     const res = await fetch(url, options);
 
     if (res.status === 401) {
+      // Access tokens are short-lived (15 min); try one silent refresh (matches the admin
+      // panel's retry pattern in admin/js/admin-api.js) before dropping the session.
+      if (requiresAuth && !_isRetry) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          return apiRequest(method, endpoint, body, requiresAuth, true);
+        }
+      }
       clearAuthSession();
       redirectToLogin();
       return null;

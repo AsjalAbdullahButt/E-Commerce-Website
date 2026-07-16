@@ -17,6 +17,7 @@ from bson import ObjectId
 from datetime import datetime
 from config import settings
 from utils.limiter import limiter
+from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
 
 logger = get_logger(__name__)
 
@@ -332,6 +333,9 @@ REFRESH_COOKIE_NAME = "admin_refresh_token"
 REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches jwt_refresh_expire_minutes default
 
 
+CSRF_COOKIE_NAME = "admin_csrf_token"
+
+
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
@@ -341,6 +345,11 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
         samesite="strict",
         max_age=REFRESH_COOKIE_MAX_AGE,
     )
+    # Double-submit CSRF cookie, rotated alongside the refresh cookie — see utils/csrf.py.
+    # POST /admin/auth/refresh is the only admin endpoint that authenticates purely off a cookie
+    # (no bearer header), so it's the one that needs this; /admin/auth/logout already requires
+    # verify_admin_token.
+    set_csrf_cookie(response, CSRF_COOKIE_NAME, generate_csrf_token(), settings.cookie_secure, REFRESH_COOKIE_MAX_AGE)
 
 
 @router.post("/auth/login")
@@ -380,6 +389,9 @@ async def refresh(request: Request, response: Response):
     refresh_token_str = request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_token_str:
         raise HTTPException(status_code=401, detail="No refresh token")
+
+    verify_csrf(request, CSRF_COOKIE_NAME)
+
     try:
         result = await AdminAuthService.refresh_token(refresh_token_str)
         _set_refresh_cookie(response, result.pop("refresh_token"))
@@ -404,6 +416,7 @@ async def logout(request: Request, response: Response, admin_data: dict = Depend
             ip_address=request.state.ip_address
         )
         response.delete_cookie(REFRESH_COOKIE_NAME, httponly=True, secure=settings.cookie_secure, samesite="strict")
+        response.delete_cookie(CSRF_COOKIE_NAME, httponly=False, secure=settings.cookie_secure, samesite="strict")
         return {
             "success": True,
             "message": "Logout successful"

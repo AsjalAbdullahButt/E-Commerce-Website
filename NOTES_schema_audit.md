@@ -330,6 +330,50 @@ typed `datetime`, never `str`.
 Verified via full `pytest` run after all Phase 1 changes (timestamps + dead code): 26/26 passing,
 no import errors.
 
+## 11. Polish-pass Phase 2 — CSRF protection + auth reconciliation (2026-07-17)
+
+**Threat-modeled before adding anything.** Every protected endpoint (`middleware/auth_middleware.py
+::get_current_user`, `middleware/admin_auth.py::verify_admin_token`/`AdminAuthMiddleware`) requires
+an `Authorization: Bearer <token>` header — a cross-site request cannot forge that without already
+having XSS, at which point CSRF is moot. The refresh cookies (`refresh_token`/`admin_refresh_token`)
+are httpOnly + `Secure` + `SameSite=Strict`, which already blocks the cookie from being attached to
+*any* cross-site request in modern browsers. So `/auth/logout` and `/admin/auth/logout` (which both
+require the bearer token) were never CSRF-exploitable. The **only** genuinely cookie-only-
+authenticated, state-changing endpoints are `POST /auth/refresh` and `POST /admin/auth/refresh` —
+added double-submit-cookie CSRF protection there specifically (`backend/utils/csrf.py`), as explicit
+defense-in-depth on top of `SameSite=Strict` (covers browsers/proxies that don't enforce it, and any
+future accidental weakening of the cookie's SameSite setting).
+
+- New non-httpOnly `csrf_token`/`admin_csrf_token` cookie, issued alongside the refresh cookie at
+  login/register/refresh, rotated on every refresh. `verify_csrf()` does a constant-time compare of
+  the cookie value against an `X-CSRF-Token` request header; `/refresh` checks refresh-cookie
+  presence first (401 "No refresh token" if absent) then CSRF (403 if missing/mismatched), so the
+  status code still distinguishes "not logged in" from "CSRF check failed."
+- Frontend: `frontend/shared/js/api.js` and `frontend/admin/js/admin-api.js` read the CSRF cookie via
+  `document.cookie` and echo it back as `X-CSRF-Token` on refresh calls.
+- **Found and fixed a real bug while doing this:** `POST /auth/register` returned the raw
+  `refresh_token` in the JSON response body (a secret leaking into the response) and never set the
+  refresh/CSRF cookies at all — so a freshly-registered user had no cookie session and couldn't use
+  `/auth/refresh` until they separately logged in. Now matches `/login`'s cookie contract exactly
+  (verified the frontend never read `data.refresh_token` from the register response, so this is a
+  pure fix, not a breaking change).
+- **Found and fixed a second real bug:** the customer-facing `apiRequest()` in `shared/js/api.js`
+  never called `/auth/refresh` at all — any 401 immediately cleared the session and redirected to
+  login, meaning customers were silently logged out every 15 minutes (the access-token lifetime).
+  The admin panel (`admin-api.js::request()`) already retried once via `refreshAccessToken()` on 401.
+  Customer `apiRequest()` now does the same (dedup'd via a shared in-flight promise to avoid a
+  refresh stampede when several calls 401 at once), so the two flows are now behaviorally identical,
+  not just structurally identical.
+- Net result: customer and admin auth are now one consistent, documented strategy — httpOnly+Secure+
+  SameSite=Strict refresh cookie, sibling CSRF cookie, Bearer access token for all other calls,
+  auto-refresh-and-retry-once on 401 — differing only in cookie *names* (`refresh_token`/`csrf_token`
+  vs `admin_refresh_token`/`admin_csrf_token`), which is intentional so both sessions can coexist in
+  the same browser without clobbering each other.
+
+Tests: `backend/tests/test_integration/test_refresh_token.py` covers both flows — missing CSRF
+header (403), wrong CSRF header (403), correct header (200 + rotation), and the pre-existing
+no-cookie-at-all case (401). Full suite: 29/29 passing.
+
 ## 8. Fields NOT touched by this audit (confirmed consistent, no divergence found)
 `wishlist_col`, `promos_col` (both `routes/promos.py` and `services/discount.py` write compatible
 `code/discount_type/discount_value/min_order/max_uses/uses/is_active/expires_at` shapes — the admin

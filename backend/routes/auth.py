@@ -5,6 +5,7 @@ from utils.helpers import hash_password, verify_password, create_access_token, c
 from middleware.auth_middleware import get_current_user
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
+from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
 from config import settings
 from datetime import datetime, timedelta
 from bson import ObjectId
@@ -16,6 +17,24 @@ import secrets
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days, matches jwt_refresh_expire_minutes default
+
+
+def _set_session_cookies(response: Response, refresh_token: str) -> None:
+    """Set the httpOnly refresh cookie plus its double-submit CSRF cookie together, so the two
+    are always issued/rotated in lockstep. See utils/csrf.py for why only /auth/refresh needs
+    this (not /auth/logout, which already requires a bearer token)."""
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite="strict",
+        max_age=REFRESH_COOKIE_MAX_AGE,
+    )
+    set_csrf_cookie(response, "csrf_token", generate_csrf_token(), settings.cookie_secure, REFRESH_COOKIE_MAX_AGE)
+
 
 def serialize_user(u: dict) -> dict:
     return {
@@ -29,7 +48,7 @@ def serialize_user(u: dict) -> dict:
 
 @router.post("/register")
 @limiter.limit("3/minute")
-async def register(request: Request, body: UserCreate):
+async def register(request: Request, body: UserCreate, response: Response):
     """Register a new customer. Rate limited: 3 per minute per IP."""
     # Sanitize inputs
     name = sanitize_input(body.name)
@@ -54,9 +73,13 @@ async def register(request: Request, body: UserCreate):
     access_token = create_access_token(str(result.inserted_id), "customer")
     refresh_token = create_refresh_token(str(result.inserted_id), "customer")
 
+    # Match /login's cookie contract exactly — previously this returned refresh_token in the
+    # JSON body (a secret leaking into the response) and never set the cookie at all, so a
+    # freshly-registered user couldn't use /auth/refresh until they separately logged in.
+    _set_session_cookies(response, refresh_token)
+
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": serialize_user(user)
     }
@@ -79,14 +102,7 @@ async def login(request: Request, body: UserLogin, response: Response):
         access_token = create_access_token(str(user["_id"]), user.get("role", "customer"))
         refresh_token = create_refresh_token(str(user["_id"]), user.get("role", "customer"))
 
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            max_age=7*24*60*60
-        )
+        _set_session_cookies(response, refresh_token)
 
         return {
             "access_token": access_token,
@@ -107,14 +123,7 @@ async def login(request: Request, body: UserLogin, response: Response):
         access_token = create_access_token(str(admin["_id"]), "admin")
         refresh_token = create_refresh_token(str(admin["_id"]), "admin")
 
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            max_age=7*24*60*60
-        )
+        _set_session_cookies(response, refresh_token)
 
         admin_serialized = {
             "id": str(admin["_id"]),
@@ -140,14 +149,7 @@ async def login(request: Request, body: UserLogin, response: Response):
         access_token = create_access_token(str(rider["_id"]), "rider")
         refresh_token = create_refresh_token(str(rider["_id"]), "rider")
 
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            max_age=7*24*60*60
-        )
+        _set_session_cookies(response, refresh_token)
 
         rider_serialized = {
             "id": str(rider["_id"]),
@@ -168,13 +170,17 @@ async def login(request: Request, body: UserLogin, response: Response):
 @router.post("/refresh")
 @limiter.limit("10/minute")
 async def refresh(request: Request, response: Response):
-    """Refresh access token using refresh token from cookie"""
+    """Refresh access token using refresh token from cookie. This is the only endpoint that
+    authenticates purely off a cookie (no bearer header), so it's the one that needs an explicit
+    CSRF check — see utils/csrf.py."""
     from jose import jwt, JWTError
-    
+
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="No refresh token")
-    
+
+    verify_csrf(request, "csrf_token")
+
     try:
         payload = jwt.decode(
             refresh_token,
@@ -202,17 +208,9 @@ async def refresh(request: Request, response: Response):
         
         new_access_token = create_access_token(user_id, role)
         new_refresh_token = create_refresh_token(user_id, role)
-        
-        # Update refresh token cookie
-        response.set_cookie(
-            key="refresh_token",
-            value=new_refresh_token,
-            httponly=True,
-            secure=settings.cookie_secure,
-            samesite="strict",
-            max_age=7*24*60*60
-        )
-        
+
+        _set_session_cookies(response, new_refresh_token)
+
         return {
             "access_token": new_access_token,
             "token_type": "bearer"
@@ -226,6 +224,7 @@ async def refresh(request: Request, response: Response):
 async def logout(request: Request, response: Response, user=Depends(get_current_user)):
     """Logout by clearing refresh token cookie"""
     response.delete_cookie("refresh_token", httponly=True, secure=settings.cookie_secure, samesite="strict")
+    response.delete_cookie("csrf_token", httponly=False, secure=settings.cookie_secure, samesite="strict")
     return {"message": "Logged out successfully"}
 
 @router.get("/me")
