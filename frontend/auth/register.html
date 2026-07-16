@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="../shared/css/global.css">
-  <link rel="stylesheet" href="../shared/css/auth.css">
+  <link rel="stylesheet" href="../shared/css/global.css?v=20260716">
+  <link rel="stylesheet" href="../shared/css/auth.css?v=20260716">
 </head>
 <body>
 
@@ -117,11 +117,11 @@
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
   </footer>
 
-  <script src="../shared/js/config.js"></script>
-  <script src="../shared/js/api.js"></script>
-  <script src="../shared/js/auth.js"></script>
-  <script src="../shared/js/cart.js"></script>
-  <script src="../shared/js/neural-bg.js"></script>
+  <script src="../shared/js/config.js?v=20260716"></script>
+  <script src="../shared/js/api.js?v=20260716"></script>
+  <script src="../shared/js/auth.js?v=20260716"></script>
+  <script src="../shared/js/cart.js?v=20260716"></script>
+  <script src="../shared/js/neural-bg.js?v=20260716"></script>
 
   <script>
     async function handleRegister() {
@@ -133,16 +133,23 @@
 
       if (!name || !email || !password || !confirm) {
         showToast('Please fill all fields', 'warning');
+        if (!name) shakeField(document.getElementById('register-name'));
+        if (!email) shakeField(document.getElementById('register-email'));
+        if (!password) shakeField(document.getElementById('register-password'));
+        if (!confirm) shakeField(document.getElementById('register-confirm'));
         return;
       }
 
       if (password !== confirm) {
         showToast('Passwords do not match', 'warning');
+        shakeField(document.getElementById('register-password'));
+        shakeField(document.getElementById('register-confirm'));
         return;
       }
 
       if (password.length < 6) {
         showToast('Password must be at least 6 characters', 'warning');
+        shakeField(document.getElementById('register-password'));
         return;
       }
 

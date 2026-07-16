@@ -5,7 +5,7 @@ main {
   padding: 2rem;
 }
 
-.profile-header {
+.profile-title {
   font-family: var(--font-display);
   font-size: 2rem;
   color: var(--gold);
@@ -43,6 +43,18 @@ main {
 
 .tab-content.active {
   display: block;
+  animation: tab-fade-in var(--duration-base) var(--ease);
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.info-item,
+.wishlist-item,
+.orders-table tbody tr {
+  animation: tab-fade-in var(--duration-base) var(--ease) both;
 }
 
 .profile-info {
@@ -224,6 +236,13 @@ textarea:focus {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   overflow: hidden;
+  transition: transform var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
+}
+
+.wishlist-item:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-md);
 }
 
 .wishlist-image {
@@ -274,6 +293,16 @@ textarea:focus {
 
 .wishlist-actions button:hover {
   background: var(--gold-glow);
+}
+
+@media (max-width: 1024px) {
+  main {
+    padding: 1.5rem;
+  }
+
+  .wishlist-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 768px) {

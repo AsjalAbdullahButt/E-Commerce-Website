@@ -333,6 +333,16 @@ main {
   font-size: 0.95rem;
 }
 
+@media (max-width: 1024px) {
+  main {
+    padding: 1.5rem;
+  }
+
+  .product-detail {
+    gap: 2rem;
+  }
+}
+
 @media (max-width: 768px) {
   .product-detail {
     grid-template-columns: 1fr;

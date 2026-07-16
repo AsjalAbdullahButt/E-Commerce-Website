@@ -64,6 +64,15 @@ main {
   gap: 0.6rem;
 }
 
+.form-group.shake input {
+  animation: field-shake 0.4s var(--ease);
+  border-color: var(--error) !important;
+}
+
+.form-group.field-valid input {
+  border-color: var(--success);
+}
+
 label {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -186,6 +195,22 @@ input:focus {
   color: var(--error);
   font-size: 0.8rem;
   margin-top: -1rem;
+}
+
+@media (max-width: 1024px) {
+  main {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .auth-container {
+    max-width: 440px;
+  }
+
+  .auth-card {
+    padding: 2rem;
+  }
 }
 
 @media (max-width: 480px) {

@@ -21,37 +21,83 @@ async function loadTrackingData() {
       orderIdElement.textContent = `Order #${sanitizeString(orderId.substring(0, 8))}...`;
     }
 
-    // Status timeline with sanitized data
+    // Status timeline with sanitized data. status_history (already returned by
+    // GET /orders/{id}, per backend/schemas/order.py) supplies the timestamp/note
+    // for each step that's actually been reached.
     const statuses = ['pending', 'confirmed', 'packed', 'shipped', 'delivered'];
     const timeline = document.querySelector('.status-timeline');
-    
+    const history = Array.isArray(order.status_history) ? order.status_history : [];
+    const isTerminalBad = order.status === 'cancelled' || order.status === 'returned';
+
     if (timeline) {
       timeline.textContent = '';
-      
+      const currentIdx = statuses.indexOf(order.status);
+
       statuses.forEach((status, idx) => {
-        const completed = statuses.indexOf(order.status) >= idx;
-        const active = status === order.status;
-        
+        const completed = !isTerminalBad && currentIdx >= idx && currentIdx !== -1 && idx < currentIdx;
+        const active = !isTerminalBad && status === order.status;
+
         const step = document.createElement('div');
         step.className = 'timeline-step';
-        
+        step.style.position = 'relative';
+
+        if (idx < statuses.length - 1) {
+          const line = document.createElement('div');
+          line.className = 'timeline-line';
+          if (completed) line.classList.add('filled');
+          step.appendChild(line);
+        }
+
         const dot = document.createElement('div');
         dot.className = `timeline-dot ${active ? 'active' : ''} ${completed ? 'completed' : ''}`;
         dot.textContent = active ? '●' : completed ? '✓' : '◦';
-        
+
         const content = document.createElement('div');
         content.className = 'timeline-content';
-        
+
         const statusP = document.createElement('p');
         statusP.className = 'timeline-status';
         statusP.style.textTransform = 'capitalize';
         statusP.textContent = status;
-        
         content.appendChild(statusP);
+
+        const entry = history.find(h => h.status === status);
+        if (entry?.timestamp) {
+          const timeP = document.createElement('p');
+          timeP.className = 'timeline-time';
+          try { timeP.textContent = new Date(entry.timestamp).toLocaleString(); } catch { /* skip */ }
+          content.appendChild(timeP);
+        }
+        if (entry?.note) {
+          const noteP = document.createElement('p');
+          noteP.className = 'timeline-note';
+          noteP.textContent = sanitizeString(entry.note);
+          content.appendChild(noteP);
+        }
+
         step.appendChild(dot);
         step.appendChild(content);
         timeline.appendChild(step);
       });
+
+      if (isTerminalBad) {
+        const badStep = document.createElement('div');
+        badStep.className = 'timeline-step';
+        const dot = document.createElement('div');
+        dot.className = 'timeline-dot cancelled';
+        const icon = document.createElement('i'); icon.className = 'fas fa-times';
+        dot.appendChild(icon);
+        const content = document.createElement('div');
+        content.className = 'timeline-content';
+        const statusP = document.createElement('p');
+        statusP.className = 'timeline-status';
+        statusP.style.textTransform = 'capitalize';
+        statusP.textContent = order.status;
+        content.appendChild(statusP);
+        badStep.appendChild(dot);
+        badStep.appendChild(content);
+        timeline.appendChild(badStep);
+      }
     }
 
     // Order items with sanitized data

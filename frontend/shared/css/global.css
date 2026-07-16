@@ -319,6 +319,16 @@ button {
   50%       { box-shadow: 0 0 14px rgba(255,215,0,0.80); }
 }
 
+.cart-badge.bump {
+  animation: badge-pulse 2.5s ease-in-out infinite, badge-bump var(--duration-slow) var(--ease-out-back);
+}
+
+@keyframes badge-bump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.5); }
+  100% { transform: scale(1); }
+}
+
 .hamburger {
   display: none;
   flex-direction: column;
@@ -921,6 +931,15 @@ button {
   0%   { transform: scale(1); }
   40%  { transform: scale(0.90); }
   100% { transform: scale(1); }
+}
+
+/* Generic shake for invalid-field feedback (used by checkout.css and auth.css) */
+@keyframes field-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(5px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(3px); }
 }
 
 /* Skeleton product card (fetch loading state) */

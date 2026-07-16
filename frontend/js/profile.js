@@ -1,7 +1,5 @@
 // === PROFILE.JS ===
 document.addEventListener('DOMContentLoaded', async () => {
-  requireAuth(['customer']);
-
   const user = getUser();
   const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');

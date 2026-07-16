@@ -124,6 +124,16 @@ async function logout() {
 
 // redirectToLogin() consolidated into api.js
 
+// Shared shake-on-invalid feedback for auth/checkout style forms.
+function shakeField(input) {
+  const group = input?.closest('.form-group');
+  if (!group) return;
+  group.classList.remove('shake');
+  void group.offsetWidth;
+  group.classList.add('shake');
+  group.addEventListener('animationend', () => group.classList.remove('shake'), { once: true });
+}
+
 function redirectAfterLogin(role) {
   const routes = {
     admin:    '../admin/dashboard.html',

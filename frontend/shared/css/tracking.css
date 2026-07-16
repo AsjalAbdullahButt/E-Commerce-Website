@@ -35,7 +35,20 @@ main {
   display: flex;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  animation: tl-step-in var(--duration-slow) var(--ease) both;
 }
+
+@keyframes tl-step-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.timeline-step:nth-child(1) { animation-delay: 0ms; }
+.timeline-step:nth-child(2) { animation-delay: 80ms; }
+.timeline-step:nth-child(3) { animation-delay: 160ms; }
+.timeline-step:nth-child(4) { animation-delay: 240ms; }
+.timeline-step:nth-child(5) { animation-delay: 320ms; }
+.timeline-step:nth-child(6) { animation-delay: 400ms; }
 
 .timeline-step:last-child {
   margin-bottom: 0;
@@ -81,14 +94,28 @@ main {
 .timeline-line {
   position: absolute;
   width: 2px;
-  background: var(--gold);
+  background: var(--border);
   left: 19px;
   top: 40px;
-  height: 60px;
+  bottom: -2rem;
+  z-index: 0;
+  transition: background var(--duration-slow) var(--ease);
 }
 
-.timeline-dot.active ~ .timeline-content .timeline-line {
+.timeline-line.filled {
   background: var(--gold);
+}
+
+.timeline-dot,
+.timeline-content {
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-dot.cancelled {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
 }
 
 .timeline-content {
@@ -132,6 +159,11 @@ main {
   gap: 1rem;
   padding: 1rem 0;
   border-bottom: 1px solid var(--border);
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.order-item:hover {
+  background: var(--bg-surface);
 }
 
 .order-item:last-child {
@@ -196,6 +228,32 @@ main {
   font-size: 0.95rem;
 }
 
+@media (max-width: 1024px) {
+  main {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .status-timeline,
+  .order-items,
+  .shipping-info {
+    padding: 1.25rem;
+  }
+
+  .timeline-step {
+    gap: 1.25rem;
+  }
+
+  .order-item {
+    flex-wrap: wrap;
+  }
+
+  .item-price {
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 480px) {
   main {
     padding: 1rem;
@@ -208,5 +266,9 @@ main {
   .timeline-dot {
     width: 32px;
     height: 32px;
+  }
+
+  .timeline-line {
+    left: 15px;
   }
 }

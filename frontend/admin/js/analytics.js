@@ -38,6 +38,11 @@ class AdminAnalyticsDashboard {
         });
     }
 
+    _chartAnimation() {
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        return reduced ? { duration: 0 } : { duration: 800, easing: 'easeOutQuart' };
+    }
+
     _destroyChart(key) {
         if (this.charts[key]) {
             this.charts[key].destroy();
@@ -52,20 +57,60 @@ class AdminAnalyticsDashboard {
         }
     }
 
+    // Animates a stat card from its current displayed value up to `endValue`,
+    // formatting each intermediate frame with `formatFn` (e.g. currency).
+    _animateStat(selector, endValue, formatFn) {
+        const node = document.querySelector(selector);
+        if (!node) return;
+
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduced) {
+            node.textContent = formatFn(endValue);
+            return;
+        }
+
+        const startValue = Number(String(node.textContent).replace(/[^\d.-]/g, '')) || 0;
+        const duration = 800;
+        const startTime = performance.now();
+
+        const step = (now) => {
+            const progress = Math.min(1, (now - startTime) / duration);
+            const eased = 1 - Math.pow(1 - progress, 3); // ease-out-cubic
+            const current = startValue + (endValue - startValue) * eased;
+            node.textContent = formatFn(progress >= 1 ? endValue : current);
+            if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    }
+
     _renderTableBody(bodyId, rows) {
         const body = document.getElementById(bodyId);
         if (!body) return;
 
+        const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         body.textContent = '';
-        rows.forEach((rowData) => {
+        rows.forEach((rowData, idx) => {
             const row = document.createElement('tr');
             rowData.forEach((cell) => {
                 const cellNode = document.createElement('td');
                 cellNode.textContent = cell;
                 row.appendChild(cellNode);
             });
+            if (!reduced) {
+                row.style.opacity = '0';
+                row.style.transform = 'translateY(8px)';
+                row.style.transition = `opacity var(--duration-base) var(--ease) ${idx * 40}ms, transform var(--duration-base) var(--ease) ${idx * 40}ms`;
+            }
             body.appendChild(row);
         });
+        if (!reduced) {
+            requestAnimationFrame(() => {
+                Array.from(body.children).forEach((row) => {
+                    row.style.opacity = '1';
+                    row.style.transform = 'none';
+                });
+            });
+        }
     }
 
     async loadDashboard() {
@@ -73,10 +118,10 @@ class AdminAnalyticsDashboard {
             const summary = await adminAPI.getDashboardSummary();
             const stats = summary.stats || {};
 
-            this._setStat('[data-stat="revenue"]', this._formatCurrency(stats.total_revenue));
-            this._setStat('[data-stat="orders"]', String(stats.total_orders ?? 0));
-            this._setStat('[data-stat="pending"]', String(stats.pending_orders ?? 0));
-            this._setStat('[data-stat="products"]', String(stats.total_products ?? 0));
+            this._animateStat('[data-stat="revenue"]', Number(stats.total_revenue || 0), (v) => this._formatCurrency(v));
+            this._animateStat('[data-stat="orders"]', Number(stats.total_orders || 0), (v) => String(Math.round(v)));
+            this._animateStat('[data-stat="pending"]', Number(stats.pending_orders || 0), (v) => String(Math.round(v)));
+            this._animateStat('[data-stat="products"]', Number(stats.total_products || 0), (v) => String(Math.round(v)));
 
             this.renderRevenueChart(summary.revenue_by_status || []);
             this.renderOrdersChart(summary.orders_by_status || []);
@@ -110,6 +155,7 @@ class AdminAnalyticsDashboard {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: this._chartAnimation(),
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -144,6 +190,7 @@ class AdminAnalyticsDashboard {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: this._chartAnimation(),
                 scales: {
                     x: {
                         ticks: { color: '#D8D8D8' },
@@ -185,6 +232,7 @@ class AdminAnalyticsDashboard {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: this._chartAnimation(),
                 scales: {
                     x: {
                         ticks: { color: '#D8D8D8' },

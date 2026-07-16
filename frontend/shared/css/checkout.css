@@ -240,14 +240,6 @@ main {
   border-color: var(--error) !important;
 }
 
-@keyframes field-shake {
-  0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-6px); }
-  40%      { transform: translateX(5px); }
-  60%      { transform: translateX(-4px); }
-  80%      { transform: translateX(3px); }
-}
-
 .form-group.field-valid input {
   border-color: var(--success);
 }
@@ -535,17 +527,23 @@ textarea {
   margin: 2rem 0;
 }
 
-@media (max-width: 768px) {
-  .checkout-container {
-    grid-template-columns: 1fr;
+@media (max-width: 1024px) {
+  main {
+    padding: 1.5rem;
   }
 
-  .form-grid {
+  .checkout-container {
     grid-template-columns: 1fr;
   }
 
   .order-summary {
     order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

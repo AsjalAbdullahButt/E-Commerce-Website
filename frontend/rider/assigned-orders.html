@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="../shared/css/global.css">
+  <link rel="stylesheet" href="../shared/css/global.css?v=20260716">
   <style>
     main {
       max-width: 1280px;
@@ -68,6 +68,18 @@
     .order-card:hover {
       border-color: var(--gold);
       box-shadow: var(--shadow-md);
+    }
+
+    .order-card.status-updating {
+      border-color: var(--gold);
+      animation: card-status-pulse 1.1s ease-in-out infinite;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    @keyframes card-status-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.35); }
+      50%       { box-shadow: 0 0 0 6px rgba(255,215,0,0); }
     }
 
     .order-header {
@@ -220,6 +232,140 @@
       padding: 2rem;
       color: var(--text-secondary);
     }
+
+    /* === STATUS TIMELINE === */
+    .status-timeline {
+      display: flex;
+      align-items: flex-start;
+      margin: 0.5rem 0 1.5rem;
+    }
+
+    .tl-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      position: relative;
+      text-align: center;
+    }
+
+    .tl-line {
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+
+    .tl-line-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: var(--gold);
+      transition: width var(--duration-slow) var(--ease);
+    }
+
+    .tl-step:last-child .tl-line { display: none; }
+
+    .tl-dot {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      transition: background var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease), color var(--duration-base) var(--ease);
+      position: relative;
+      z-index: 1;
+    }
+
+    .tl-label {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+      transition: color var(--duration-base) var(--ease);
+    }
+
+    .tl-time {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+
+    .tl-step.done .tl-dot {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: #000;
+    }
+
+    .tl-step.done .tl-label { color: var(--gold); }
+
+    .tl-step.current .tl-dot {
+      border-color: var(--gold);
+      color: var(--gold);
+      animation: tl-pulse 1.6s ease-in-out infinite;
+    }
+
+    .tl-step.current .tl-label { color: var(--text-primary); }
+
+    .tl-step.cancelled .tl-dot {
+      background: var(--error);
+      border-color: var(--error);
+      color: #fff;
+    }
+
+    .tl-step.cancelled .tl-label { color: var(--error); }
+
+    @keyframes tl-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.45); }
+      50%       { box-shadow: 0 0 0 7px rgba(255,215,0,0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tl-step.current .tl-dot { animation: none; }
+    }
+
+    @media (max-width: 480px) {
+      .tl-label { font-size: 0.6rem; }
+      .tl-time { display: none; }
+    }
+
+    @media (max-width: 1024px) {
+      main { padding: 1.5rem; }
+    }
+
+    @media (max-width: 768px) {
+      .order-details {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      main { padding: 1rem; }
+
+      .status-controls {
+        flex-direction: column;
+      }
+
+      .btn-status {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -273,11 +419,11 @@
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
   </footer>
 
-  <script src="../shared/js/config.js"></script>
-  <script src="../shared/js/api.js"></script>
-  <script src="../shared/js/auth.js"></script>
-  <script src="../shared/js/sanitize.js"></script>
-  <script src="../shared/js/neural-bg.js"></script>
+  <script src="../shared/js/config.js?v=20260716"></script>
+  <script src="../shared/js/api.js?v=20260716"></script>
+  <script src="../shared/js/auth.js?v=20260716"></script>
+  <script src="../shared/js/sanitize.js?v=20260716"></script>
+  <script src="../shared/js/neural-bg.js?v=20260716"></script>
 
   <script>
     let allOrders = [];
@@ -309,6 +455,53 @@
       renderOrders(filtered);
     }
 
+    // Pipeline the rider cares about. status_history (already returned by GET /rider/orders,
+    // per backend/schemas/order.py) supplies the timestamp for each step that's been reached.
+    const STATUS_PIPELINE = ['confirmed', 'packed', 'shipped', 'delivered'];
+
+    function buildStatusTimeline(order) {
+      const timeline = document.createElement('div'); timeline.className = 'status-timeline';
+      const currentIdx = STATUS_PIPELINE.indexOf(order.status);
+      const history = Array.isArray(order.status_history) ? order.status_history : [];
+      const isTerminalBad = order.status === 'cancelled' || order.status === 'returned';
+
+      STATUS_PIPELINE.forEach((status, idx) => {
+        const step = document.createElement('div'); step.className = 'tl-step';
+        if (isTerminalBad) {
+          step.classList.add(idx === 0 ? 'cancelled' : '');
+        } else if (idx < currentIdx) {
+          step.classList.add('done');
+        } else if (idx === currentIdx) {
+          step.classList.add('current');
+        }
+
+        const line = document.createElement('div'); line.className = 'tl-line';
+        const lineFill = document.createElement('div'); lineFill.className = 'tl-line-fill';
+        if (idx < currentIdx) lineFill.style.width = '100%';
+        line.appendChild(lineFill);
+
+        const dot = document.createElement('span'); dot.className = 'tl-dot';
+        const icon = document.createElement('i');
+        icon.className = idx < currentIdx ? 'fas fa-check' : 'fas fa-circle-dot';
+        dot.appendChild(icon);
+
+        const label = document.createElement('span'); label.className = 'tl-label'; label.textContent = formatStatus(status);
+
+        const entry = history.find(h => h.status === status);
+        step.appendChild(line);
+        step.appendChild(dot);
+        step.appendChild(label);
+        if (entry?.timestamp) {
+          const time = document.createElement('span'); time.className = 'tl-time';
+          try { time.textContent = new Date(entry.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { /* skip */ }
+          step.appendChild(time);
+        }
+        timeline.appendChild(step);
+      });
+
+      return timeline;
+    }
+
     function renderOrders(orders) {
       const container = document.getElementById('orders-container');
       container.textContent = '';
@@ -322,8 +515,10 @@
         return;
       }
 
-      orders.forEach(order => {
-        const card = document.createElement('div'); card.className = 'order-card';
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      orders.forEach((order, idx) => {
+        const card = document.createElement('div'); card.className = 'order-card'; card.dataset.orderId = order.id;
 
         const header = document.createElement('div'); header.className = 'order-header';
         const left = document.createElement('div');
@@ -337,6 +532,9 @@
         statusSpan.appendChild(statusIcon); statusSpan.appendChild(statusText);
 
         header.appendChild(left); header.appendChild(statusSpan);
+
+        card.appendChild(header);
+        card.appendChild(buildStatusTimeline(order));
 
         const details = document.createElement('div'); details.className = 'order-details';
         const addrGroup = document.createElement('div'); addrGroup.className = 'detail-group';
@@ -379,9 +577,24 @@
 
         controls.appendChild(shipBtn); controls.appendChild(delBtn);
 
-        card.appendChild(header); card.appendChild(details); card.appendChild(itemsList); card.appendChild(controls);
+        card.appendChild(details); card.appendChild(itemsList); card.appendChild(controls);
+
+        if (!reduced) {
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(14px)';
+        }
         container.appendChild(card);
       });
+
+      if (!reduced) {
+        requestAnimationFrame(() => {
+          Array.from(container.children).forEach((card, idx) => {
+            card.style.transition = `opacity var(--duration-slow) var(--ease) ${idx * 50}ms, transform var(--duration-slow) var(--ease) ${idx * 50}ms`;
+            card.style.opacity = '1';
+            card.style.transform = 'none';
+          });
+        });
+      }
     }
 
     function formatStatus(status) {
@@ -395,6 +608,8 @@
     }
 
     async function updateStatus(orderId, newStatus) {
+      const card = document.querySelector(`.order-card[data-order-id="${CSS.escape(orderId)}"]`);
+      card?.classList.add('status-updating');
       try {
         await api.patch(`/rider/orders/${orderId}/status`, { status: newStatus }, true);
         showToast('Status updated successfully', 'success');
@@ -402,6 +617,7 @@
       } catch (err) {
         console.error('Failed to update status:', err);
         showToast('Failed to update status', 'error');
+        card?.classList.remove('status-updating');
       }
     }
   </script>

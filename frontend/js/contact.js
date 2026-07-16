@@ -124,12 +124,17 @@ function initContactForm() {
     // Validation
     if (!contactData.name || !contactData.email || !contactData.subject || !contactData.message) {
       showToast('Please fill in all required fields', 'error');
+      if (!contactData.name) shakeField(nameInput);
+      if (!contactData.email) shakeField(emailInput);
+      if (!contactData.subject) shakeField(subjectInput);
+      if (!contactData.message) shakeField(messageInput);
       return;
     }
 
     // Email validation
     if (!isValidEmail(contactData.email)) {
       showToast('Please enter a valid email address', 'error');
+      shakeField(emailInput);
       return;
     }
 
@@ -180,14 +185,21 @@ function initComplaintForm() {
     }
 
     // Validation
-    if (!nameInput.value.trim() || !emailInput.value.trim() || !phoneInput.value.trim() || 
+    if (!nameInput.value.trim() || !emailInput.value.trim() || !phoneInput.value.trim() ||
         !categoryInput.value || !dateInput.value || !descriptionInput.value.trim()) {
       showToast('Please fill in all required fields', 'error');
+      if (!nameInput.value.trim()) shakeField(nameInput);
+      if (!emailInput.value.trim()) shakeField(emailInput);
+      if (!phoneInput.value.trim()) shakeField(phoneInput);
+      if (!categoryInput.value) shakeField(categoryInput);
+      if (!dateInput.value) shakeField(dateInput);
+      if (!descriptionInput.value.trim()) shakeField(descriptionInput);
       return;
     }
 
     if (!isValidEmail(emailInput.value.trim())) {
       showToast('Please enter a valid email address', 'error');
+      shakeField(emailInput);
       return;
     }
 
