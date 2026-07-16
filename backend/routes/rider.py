@@ -63,6 +63,7 @@ async def get_profile(request: Request, user=Depends(require_rider)):
     if not rider:
         raise HTTPException(status_code=404, detail="Rider not found")
     rider["id"] = str(rider.pop("_id"))
+    rider.pop("password", None)
     return {"success": True, "data": rider}
 
 
