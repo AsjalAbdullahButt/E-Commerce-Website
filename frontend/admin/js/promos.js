@@ -479,7 +479,7 @@ function bindEvents() {
       localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
       localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
-      window.location.href = '../auth/login.html';
+      window.location.href = './login.html';
     });
   }
 
@@ -498,7 +498,7 @@ function bindEvents() {
 document.addEventListener('DOMContentLoaded', async () => {
   const admin = getAdminData();
   if (!admin || !['admin', 'super_admin'].includes(admin.role)) {
-    window.location.replace('../auth/login.html');
+    window.location.replace('./login.html');
     return;
   }
 

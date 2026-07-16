@@ -93,7 +93,7 @@
   </main>
 
   <script src="./js/admin-config.js"></script>
-  <script src="../shared/js/auth.js"></script>
+  <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/sanitize.js"></script>
   <script>
     const AUDIT_STATE = {
@@ -134,7 +134,7 @@
 
     async function fetchLogs() {
       const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || localStorage.getItem('ecom_token');
-      if (!token) return window.location.href = '../auth/login.html';
+      if (!token) return window.location.href = './login.html';
 
       const entity = document.getElementById('filter-entity').value || '';
       const url = `${ADMIN_CONFIG.API_URL}${ADMIN_CONFIG.ENDPOINTS.AUDIT.LOGS}` + (entity ? `?entity_type=${encodeURIComponent(entity)}&limit=200` : '?limit=200');
