@@ -419,6 +419,80 @@ where to add it once one exists.
 Full backend suite: 41/41 passing after every change in this section (dependency repin, JWT algo
 Query fix, and the input-validation additions together).
 
+## 13. Polish-pass Phase 3 — frontend UI/UX (2026-07-17)
+
+**Accessibility.** Audited every `<img>` and dynamic image-creation site — found and fixed one real
+gap: `frontend/js/product.js`'s main product image never updated its `alt` text after the initial
+page load, so screen readers always announced the static placeholder "Product" instead of the real
+product name. Bulk-added `aria-label="Main navigation"` to the `<nav class="navbar">` repeated
+across all 19 pages, and `role="dialog"`/`aria-modal`/`aria-hidden` + focus management + Escape-to-
+close to every modal-like widget (cart drawer, admin rider modal, admin promo-create modal) — none
+had focus management before, so keyboard/screen-reader users had no signal these opened. Fixed ~30
+`<label>` elements across `auth/*.html`, `customer/contact.html`, `customer/checkout.html`,
+`customer/shop.html`, and `admin/js/products.js`'s dynamically-built variant/image rows that had no
+`for=`/`id` association (purely visual labels, invisible to screen readers); added an `id` generator
+for the products.js repeatable rows since multiple rows need unique ids. Added a `.sr-only` utility
+to `global.css` (didn't exist) for the one label that's intentionally visual-only (promo code field).
+Admin login page (`admin/login.html`) had zero ARIA anywhere — added `role="alert"` to the error
+banner and `aria-busy` to the submit button's loading state.
+
+**Toast/error consistency — found 4 duplicate implementations.** `shared/js/api.js` already had a
+clean, theme-aware, CSS-variable-driven `showToast()` used correctly by the customer site and both
+rider pages. But `admin/js/products.js`, `orders.js`, `riders.js`, and `promos.js` (as `promoToast`)
+each redeclared their own near-identical `showToast`/`promoToast` with hardcoded inline styles —
+and since plain `<script>` tags share one global scope, these duplicates silently *overwrote*
+`api.js`'s version (last script loaded wins) on every admin page, so the working shared
+implementation was never actually reachable there. Deleted all 4 duplicates; admin pages now use
+the one real `showToast`, which also fixes admin toasts not respecting the light/dark theme toggle
+(the inline-style versions were hardcoded dark colors).
+
+**Also found and deleted `frontend/admin/js/admin-ui.js`** (608 lines) — a `this.showToast(...)`
+class-based admin controller with zero `<script>` references anywhere in the repo; fully superseded
+by the products.js/orders.js/riders.js/promos.js split that's actually loaded today.
+
+**Responsive breakpoints.** Every page-specific CSS file already converges on the same 3-tier
+system (1024px/768px/480px, max-width, desktop-first) except four outlier values that didn't match:
+`shared/css/admin.css`'s product-builder grid used 980px/640px, and `admin/css/admin-style.css`
+(logs.html's dedicated stylesheet) used 1100px — all three realigned to the standard values (no
+selector/rule restructuring, just the breakpoint numbers, so zero visual risk at the breakpoints
+that already worked). **Found and fixed a real bug in the process:** `.table-wrapper` (backs all 6
+admin data tables — dashboard x2, orders, products, riders, and effectively promos) used
+`overflow: hidden` instead of `overflow-x: auto`, so on any viewport narrower than the table's
+natural width, the rightmost columns were silently clipped and permanently inaccessible rather than
+reachable via horizontal scroll. Same bug on the customer-facing `profile.html` orders table (no
+scroll wrapper existed at all) — added `display: block; overflow-x: auto; white-space: nowrap;`
+inside its existing 768px breakpoint. (`admin-style.css`'s own table already had the correct
+mobile override — confirmed via its 768px block, not a bug there.)
+
+**Design tokens.** Found `#FFE033`/`#FFFF66` (the site's gold hover/gradient-end colors) hardcoded
+identically 26 times across 8 CSS files with zero drift — a clean, zero-risk case for
+tokenization. Added `--gold-hover`/`--gold-bright` to `global.css`'s `:root` and replaced every
+occurrence with `var(...)`. **Caught and fixed a bug I introduced myself**: the bulk find-replace
+script ran across all files in one pass, including `global.css`, and replaced the two *new*
+variable definitions' own values with self-referencing `var(--gold-hover)`/`var(--gold-bright)` —
+a CSS custom property can't reference itself (resolves to the "guaranteed-invalid value"), which
+would have silently broken every gold hover/gradient effect site-wide. Caught by grep-auditing the
+result before moving on; fixed by restoring the literal hex values in the two `:root` definitions
+only. Also tokenized 11 `border-radius: 6px`/`20px` declarations in `admin-style.css` (which does
+load `global.css`, so `var(--radius-sm)`/`var(--radius-lg)` were already available) to the matching
+existing tokens — exact-value matches only, no rounding/approximation.
+
+**Verification:** every touched `.js` file syntax-checked with `node --check`; every touched `.html`
+file checked for balanced `<div>` tags; every touched `.css` file checked for balanced braces; every
+new `for="..."` cross-checked against a matching `id="..."` in the same file. No backend changes in
+this phase, so the 41/41 pytest suite is unaffected (not re-run for this section). **Not done:**
+interactive/visual browser verification — this environment has no headless-browser tool available,
+so these changes are verified statically (syntax, structure, selector/attribute correctness) but not
+visually confirmed in a live viewport. Recommend a manual click-through (cart drawer open/close,
+Escape-to-close on modals, tab order through the login/checkout forms, resize to 768px/480px on the
+admin tables) before shipping. Not addressed in this pass (out of scope / lower value):
+`frontend/admin/css/admin-style.css` duplicates a large amount of `shared/css/admin.css`'s job with
+older, unused selectors (`.sidebar`, `.dashboard-grid`, `.toast.info` — logs.html uses none of
+these) — worth migrating logs.html onto the shared admin stylesheet in a future pass rather than
+maintaining two parallel admin design systems. Literal animated loading-skeleton screens (as opposed
+to the "Loading…" text states that already exist everywhere) were not built — would need a
+dedicated component and touches every list view; flagging rather than partially implementing it.
+
 ## 8. Fields NOT touched by this audit (confirmed consistent, no divergence found)
 `wishlist_col`, `promos_col` (both `routes/promos.py` and `services/discount.py` write compatible
 `code/discount_type/discount_value/min_order/max_uses/uses/is_active/expires_at` shapes — the admin

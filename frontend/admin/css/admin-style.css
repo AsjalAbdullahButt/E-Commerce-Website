@@ -166,7 +166,7 @@ body::before {
     background: linear-gradient(180deg, rgba(19,19,22,0.96), rgba(12,12,14,0.96));
     border: 1px solid rgba(212, 175, 55, 0.16);
     backdrop-filter: blur(10px);
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
     padding: 18px 20px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.26);
 }
@@ -302,7 +302,7 @@ body::before {
     position: relative;
     overflow: hidden;
     border: 1px solid rgba(212, 175, 55, 0.14);
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
     background: #0f0f11;
 }
 
@@ -402,7 +402,8 @@ body::before {
     font-size: 28px;
 }
 
-@media (max-width: 1100px) {
+/* Breakpoint matches the site-wide standard (1024/768/480 — see global.css). */
+@media (max-width: 1024px) {
     .audit-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -528,7 +529,7 @@ body::before {
     background: var(--danger);
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -577,7 +578,7 @@ body::before {
     background: var(--primary);
     color: white;
     padding: 4px 12px;
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
     font-size: 12px;
     font-weight: 600;
 }
@@ -708,7 +709,7 @@ body::before {
     min-width: 200px;
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     outline: none;
 }
@@ -721,7 +722,7 @@ body::before {
 .filter-select {
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     background: white;
     cursor: pointer;
@@ -774,7 +775,7 @@ body::before {
 .status-badge {
     display: inline-block;
     padding: 4px 12px;
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
     font-size: 12px;
     font-weight: 600;
     text-transform: capitalize;
@@ -819,7 +820,7 @@ body::before {
 .btn {
     padding: 8px 16px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -957,7 +958,7 @@ body::before {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     font-family: inherit;
     outline: none;
@@ -998,7 +999,7 @@ body::before {
 .toast {
     background: white;
     padding: 15px 20px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     margin-bottom: 10px;
     display: flex;

@@ -155,7 +155,7 @@ textarea {
 }
 
 .submit-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
   box-shadow: 0 6px 25px rgba(255, 215, 0, 0.5);
   transform: translateY(-2px);
 }
@@ -358,7 +358,7 @@ textarea {
 
 .file-upload-area:hover {
   background: rgba(255, 215, 0, 0.1);
-  border-color: #FFE033;
+  border-color: var(--gold-hover);
 }
 
 .file-upload-area i {

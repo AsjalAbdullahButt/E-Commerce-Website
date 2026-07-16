@@ -277,7 +277,7 @@ main {
 }
 
 .add-to-cart-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
   transform: translateY(-2px);
 }
 

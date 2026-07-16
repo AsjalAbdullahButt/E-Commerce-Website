@@ -22,6 +22,8 @@
   --gold-dim:        #B8960C;
   --gold-glow:       rgba(255,215,0,0.12);
   --gold-border:     rgba(255,215,0,0.25);
+  --gold-hover:      #FFE033; /* hover/active state for gold buttons + borders, site-wide */
+  --gold-bright:     #FFFF66; /* gradient end paired with --gold-hover */
 
   /* Text */
   --text-primary:    #F0F0F0;
@@ -577,7 +579,7 @@ button {
 }
 
 .btn-primary:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
   transform: translateY(-2px);
   box-shadow:
     0 0 16px rgba(255,215,0,0.50),

@@ -32,33 +32,7 @@ function slugify(value) {
     .replace(/(^-|-$)/g, '');
 }
 
-function showToast(message, type = 'success') {
-  let toast = document.getElementById('product-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'product-toast';
-    toast.style.position = 'fixed';
-    toast.style.right = '20px';
-    toast.style.bottom = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.maxWidth = '380px';
-    toast.style.padding = '12px 16px';
-    toast.style.borderRadius = '12px';
-    toast.style.boxShadow = '0 12px 30px rgba(0,0,0,0.28)';
-    toast.style.fontWeight = '600';
-    toast.style.display = 'none';
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.style.display = 'block';
-  toast.style.background = type === 'error' ? '#7f1d1d' : type === 'warning' ? '#78350f' : '#1f2937';
-  toast.style.color = '#f8f4ea';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.style.display = 'none';
-  }, 2600);
-}
+// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
 
 function requireAuth() {
   const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
@@ -113,15 +87,20 @@ function ensureRows(kind) {
   return container;
 }
 
+let _builderRowId = 0;
+
 function createImageRow(url = '') {
   const row = document.createElement('div');
   row.className = 'builder-row compact-row image-row';
+  const rowId = `image-url-${++_builderRowId}`;
 
   const field = document.createElement('div');
   field.className = 'builder-field';
   const label = document.createElement('label');
   label.textContent = 'Image URL';
+  label.setAttribute('for', rowId);
   const input = document.createElement('input');
+  input.id = rowId;
   input.type = 'url';
   input.placeholder = 'https://example.com/image.jpg';
   input.value = url;
@@ -145,12 +124,15 @@ function createImageRow(url = '') {
 function createVariantRow(variant = {}) {
   const row = document.createElement('div');
   row.className = 'builder-row variant-row';
+  const rowId = ++_builderRowId;
 
   const sizeField = document.createElement('div');
   sizeField.className = 'builder-field';
   const sizeLabel = document.createElement('label');
   sizeLabel.textContent = 'Size';
+  sizeLabel.setAttribute('for', `variant-size-${rowId}`);
   const sizeInput = document.createElement('input');
+  sizeInput.id = `variant-size-${rowId}`;
   sizeInput.type = 'text';
   sizeInput.placeholder = 'M';
   sizeInput.maxLength = 12;
@@ -162,7 +144,9 @@ function createVariantRow(variant = {}) {
   colorField.className = 'builder-field';
   const colorLabel = document.createElement('label');
   colorLabel.textContent = 'Color';
+  colorLabel.setAttribute('for', `variant-color-${rowId}`);
   const colorInput = document.createElement('input');
+  colorInput.id = `variant-color-${rowId}`;
   colorInput.type = 'text';
   colorInput.placeholder = 'Jet Black';
   colorInput.maxLength = 24;
@@ -174,7 +158,9 @@ function createVariantRow(variant = {}) {
   skuField.className = 'builder-field';
   const skuLabel = document.createElement('label');
   skuLabel.textContent = 'SKU';
+  skuLabel.setAttribute('for', `variant-sku-${rowId}`);
   const skuInput = document.createElement('input');
+  skuInput.id = `variant-sku-${rowId}`;
   skuInput.type = 'text';
   skuInput.placeholder = 'sku-auto-001';
   skuInput.maxLength = 48;
@@ -186,7 +172,9 @@ function createVariantRow(variant = {}) {
   stockField.className = 'builder-field';
   const stockLabel = document.createElement('label');
   stockLabel.textContent = 'Stock';
+  stockLabel.setAttribute('for', `variant-stock-${rowId}`);
   const stockInput = document.createElement('input');
+  stockInput.id = `variant-stock-${rowId}`;
   stockInput.type = 'number';
   stockInput.min = '0';
   stockInput.step = '1';

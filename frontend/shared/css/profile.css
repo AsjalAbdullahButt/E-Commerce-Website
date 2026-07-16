@@ -93,7 +93,7 @@ main {
 }
 
 .edit-profile-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
 }
 
 .edit-form {
@@ -159,7 +159,7 @@ textarea:focus {
 }
 
 .save-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
 }
 
 .cancel-btn {
@@ -316,6 +316,9 @@ textarea:focus {
 
   .orders-table {
     font-size: 0.8rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
   }
 
   .wishlist-grid {

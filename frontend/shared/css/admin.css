@@ -118,14 +118,14 @@ main {
 }
 
 .action-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
 }
 
 .table-wrapper {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 table {
@@ -240,7 +240,7 @@ tr:hover {
 }
 
 .promo-toggle-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
 }
 
 .icon-btn {
@@ -364,7 +364,7 @@ textarea:focus {
 }
 
 .modal-footer .btn-primary:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
 }
 
 .modal-footer .btn-secondary {
@@ -659,7 +659,8 @@ textarea:focus {
   background: rgba(255,255,255,0.03);
 }
 
-@media (max-width: 980px) {
+/* Breakpoints match the site-wide standard (1024/768/480 — see global.css) rather than one-off values. */
+@media (max-width: 1024px) {
   .product-page .filters,
   .product-page .product-form-grid {
     grid-template-columns: 1fr;
@@ -676,7 +677,7 @@ textarea:focus {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .product-page .builder-row {
     grid-template-columns: 1fr;
   }

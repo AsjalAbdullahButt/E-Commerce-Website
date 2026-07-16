@@ -8,33 +8,7 @@ const promoState = {
   filtered: [],
 };
 
-function promoToast(message, type = 'success') {
-  let toast = document.getElementById('promo-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'promo-toast';
-    toast.style.position = 'fixed';
-    toast.style.right = '20px';
-    toast.style.bottom = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.maxWidth = '360px';
-    toast.style.padding = '12px 16px';
-    toast.style.borderRadius = '12px';
-    toast.style.boxShadow = '0 12px 30px rgba(0,0,0,0.28)';
-    toast.style.fontWeight = '600';
-    toast.style.display = 'none';
-    document.body.appendChild(toast);
-  }
-
-  toast.textContent = message;
-  toast.style.display = 'block';
-  toast.style.background = type === 'error' ? '#7f1d1d' : type === 'warning' ? '#78350f' : '#1f2937';
-  toast.style.color = '#f8f4ea';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.style.display = 'none';
-  }, 2600);
-}
+// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
 
 function getAdminData() {
   try {
@@ -84,6 +58,10 @@ function ensureModal() {
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.id = 'promo-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-labelledby', 'promo-modal-title');
+  modal.setAttribute('aria-hidden', 'true');
 
   const content = document.createElement('div');
   content.className = 'modal-content';
@@ -92,11 +70,13 @@ function ensureModal() {
   header.className = 'modal-header';
   const title = document.createElement('h3');
   title.className = 'modal-title';
+  title.id = 'promo-modal-title';
   title.textContent = 'Create Promo';
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'modal-close';
   close.textContent = '×';
+  close.setAttribute('aria-label', 'Close');
   close.addEventListener('click', closeModal);
   header.appendChild(title);
   header.appendChild(close);
@@ -206,14 +186,26 @@ function buildSelectField(labelText, id, options) {
   return wrapper;
 }
 
+function _onPromoModalKeydown(e) {
+  if (e.key === 'Escape') closeModal();
+}
+
 function openModal() {
   ensureModal();
-  document.getElementById('promo-modal').classList.add('open');
+  const modal = document.getElementById('promo-modal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.getElementById('promo-code')?.focus();
+  document.addEventListener('keydown', _onPromoModalKeydown);
 }
 
 function closeModal() {
   const modal = document.getElementById('promo-modal');
-  if (modal) modal.classList.remove('open');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  document.removeEventListener('keydown', _onPromoModalKeydown);
 }
 
 function getActiveFilter() {
@@ -325,14 +317,14 @@ function renderPromos(promos) {
         await navigator.clipboard.writeText(promo.code);
         copyBtn.classList.add('copied');
         copyBtn.innerHTML = '<i class="fas fa-check"></i><span>Copied</span>';
-        promoToast(`Copied ${promo.code}`);
+        showToast(`Copied ${promo.code}`);
         clearTimeout(copyBtn._resetTimer);
         copyBtn._resetTimer = setTimeout(() => {
           copyBtn.classList.remove('copied');
           copyBtn.innerHTML = '<i class="fas fa-copy"></i><span>Copy</span>';
         }, 1600);
       } catch {
-        promoToast('Copy failed', 'error');
+        showToast('Copy failed', 'error');
       }
     });
 
@@ -343,10 +335,10 @@ function renderPromos(promos) {
     toggleBtn.addEventListener('click', async () => {
       try {
         await adminAPI.updateDiscount(promo.id, { is_active: !promo.is_active });
-        promoToast(`Promo ${promo.is_active ? 'deactivated' : 'activated'}`);
+        showToast(`Promo ${promo.is_active ? 'deactivated' : 'activated'}`);
         await loadPromos();
       } catch (error) {
-        promoToast(error.message || 'Failed to update promo', 'error');
+        showToast(error.message || 'Failed to update promo', 'error');
       }
     });
 
@@ -395,7 +387,7 @@ async function loadPromos() {
     updateSummary(promoState.promos);
     applyFilters();
   } catch (error) {
-    promoToast(error.message || 'Failed to load promos', 'error');
+    showToast(error.message || 'Failed to load promos', 'error');
   }
 }
 
@@ -411,33 +403,33 @@ async function handleCreatePromo(event) {
   const expiryRaw = document.getElementById('promo-expiry').value;
 
   if (!code || !description || !expiryRaw) {
-    promoToast('Please complete all required fields', 'warning');
+    showToast('Please complete all required fields', 'warning');
     return;
   }
 
   if (!/^[A-Z0-9_-]{3,20}$/.test(code)) {
-    promoToast('Promo code must be 3-20 characters and use only A-Z, 0-9, underscore, or hyphen', 'warning');
+    showToast('Promo code must be 3-20 characters and use only A-Z, 0-9, underscore, or hyphen', 'warning');
     return;
   }
 
   if (!Number.isFinite(discountValue) || discountValue <= 0) {
-    promoToast('Discount value must be greater than 0', 'warning');
+    showToast('Discount value must be greater than 0', 'warning');
     return;
   }
 
   if (discountType === 'percentage' && discountValue > 100) {
-    promoToast('Percentage discounts cannot exceed 100%', 'warning');
+    showToast('Percentage discounts cannot exceed 100%', 'warning');
     return;
   }
 
   if (!Number.isFinite(maxUsage) || maxUsage < 1) {
-    promoToast('Max usage must be at least 1', 'warning');
+    showToast('Max usage must be at least 1', 'warning');
     return;
   }
 
   const expiryDate = new Date(expiryRaw);
   if (Number.isNaN(expiryDate.getTime()) || expiryDate <= new Date()) {
-    promoToast('Expiry date must be in the future', 'warning');
+    showToast('Expiry date must be in the future', 'warning');
     return;
   }
 
@@ -453,12 +445,12 @@ async function handleCreatePromo(event) {
     };
 
     await adminAPI.createDiscount(payload);
-    promoToast('Promo created successfully');
+    showToast('Promo created successfully');
     closeModal();
     event.target.reset();
     await loadPromos();
   } catch (error) {
-    promoToast(error.message || 'Failed to create promo', 'error');
+    showToast(error.message || 'Failed to create promo', 'error');
   }
 }
 

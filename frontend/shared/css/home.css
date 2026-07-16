@@ -118,7 +118,7 @@ main {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--gold), #FFE033);
+  background: linear-gradient(135deg, var(--gold), var(--gold-hover));
   color: #000;
   box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
 }
@@ -126,7 +126,7 @@ main {
 .btn-primary:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 25px rgba(255, 215, 0, 0.5);
-  background: linear-gradient(135deg, #FFE033, #FFFF66);
+  background: linear-gradient(135deg, var(--gold-hover), var(--gold-bright));
 }
 
 .btn-outline {
@@ -465,7 +465,7 @@ main {
 
 .tracking-btn {
   padding: 0.9rem 2rem;
-  background: linear-gradient(135deg, var(--gold), #FFE033);
+  background: linear-gradient(135deg, var(--gold), var(--gold-hover));
   color: #000;
   border: none;
   border-radius: var(--radius-sm);
@@ -481,7 +481,7 @@ main {
 }
 
 .tracking-btn:hover {
-  background: linear-gradient(135deg, #FFE033, #FFFF66);
+  background: linear-gradient(135deg, var(--gold-hover), var(--gold-bright));
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
 }
@@ -833,7 +833,7 @@ main {
 }
 
 .user-profile-btn:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
   transform: translateY(-2px);
 }
 
@@ -913,7 +913,7 @@ main {
 }
 
 .sidebar-toggle:hover {
-  background: #FFE033;
+  background: var(--gold-hover);
   transform: translateY(-3px);
   box-shadow: 0 6px 25px rgba(255, 215, 0, 0.5);
 }
@@ -997,7 +997,7 @@ main {
 .apply-filter-btn {
   width: 100%;
   padding: 0.7rem 1rem;
-  background: linear-gradient(135deg, var(--gold), #FFE033);
+  background: linear-gradient(135deg, var(--gold), var(--gold-hover));
   color: #000;
   border: none;
   border-radius: var(--radius-sm);
@@ -1013,7 +1013,7 @@ main {
 }
 
 .apply-filter-btn:hover {
-  background: linear-gradient(135deg, #FFE033, #FFFF66);
+  background: linear-gradient(135deg, var(--gold-hover), var(--gold-bright));
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
 }

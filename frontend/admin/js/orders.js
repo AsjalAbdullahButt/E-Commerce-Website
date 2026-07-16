@@ -46,30 +46,7 @@ function formatDate(value) {
   return date.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function showToast(message, type = 'success') {
-  let toast = document.getElementById('order-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'order-toast';
-    toast.style.position = 'fixed';
-    toast.style.right = '20px';
-    toast.style.bottom = '20px';
-    toast.style.zIndex = '9999';
-    toast.style.maxWidth = '380px';
-    toast.style.padding = '12px 16px';
-    toast.style.borderRadius = '12px';
-    toast.style.boxShadow = '0 12px 30px rgba(0,0,0,0.28)';
-    toast.style.fontWeight = '600';
-    toast.style.display = 'none';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.style.display = 'block';
-  toast.style.background = type === 'error' ? '#7f1d1d' : '#1f2937';
-  toast.style.color = '#f8f4ea';
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
-}
+// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
 
 function renderOrders(orders) {
   const tbody = document.getElementById('order-table-body');
