@@ -79,28 +79,28 @@
           <h3 class="form-section-title">Shipping Address</h3>
           <div class="form-grid">
             <div class="form-group">
-              <label>Full Name</label>
-              <input type="text" name="fullName" required>
+              <label for="checkout-fullName">Full Name</label>
+              <input type="text" id="checkout-fullName" name="fullName" required autocomplete="name">
             </div>
             <div class="form-group">
-              <label>Phone</label>
-              <input type="tel" name="phone" required>
+              <label for="checkout-phone">Phone</label>
+              <input type="tel" id="checkout-phone" name="phone" required autocomplete="tel">
             </div>
           </div>
           <div class="form-grid full">
             <div class="form-group">
-              <label>Address</label>
-              <input type="text" name="address" required>
+              <label for="checkout-address">Address</label>
+              <input type="text" id="checkout-address" name="address" required autocomplete="street-address">
             </div>
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label>City</label>
-              <input type="text" name="city" required>
+              <label for="checkout-city">City</label>
+              <input type="text" id="checkout-city" name="city" required autocomplete="address-level2">
             </div>
             <div class="form-group">
-              <label>Postal Code</label>
-              <input type="text" name="postal" required>
+              <label for="checkout-postal">Postal Code</label>
+              <input type="text" id="checkout-postal" name="postal" required autocomplete="postal-code">
             </div>
           </div>
         </div>
@@ -108,7 +108,8 @@
         <div class="form-section">
           <h3 class="form-section-title">Promo Code (Optional)</h3>
           <div class="promo-section">
-            <input type="text" placeholder="Enter promo code" name="promo">
+            <label for="checkout-promo" class="sr-only">Promo code</label>
+            <input type="text" id="checkout-promo" placeholder="Enter promo code" name="promo">
             <button type="button">Apply</button>
           </div>
         </div>
@@ -156,7 +157,7 @@
               Send payment to: <strong>0300-1234567</strong> (JazzCash) <!-- TODO: replace with real number -->
             </p>
             <div class="form-group">
-              <label>Your JazzCash Number</label>
+              <label for="jazzcash-number">Your JazzCash Number</label>
               <input type="tel" id="jazzcash-number" class="form-input"
                      placeholder="03XX-XXXXXXX" maxlength="11">
               <small>Enter the number you sent payment from</small>
@@ -170,7 +171,7 @@
               Send payment to: <strong>0300-1234567</strong> (Easypaisa) <!-- TODO: replace with real number -->
             </p>
             <div class="form-group">
-              <label>Your Easypaisa Number</label>
+              <label for="easypaisa-number">Your Easypaisa Number</label>
               <input type="tel" id="easypaisa-number" class="form-input"
                      placeholder="03XX-XXXXXXX" maxlength="11">
               <small>Enter the number you sent payment from</small>
