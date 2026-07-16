@@ -30,6 +30,7 @@ async function loadProduct() {
     const mainImg = document.querySelector('.main-image img');
     if (mainImg) {
       mainImg.src = product.images?.[0] || '../images/fallback.jpg';
+      mainImg.alt = product.name || 'Product';
       mainImg.onerror = () => mainImg.src = '../images/fallback.jpg';
     }
 

@@ -16,7 +16,7 @@
 
   <canvas id="neural-bg"></canvas>
 
-  <nav class="navbar" id="navbar">
+  <nav class="navbar" id="navbar" aria-label="Main navigation">
     <div class="nav-inner">
       <a class="nav-logo" href="./index.html">
         <span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span>
@@ -68,9 +68,9 @@
         <div class="filter-section">
           <p class="filter-section-title"><i class="fas fa-coins"></i> Price Range (Rs)</p>
           <div class="price-range-inputs">
-            <input type="number" class="price-input" id="price-min" placeholder="Min" min="0">
-            <span class="price-separator">—</span>
-            <input type="number" class="price-input" id="price-max" placeholder="Max" min="0">
+            <input type="number" class="price-input" id="price-min" placeholder="Min" min="0" aria-label="Minimum price">
+            <span class="price-separator" aria-hidden="true">—</span>
+            <input type="number" class="price-input" id="price-max" placeholder="Max" min="0" aria-label="Maximum price">
           </div>
           <button class="apply-filter-btn" id="apply-price-filter">
             <i class="fas fa-filter"></i> Apply

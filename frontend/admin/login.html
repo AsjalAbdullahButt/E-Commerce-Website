@@ -147,22 +147,22 @@
             <p>Secure Admin Access</p>
         </div>
 
-        <div class="error-message" id="errorMessage"></div>
+        <div class="error-message" id="errorMessage" role="alert" aria-live="assertive"></div>
 
-        <form id="loginForm">
+        <form id="loginForm" aria-label="Admin sign in">
             <div class="form-group">
                 <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" required placeholder="admin@example.com">
+                <input type="email" id="email" name="email" required placeholder="admin@example.com" autocomplete="username">
             </div>
 
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required placeholder="••••••••">
+                <input type="password" id="password" name="password" required placeholder="••••••••" autocomplete="current-password">
             </div>
 
             <button type="submit" class="login-btn" id="loginBtn">
                 <div class="btn-content">
-                    <span class="loading-spinner" id="spinner"></span>
+                    <span class="loading-spinner" id="spinner" aria-hidden="true"></span>
                     <span id="btnText">Sign In</span>
                 </div>
             </button>
@@ -188,6 +188,7 @@
             // Show loading
             loginBtn.disabled = true;
             loginBtn.classList.add('loading');
+            loginBtn.setAttribute('aria-busy', 'true');
             spinner.style.display = 'inline-block';
             btnText.textContent = 'Signing in...';
 
@@ -212,6 +213,7 @@
 
                 loginBtn.disabled = false;
                 loginBtn.classList.remove('loading');
+                loginBtn.removeAttribute('aria-busy');
                 spinner.style.display = 'none';
                 btnText.textContent = 'Sign In';
             }
