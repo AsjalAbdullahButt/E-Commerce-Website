@@ -7,8 +7,8 @@ grep/read-verified against the actual code, not assumed.
 
 ## Collections (database.py)
 `users`, `products`, `orders`, `reviews`, `wishlist`, `promos`, `admin_users`, `riders`,
-`inventory_history`, `audit_logs`, `notifications` (notifications_col is declared but never
-referenced anywhere — dead collection, out of scope to build a feature for it).
+`inventory_history`, `audit_logs`. (`notifications` was declared but never referenced anywhere —
+removed in the Phase 1 polish pass, see §10.)
 
 ---
 
@@ -267,6 +267,68 @@ audit-log entry written by those ~24 call sites had garbled `module`/`message` f
 `__name__` as the 2nd argument at every Pattern-B call site (mechanical, no behavior change to
 the calling code otherwise) — found while implementing task 8's forgot-password logging, whose
 own test needed to read `meta.reset_link` back out of `audit_logs_col`.
+
+## 9. Polish-pass Phase 1 — timestamp standardization (2026-07-17)
+
+Picked native `datetime` (BSON date) as the single standard, since it was already the majority
+(52 vs 11 sites) and matches every `datetime` schema field in `backend/schemas/*.py` (Pydantic's
+`datetime` validator accepts both a native object and an ISO string, so this was safe either way
+for API responses — the real risk was intra-collection sort order, not serialization).
+
+Converted the 11 remaining `datetime.utcnow().isoformat()` call sites to `datetime.utcnow()`:
+`routes/admin.py` (rider assignment `updated_at`), `routes/wishlist.py` (`added_at`),
+`routes/auth.py` (register `created_at`, change-password/reset-password/update-me `updated_at`,
+forgot-password `reset_token_expires`), `routes/reviews.py` (`created_at`), `routes/rider.py`
+(profile/status `updated_at`), `utils/logger.py::log_to_db` (`timestamp`), and `seed/seed_db.py`
+(all product/user/order timestamps, 32 sites).
+
+**Confirmed real bug, not just cosmetic:** `audit_logs_col` had two writers disagreeing on type —
+`models/admin.py::audit_log_document` (native datetime, admin-panel actions) vs. the old
+`utils/logger.py::log_to_db` (ISO string, ~24 call sites across every other route). This collection
+is sorted by `timestamp: -1` in `services/admin_auth.py::AdminAuditService.get_logs` (backs the
+admin Logs page). MongoDB's BSON type order ranks Date above String, so with mixed types a
+"descending" sort groups all-native-first then all-string, not by actual time — the admin Logs
+page has been silently showing entries out of chronological order whenever both writers
+contributed. Same class of bug existed for `products_col.created_at` (seeded demo products wrote
+ISO strings; admin-panel-created products already wrote native datetime via
+`models/admin.py::product_document`), sorted in `services/product.py::list_products`.
+
+**Migration for existing data:** added `backend/scripts/migrate_timestamps_to_datetime.py`
+(idempotent, follows the same pattern as `migrate_products_to_variants.py`) — converts any
+already-stored ISO-string `created_at`/`updated_at`/`added_at`/`timestamp`/`reset_token_expires`
+fields (including `orders.status_history[].timestamp`) to native dates across every collection.
+Run once against any existing dev/prod DB after deploying this change:
+`python -m scripts.migrate_timestamps_to_datetime` (from `backend/`).
+
+No schema/response-model changes were needed — every relevant Pydantic response field was already
+typed `datetime`, never `str`.
+
+## 10. Polish-pass Phase 1 — dead code removal (2026-07-17)
+
+- `backend/routes/v1/` deleted — contained only an `__init__.py` with version constants, never
+  imported/mounted anywhere (`main.py` mounts `auth`/`products`/`orders`/`reviews`/`wishlist`/
+  `promos`/`rider`/`admin` directly, no `v1` prefix). No working routes existed under it, so there
+  was nothing to "wire up" — pure scaffolding.
+- `notifications_col` (`database.py`) deleted — zero read/write call sites anywhere in
+  `backend/routes|services|middleware|main.py`; only reference was `tests/conftest.py`'s generic
+  per-test collection-clear loop, updated to match.
+- Three zero-call-site service methods deleted (confirmed via full-repo grep, each had no
+  reference besides its own definition): `DiscountService.deactivate_discount` (services/discount.py
+  — the admin UI's "Deactivate" button already goes through `update_discount({"is_active": False})`
+  instead), `DiscountService.apply_discount_to_order` (services/discount.py — dead, which
+  transitively left `get_discount_by_code` dead too since that was its only caller; the live
+  customer-facing promo-code path is `routes/promos.py`'s independent implementation, per §8 below),
+  `OrderService.get_pending_orders` (services/order_user.py — admin dashboard/stats compute the
+  pending count directly via `orders_col.count_documents(...)` instead). Removed the now-unused
+  `orders_col` import from `services/discount.py` left over from the second deletion.
+- `class Security` in `backend/utils/helpers.py` deleted — a "backward-compatible wrapper" around
+  the module-level `hash_password`/`verify_password`/`create_access_token`/`create_refresh_token`/
+  `decode_token` functions; every real caller (`routes/auth.py`, `services/admin_auth.py`,
+  `services/rider.py`, `middleware/admin_auth.py`) already used the module-level functions
+  directly, never `Security.*`.
+
+Verified via full `pytest` run after all Phase 1 changes (timestamps + dead code): 26/26 passing,
+no import errors.
 
 ## 8. Fields NOT touched by this audit (confirmed consistent, no divergence found)
 `wishlist_col`, `promos_col` (both `routes/promos.py` and `services/discount.py` write compatible

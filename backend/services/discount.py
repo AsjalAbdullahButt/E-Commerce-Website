@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from database import promos_col, orders_col
+from database import promos_col
 from bson import ObjectId
 from datetime import datetime
 from typing import Optional
@@ -146,15 +146,6 @@ class DiscountService:
         return await DiscountService.get_discount(discount_id)
 
     @staticmethod
-    async def deactivate_discount(discount_id: str, admin_id: str) -> dict:
-        """Deactivate discount"""
-        return await DiscountService.update_discount(
-            discount_id=discount_id,
-            updates={"is_active": False},
-            admin_id=admin_id
-        )
-
-    @staticmethod
     async def list_discounts(
         is_active: Optional[bool] = None,
         limit: int = 50,
@@ -175,51 +166,3 @@ class DiscountService:
         
         total = await promos_col.count_documents(query)
         return discounts, total
-
-    @staticmethod
-    async def apply_discount_to_order(order_id: str, discount_code: str) -> tuple:
-        """Apply discount to order and calculate discount amount"""
-        # Get order
-        from services.order_user import OrderService
-        order = await OrderService.get_order(order_id)
-        
-        # Get discount
-        discount = await DiscountService.get_discount_by_code(discount_code)
-        
-        # Check minimum order value
-        order_total = float(order.get("total_price", order.get("total", 0)) or 0)
-        if order_total < float(discount.get("min_order", 0) or 0):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Order must be at least {discount.get('min_order', 0)} to use this discount"
-            )
-        
-        # Calculate discount amount
-        if discount["discount_type"] == "percentage":
-            discount_amount = order_total * (discount["discount_value"] / 100)
-        else:  # fixed
-            discount_amount = discount["discount_value"]
-        
-        final_price = order_total - discount_amount
-        
-        # Update order
-        await orders_col.update_one(
-            {"_id": ObjectId(order_id)},
-            {
-                "$set": {
-                    "discount_applied": discount_amount,
-                    "final_price": final_price,
-                    "discount_code_used": discount_code,
-                    "updated_at": datetime.utcnow(),
-                }
-            }
-        )
-        
-        # Increment discount usage
-        await promos_col.update_one(
-            {"_id": ObjectId(discount["id"])},
-            {"$inc": {"uses": 1}, "$set": {"updated_at": datetime.utcnow()}}
-        )
-        
-        logger.info(f"Discount {discount_code} applied to order {order_id}")
-        return discount_amount, final_price

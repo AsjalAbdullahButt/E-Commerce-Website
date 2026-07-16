@@ -36,28 +36,28 @@ db = client[DB_NAME]
 
 PRODUCTS_AUTHORED = [
     # ━━━━━ CLOTHING (12 items) ━━━━━
-    {"name": "Classic White T-Shirt", "price": 1200, "category": "clothing", "description": "Premium 100% cotton classic white t-shirt.", "images": ["https://picsum.photos/seed/WhiteTee/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Oversized Black Hoodie", "price": 3500, "category": "clothing", "description": "Comfortable oversized hoodie in premium fabric.", "images": ["https://picsum.photos/seed/Hoodie/600/600"], "sizes": ["M", "L", "XL", "XXL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 75, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Slim Fit Jeans", "price": 4200, "category": "clothing", "description": "Classic slim fit jeans with premium denim.", "images": ["https://picsum.photos/seed/Jeans/600/600"], "sizes": ["30", "32", "34", "36"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 80, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Striped Polo Shirt", "price": 1800, "category": "clothing", "description": "Classic striped polo shirt for casual and formal occasions.", "images": ["https://picsum.photos/seed/Polo/600/600"], "sizes": ["S", "M", "L"], "colors": [{"name": "Navy", "hex": "#001a4d"}, {"name": "White", "hex": "#ffffff"}], "stock": 60, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Graphic Tee - Urban", "price": 1500, "category": "clothing", "description": "Urban style graphic t-shirt with unique design.", "images": ["https://picsum.photos/seed/GraphicTee/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Grey", "hex": "#808080"}], "stock": 90, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Cargo Pants", "price": 3800, "category": "clothing", "description": "Durable cargo pants with multiple pockets for functionality.", "images": ["https://picsum.photos/seed/Cargo/600/600"], "sizes": ["30", "32", "34"], "colors": [{"name": "Khaki", "hex": "#c3b091"}, {"name": "Black", "hex": "#000000"}], "stock": 50, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Denim Jacket", "price": 5500, "category": "clothing", "description": "Premium denim jacket perfect for layering in any season.", "images": ["https://picsum.photos/seed/DenimJacket/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 40, "rating": 4.8, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Tracksuit Set", "price": 4800, "category": "clothing", "description": "Comfortable matching tracksuit for casual and active wear.", "images": ["https://picsum.photos/seed/Tracksuit/600/600"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 55, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Linen Summer Shirt", "price": 2200, "category": "clothing", "description": "Breathable linen shirt perfect for summer. Cool and comfortable.", "images": ["https://picsum.photos/seed/Linen/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Beige", "hex": "#f5f5dc"}], "stock": 70, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Printed Shorts", "price": 1600, "category": "clothing", "description": "Colorful printed shorts for casual summer wear.", "images": ["https://picsum.photos/seed/Shorts/600/600"], "sizes": ["S", "M", "L"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Green", "hex": "#008000"}], "stock": 85, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Zip-up Sweatshirt", "price": 3200, "category": "clothing", "description": "Cozy zip-up sweatshirt for layering. Perfect for all seasons.", "images": ["https://picsum.photos/seed/Sweatshirt/600/600"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Grey", "hex": "#808080"}, {"name": "Black", "hex": "#000000"}], "stock": 65, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Plain Crew Neck Sweatshirt", "price": 2800, "category": "clothing", "description": "Classic crew neck sweatshirt in premium fabric. Timeless style.", "images": ["https://picsum.photos/seed/CrewNeck/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 95, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Classic White T-Shirt", "price": 1200, "category": "clothing", "description": "Premium 100% cotton classic white t-shirt.", "images": ["https://picsum.photos/seed/WhiteTee/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Oversized Black Hoodie", "price": 3500, "category": "clothing", "description": "Comfortable oversized hoodie in premium fabric.", "images": ["https://picsum.photos/seed/Hoodie/600/600"], "sizes": ["M", "L", "XL", "XXL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 75, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Slim Fit Jeans", "price": 4200, "category": "clothing", "description": "Classic slim fit jeans with premium denim.", "images": ["https://picsum.photos/seed/Jeans/600/600"], "sizes": ["30", "32", "34", "36"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 80, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Striped Polo Shirt", "price": 1800, "category": "clothing", "description": "Classic striped polo shirt for casual and formal occasions.", "images": ["https://picsum.photos/seed/Polo/600/600"], "sizes": ["S", "M", "L"], "colors": [{"name": "Navy", "hex": "#001a4d"}, {"name": "White", "hex": "#ffffff"}], "stock": 60, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Graphic Tee - Urban", "price": 1500, "category": "clothing", "description": "Urban style graphic t-shirt with unique design.", "images": ["https://picsum.photos/seed/GraphicTee/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Grey", "hex": "#808080"}], "stock": 90, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Cargo Pants", "price": 3800, "category": "clothing", "description": "Durable cargo pants with multiple pockets for functionality.", "images": ["https://picsum.photos/seed/Cargo/600/600"], "sizes": ["30", "32", "34"], "colors": [{"name": "Khaki", "hex": "#c3b091"}, {"name": "Black", "hex": "#000000"}], "stock": 50, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Denim Jacket", "price": 5500, "category": "clothing", "description": "Premium denim jacket perfect for layering in any season.", "images": ["https://picsum.photos/seed/DenimJacket/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Black", "hex": "#000000"}], "stock": 40, "rating": 4.8, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Tracksuit Set", "price": 4800, "category": "clothing", "description": "Comfortable matching tracksuit for casual and active wear.", "images": ["https://picsum.photos/seed/Tracksuit/600/600"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 55, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Linen Summer Shirt", "price": 2200, "category": "clothing", "description": "Breathable linen shirt perfect for summer. Cool and comfortable.", "images": ["https://picsum.photos/seed/Linen/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Beige", "hex": "#f5f5dc"}], "stock": 70, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Printed Shorts", "price": 1600, "category": "clothing", "description": "Colorful printed shorts for casual summer wear.", "images": ["https://picsum.photos/seed/Shorts/600/600"], "sizes": ["S", "M", "L"], "colors": [{"name": "Blue", "hex": "#0000ff"}, {"name": "Green", "hex": "#008000"}], "stock": 85, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Zip-up Sweatshirt", "price": 3200, "category": "clothing", "description": "Cozy zip-up sweatshirt for layering. Perfect for all seasons.", "images": ["https://picsum.photos/seed/Sweatshirt/600/600"], "sizes": ["M", "L", "XL"], "colors": [{"name": "Grey", "hex": "#808080"}, {"name": "Black", "hex": "#000000"}], "stock": 65, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Plain Crew Neck Sweatshirt", "price": 2800, "category": "clothing", "description": "Classic crew neck sweatshirt in premium fabric. Timeless style.", "images": ["https://picsum.photos/seed/CrewNeck/600/600"], "sizes": ["S", "M", "L", "XL"], "colors": [{"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 95, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
     
     # ━━━━━ ACCESSORIES (8 items) ━━━━━
-    {"name": "Leather Belt", "price": 900, "category": "accessories", "description": "Premium leather belt with classic buckle design.", "images": ["https://picsum.photos/seed/Belt/600/600"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 120, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Canvas Backpack", "price": 2500, "category": "accessories", "description": "Durable canvas backpack with multiple compartments.", "images": ["https://picsum.photos/seed/Backpack/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 45, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Baseball Cap", "price": 800, "category": "accessories", "description": "Classic baseball cap in premium material.", "images": ["https://picsum.photos/seed/Cap/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 150, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Aviator Sunglasses", "price": 1200, "category": "accessories", "description": "Classic aviator style sunglasses with UV protection.", "images": ["https://picsum.photos/seed/Sunglasses/600/600"], "sizes": [], "colors": [{"name": "Gold", "hex": "#ffd700"}, {"name": "Silver", "hex": "#c0c0c0"}], "stock": 60, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Leather Wallet", "price": 1500, "category": "accessories", "description": "Slim leather wallet with card slots and coin compartment.", "images": ["https://picsum.photos/seed/Wallet/600/600"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Woven Bracelet Set", "price": 600, "category": "accessories", "description": "Set of colorful woven bracelets for casual wear.", "images": ["https://picsum.photos/seed/Bracelets/600/600"], "sizes": [], "colors": [{"name": "Multi", "hex": "#ff69b4"}], "stock": 200, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Knit Beanie", "price": 700, "category": "accessories", "description": "Warm and cozy knit beanie for winter.", "images": ["https://picsum.photos/seed/Beanie/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}, {"name": "Red", "hex": "#ff0000"}], "stock": 110, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
-    {"name": "Canvas Tote Bag", "price": 950, "category": "accessories", "description": "Large canvas tote bag for shopping and daily use.", "images": ["https://picsum.photos/seed/Tote/600/600"], "sizes": [], "colors": [{"name": "Natural", "hex": "#e8d4b8"}, {"name": "Black", "hex": "#000000"}], "stock": 130, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow().isoformat()},
+    {"name": "Leather Belt", "price": 900, "category": "accessories", "description": "Premium leather belt with classic buckle design.", "images": ["https://picsum.photos/seed/Belt/600/600"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 120, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Canvas Backpack", "price": 2500, "category": "accessories", "description": "Durable canvas backpack with multiple compartments.", "images": ["https://picsum.photos/seed/Backpack/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}], "stock": 45, "rating": 4.7, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Baseball Cap", "price": 800, "category": "accessories", "description": "Classic baseball cap in premium material.", "images": ["https://picsum.photos/seed/Cap/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "White", "hex": "#ffffff"}, {"name": "Navy", "hex": "#001a4d"}], "stock": 150, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Aviator Sunglasses", "price": 1200, "category": "accessories", "description": "Classic aviator style sunglasses with UV protection.", "images": ["https://picsum.photos/seed/Sunglasses/600/600"], "sizes": [], "colors": [{"name": "Gold", "hex": "#ffd700"}, {"name": "Silver", "hex": "#c0c0c0"}], "stock": 60, "rating": 4.6, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Leather Wallet", "price": 1500, "category": "accessories", "description": "Slim leather wallet with card slots and coin compartment.", "images": ["https://picsum.photos/seed/Wallet/600/600"], "sizes": [], "colors": [{"name": "Brown", "hex": "#8b4513"}, {"name": "Black", "hex": "#000000"}], "stock": 100, "rating": 4.4, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Woven Bracelet Set", "price": 600, "category": "accessories", "description": "Set of colorful woven bracelets for casual wear.", "images": ["https://picsum.photos/seed/Bracelets/600/600"], "sizes": [], "colors": [{"name": "Multi", "hex": "#ff69b4"}], "stock": 200, "rating": 4.2, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Knit Beanie", "price": 700, "category": "accessories", "description": "Warm and cozy knit beanie for winter.", "images": ["https://picsum.photos/seed/Beanie/600/600"], "sizes": [], "colors": [{"name": "Black", "hex": "#000000"}, {"name": "Grey", "hex": "#808080"}, {"name": "Red", "hex": "#ff0000"}], "stock": 110, "rating": 4.5, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
+    {"name": "Canvas Tote Bag", "price": 950, "category": "accessories", "description": "Large canvas tote bag for shopping and daily use.", "images": ["https://picsum.photos/seed/Tote/600/600"], "sizes": [], "colors": [{"name": "Natural", "hex": "#e8d4b8"}, {"name": "Black", "hex": "#000000"}], "stock": 130, "rating": 4.3, "review_count": 0, "is_active": True, "created_at": datetime.utcnow()},
 ]
 
 
@@ -113,7 +113,7 @@ async def seed():
                 print(f"   ⚠️  User {user_data['email']} exists. Skipping...")
             else:
                 user_data["is_active"] = True
-                user_data["created_at"] = datetime.utcnow().isoformat()
+                user_data["created_at"] = datetime.utcnow()
                 await db.users.insert_one(user_data)
                 print(f"✅ Created {user_data['role']}: {user_data['email']}")
         
@@ -158,12 +158,12 @@ async def seed():
                 "status": "delivered",
                 "payment_method": "cod",
                 "status_history": [
-                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"},
-                    {"status": "confirmed", "timestamp": datetime.utcnow().isoformat(), "note": "Order confirmed"},
-                    {"status": "shipped", "timestamp": datetime.utcnow().isoformat(), "note": "Out for delivery"},
-                    {"status": "delivered", "timestamp": datetime.utcnow().isoformat(), "note": "Delivered"}
+                    {"status": "pending", "timestamp": datetime.utcnow(), "note": "Order placed"},
+                    {"status": "confirmed", "timestamp": datetime.utcnow(), "note": "Order confirmed"},
+                    {"status": "shipped", "timestamp": datetime.utcnow(), "note": "Out for delivery"},
+                    {"status": "delivered", "timestamp": datetime.utcnow(), "note": "Delivered"}
                 ],
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow()
             }
             await db.orders.insert_one(order1)
             print("✅ Order 1: customer1 - delivered")
@@ -197,11 +197,11 @@ async def seed():
                 "status": "shipped",
                 "payment_method": "cod",
                 "status_history": [
-                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"},
-                    {"status": "confirmed", "timestamp": datetime.utcnow().isoformat(), "note": "Order confirmed"},
-                    {"status": "shipped", "timestamp": datetime.utcnow().isoformat(), "note": "Out for delivery"}
+                    {"status": "pending", "timestamp": datetime.utcnow(), "note": "Order placed"},
+                    {"status": "confirmed", "timestamp": datetime.utcnow(), "note": "Order confirmed"},
+                    {"status": "shipped", "timestamp": datetime.utcnow(), "note": "Out for delivery"}
                 ],
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow()
             }
             await db.orders.insert_one(order2)
             print("✅ Order 2: customer1 - shipped")
@@ -244,9 +244,9 @@ async def seed():
                 "status": "pending",
                 "payment_method": "cod",
                 "status_history": [
-                    {"status": "pending", "timestamp": datetime.utcnow().isoformat(), "note": "Order placed"}
+                    {"status": "pending", "timestamp": datetime.utcnow(), "note": "Order placed"}
                 ],
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow()
             }
             await db.orders.insert_one(order3)
             print("✅ Order 3: customer2 - pending")

@@ -99,12 +99,6 @@ class OrderService:
         return orders, total
 
     @staticmethod
-    async def get_pending_orders() -> List[dict]:
-        """Get all pending orders"""
-        orders, _ = await OrderService.list_orders(status="pending", limit=1000)
-        return orders
-
-    @staticmethod
     async def add_order_note(order_id: str, note: str, admin_id: str) -> dict:
         """Add note to order"""
         order = await OrderService.get_order(order_id)

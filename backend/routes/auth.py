@@ -346,7 +346,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
 
         await users_col.update_one(
             {"_id": user["_id"]},
-            {"$set": {"reset_token_hash": token_hash, "reset_token_expires": expires_at.isoformat()}},
+            {"$set": {"reset_token_hash": token_hash, "reset_token_expires": expires_at}},
         )
 
         reset_link = f"{settings.frontend_url}/auth/reset-password.html?token={raw_token}"

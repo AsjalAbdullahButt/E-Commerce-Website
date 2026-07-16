@@ -31,7 +31,7 @@ async def _clear_all_collections():
     for col in (
         database.users_col, database.products_col, database.orders_col, database.reviews_col,
         database.wishlist_col, database.promos_col, database.admin_users_col, database.riders_col,
-        database.inventory_history_col, database.audit_logs_col, database.notifications_col,
+        database.inventory_history_col, database.audit_logs_col,
     ):
         await col.delete_many({})
 

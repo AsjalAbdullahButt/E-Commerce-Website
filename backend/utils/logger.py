@@ -41,7 +41,7 @@ async def log_to_db(level: str, module: str, message: str, meta: dict = None):
             "module": module,
             "message": message,
             "meta": meta or {},
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow()
         })
     except Exception:
         pass  # Never let logging crash the app
