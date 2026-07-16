@@ -184,13 +184,17 @@ function setupSidebarToggle() {
   
   if (!sidebar) return;
 
+  function setSidebarOpen(isOpen) {
+    sidebar.classList.toggle('show', isOpen);
+    if (overlay) overlay.classList.toggle('show', isOpen);
+    if (toggle) toggle.setAttribute('aria-expanded', String(isOpen));
+  }
+
   // Toggle sidebar on button click
   if (toggle) {
+    toggle.setAttribute('aria-expanded', 'false');
     toggle.addEventListener('click', () => {
-      const isOpen = sidebar.classList.toggle('show');
-      if (overlay) {
-        overlay.classList.toggle('show', isOpen);
-      }
+      setSidebarOpen(!sidebar.classList.contains('show'));
     });
   }
 
@@ -198,29 +202,31 @@ function setupSidebarToggle() {
   if (close) {
     close.addEventListener('click', (e) => {
       e.stopPropagation();
-      sidebar.classList.remove('show');
-      if (overlay) overlay.classList.remove('show');
+      setSidebarOpen(false);
     });
   }
-  
+
   // Close sidebar when clicking on a category
   document.querySelectorAll('.category-item').forEach(item => {
     item.addEventListener('click', () => {
       // Only close on mobile (when transform is active)
       if (window.innerWidth <= 768) {
-        sidebar.classList.remove('show');
-        if (overlay) overlay.classList.remove('show');
+        setSidebarOpen(false);
       }
     });
   });
-  
+
   // Close sidebar when clicking on overlay
   if (overlay) {
-    overlay.addEventListener('click', () => {
-      sidebar.classList.remove('show');
-      overlay.classList.remove('show');
-    });
+    overlay.addEventListener('click', () => setSidebarOpen(false));
   }
+
+  // Close sidebar on Escape (mobile drawer mode)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('show')) {
+      setSidebarOpen(false);
+    }
+  });
 
   // Handle resize to ensure sidebar is visible on desktop
   window.addEventListener('resize', () => {

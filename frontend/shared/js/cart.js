@@ -94,6 +94,7 @@ function updateCartDrawer() {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'drawer-close';
   closeBtn.textContent = '✕';
+  closeBtn.setAttribute('aria-label', 'Close cart');
   closeBtn.addEventListener('click', closeCartDrawer);
   header.appendChild(h2);
   header.appendChild(closeBtn);
@@ -161,17 +162,36 @@ function updateCartDrawer() {
   drawer.appendChild(footer);
 }
 
+let _cartDrawerReturnFocus = null;
+
+function _onCartDrawerKeydown(e) {
+  if (e.key === 'Escape') closeCartDrawer();
+}
+
 function openCartDrawer() {
   const drawer = document.getElementById('cart-drawer');
   const overlay = document.getElementById('cart-overlay');
-  if (drawer) drawer.classList.add('open');
+  if (drawer) {
+    drawer.classList.add('open');
+    drawer.removeAttribute('aria-hidden');
+    _cartDrawerReturnFocus = document.activeElement;
+    const closeBtn = drawer.querySelector('.drawer-close');
+    if (closeBtn) closeBtn.focus();
+    document.addEventListener('keydown', _onCartDrawerKeydown);
+  }
   if (overlay) overlay.classList.add('open');
 }
 
 function closeCartDrawer() {
   const drawer = document.getElementById('cart-drawer');
   const overlay = document.getElementById('cart-overlay');
-  if (drawer) drawer.classList.remove('open');
+  if (drawer) {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.removeEventListener('keydown', _onCartDrawerKeydown);
+    if (_cartDrawerReturnFocus instanceof HTMLElement) _cartDrawerReturnFocus.focus();
+    _cartDrawerReturnFocus = null;
+  }
   if (overlay) overlay.classList.remove('open');
 }
 
