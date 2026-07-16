@@ -83,7 +83,7 @@ async def update_profile(request: Request, body: RiderProfileUpdate, user=Depend
 
 @router.patch("/status")
 @limiter.limit("30/minute")
-async def set_status(request: Request, status: str = Query(..., regex="^(available|busy|offline)$"), user=Depends(require_rider)):
+async def set_status(request: Request, status: str = Query(..., pattern="^(available|busy|offline)$"), user=Depends(require_rider)):
     await riders_col.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"status": status, "updated_at": datetime.utcnow()}})
     return {"success": True, "status": status}
 

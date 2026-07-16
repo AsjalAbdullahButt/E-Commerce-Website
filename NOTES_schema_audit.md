@@ -374,6 +374,51 @@ Tests: `backend/tests/test_integration/test_refresh_token.py` covers both flows 
 header (403), wrong CSRF header (403), correct header (200 + rotation), and the pre-existing
 no-cookie-at-all case (401). Full suite: 29/29 passing.
 
+## 12. Polish-pass Phase 2 — input validation + dependency vulnerability scanning (2026-07-17)
+
+**Input validation.** `utils/helpers.py::sanitize_input` previously only rejected NoSQL-operator
+strings; extended it with control-character stripping and a `max_length` parameter (default 500,
+backward compatible with every existing caller). Added Pydantic `field_validator`s calling it on
+every free-text field that had none: `models/review.py::ReviewCreate.comment` (max 1000, rejects
+empty-after-strip), `models/order.py::ShippingAddress` (all 5 fields) and `OrderStatusUpdate.note`,
+`schemas/rider.py::RiderProfileUpdate.name/phone`, `schemas/admin.py::ProductCreate`/`ProductUpdate`
+`name`/`description`/`category`. Three admin endpoints take free text as bare (query-param) function
+arguments rather than a Pydantic body — `adjust_stock`'s `reason`, `add_order_note`'s `note`,
+`ban_user`'s `reason` — sanitized inline in `routes/admin.py` with `ValueError` mapped to HTTP 422.
+Also deleted `backend/models/product.py` (found while auditing product validation): zero call sites
+anywhere in the backend — the flat `ProductCreate`/`ProductUpdate` it defined was already fully
+superseded by `schemas/admin.py`'s variants[] shape per §1's migration; `routes/products.py` never
+imported it. Tests: `backend/tests/test_integration/test_input_validation.py` (12 cases — oversized
+input, NoSQL-operator injection, empty-after-strip, and the normal-input happy path for each
+surface).
+
+**Dependency vulnerability scanning.** `pip-audit -r backend/requirements.txt` found 23 known CVEs
+across 5 packages — `requirements.txt` was pinned to versions several minors/majors behind what was
+actually installed in `.venv` (and what every test in this pass has been running against all along).
+Repinned to the installed, already-tested versions: `fastapi` 0.111.0→0.139.0, `uvicorn` 0.29.0→
+0.51.0, `motor` 3.4.0→3.7.1, `pymongo` 4.7.1→4.17.0, `python-dotenv` 1.0.1→1.2.2, `python-jose`
+3.3.0→3.5.0, `pydantic` 2.7.1→2.13.4, `pydantic-settings` 2.2.1→2.14.2, `python-multipart` 0.0.9→
+0.0.32, `slowapi` 0.1.9→0.1.10 (`passlib` unchanged, already latest). This fixed 22 of 23 CVEs.
+Also fixed a `FastAPIDeprecationWarning` this bump surfaced: `routes/rider.py::set_status`'s
+`Query(..., regex=...)` → `Query(..., pattern=...)`.
+
+The 1 remaining finding, `ecdsa` `PYSEC-2026-1325`, is allow-listed in CI (not silently ignored):
+`ecdsa` is a transitive dependency of `python-jose` with **no fix release available upstream** (a
+pure-Python ECDSA timing-side-channel class the maintainers have stated won't be patched), and this
+app signs/verifies every JWT with HS256 only (`config/settings.py::jwt_algorithm`) — the vulnerable
+ECDSA code path is never exercised here. Re-evaluate this exception if the app ever adds an
+ECDSA-based JWT algorithm.
+
+Added `.github/workflows/dependency-scan.yml`: runs `pip-audit` against `backend/requirements.txt`
+on every push/PR that touches it, plus a weekly Monday cron (catches newly-disclosed CVEs against
+unchanged pins). Verified the exact CI command passes locally (exit 0) before committing it as a
+would-be-required check. No `npm audit` job yet — the frontend has no `package.json`/npm dependency
+tree to scan (matches Phase 5's lint/build tooling, not yet built); a note in the workflow flags
+where to add it once one exists.
+
+Full backend suite: 41/41 passing after every change in this section (dependency repin, JWT algo
+Query fix, and the input-validation additions together).
+
 ## 8. Fields NOT touched by this audit (confirmed consistent, no divergence found)
 `wishlist_col`, `promos_col` (both `routes/promos.py` and `services/discount.py` write compatible
 `code/discount_type/discount_value/min_order/max_uses/uses/is_active/expires_at` shapes — the admin
