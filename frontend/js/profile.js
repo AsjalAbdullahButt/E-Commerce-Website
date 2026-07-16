@@ -53,7 +53,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ordersContent = document.querySelector('[data-tab="orders"]');
   if (ordersContent) {
     try {
-      const orders = await api.get('/orders/me', true);
+      const ordersResponse = await api.get('/orders/me', true);
+      const orders = ordersResponse.data || [];
         if (orders.length === 0) {
           ordersContent.textContent = '';
           const p = document.createElement('p'); p.style.textAlign = 'center'; p.style.color = 'var(--text-secondary)'; p.textContent = 'No orders yet'; ordersContent.appendChild(p);
