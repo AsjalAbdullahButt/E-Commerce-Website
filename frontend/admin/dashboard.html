@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard | E-COM</title>
   
-  <!-- AUTH GUARD — Runs FIRST before page renders. Checks the admin token/session set by
-       admin/login.html (POST /admin/auth/login), not the customer-facing ecom_* keys. -->
+  <!-- AUTH GUARD — Runs FIRST before page renders, to avoid a flash of protected content.
+       Checks the cached (non-sensitive) admin profile set by admin/login.html
+       (POST /admin/auth/login), not the customer-facing ecom_* keys. The access token itself
+       lives in memory only (see js/admin-api.js) and isn't available this early; real auth is
+       enforced server-side on every API call via the httpOnly admin_refresh_token cookie. -->
   <script>
     (function() {
-      const token = localStorage.getItem('admin_access_token');
       const user = JSON.parse(localStorage.getItem('admin_data') || 'null');
-      if (!token || !user) { window.location.replace('./login.html'); return; }
+      if (!user) { window.location.replace('./login.html'); return; }
       if (!['admin', 'super_admin', 'manager', 'support'].includes(user.role)) { window.location.replace('../customer/index.html'); return; }
     })();
   </script>

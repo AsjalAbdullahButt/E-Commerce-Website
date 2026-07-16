@@ -3,10 +3,12 @@
 class AdminAPI {
     constructor() {
         this.baseURL = ADMIN_CONFIG.API_URL;
-        this.accessToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        // The refresh token itself lives only in an httpOnly cookie set by the server
-        // (POST /admin/auth/login and /admin/auth/refresh) — never in localStorage/JS-readable
-        // storage. Matches the customer flow in shared/js/api.js. See NOTES_schema_audit.md §7.
+        // Access token lives in memory only (never localStorage/disk), so it can't be lifted by
+        // an XSS payload reading persistent storage. It's lost on every page navigation by
+        // design — request() below silently restores it from the httpOnly admin_refresh_token
+        // cookie set by POST /admin/auth/login and /admin/auth/refresh. Matches the customer
+        // flow in shared/js/api.js.
+        this.accessToken = null;
     }
 
     /**
@@ -14,8 +16,12 @@ class AdminAPI {
      */
     async request(endpoint, method = 'GET', data = null) {
         try {
-            // Always read latest token from storage in case it changed during runtime
-            this.accessToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const isAuthBootstrap = endpoint === ADMIN_CONFIG.ENDPOINTS.AUTH.LOGIN
+                || endpoint === ADMIN_CONFIG.ENDPOINTS.AUTH.REFRESH;
+            if (!this.accessToken && !isAuthBootstrap) {
+                // Fresh page load — try a silent restore before giving up.
+                await this.refreshAccessToken();
+            }
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -74,7 +80,6 @@ class AdminAPI {
             if (response.ok) {
                 const data = await response.json();
                 this.accessToken = data.data.access_token;
-                localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, this.accessToken);
             } else {
                 // Redirect to login
                 window.location.href = 'login.html';

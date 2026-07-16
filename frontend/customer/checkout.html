@@ -6,9 +6,13 @@
   <title>Checkout | E-COM</title>
   <script>
     (function () {
-      const token = localStorage.getItem('ecom_token');
+      // Pre-render guard only, to avoid a flash of protected content — the access token itself
+      // lives in memory only (see shared/js/api.js) and isn't available this early, so this
+      // checks the non-sensitive cached profile instead. Actual auth is enforced server-side on
+      // every API call regardless.
+      const user = localStorage.getItem('ecom_user');
       const role = localStorage.getItem('ecom_role');
-      if (!token || role !== 'customer') {
+      if (!user || role !== 'customer') {
         window.location.replace('../auth/login.html');
       }
     })();

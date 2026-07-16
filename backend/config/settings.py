@@ -63,15 +63,22 @@ class Settings(BaseSettings):
     # means each worker has its own independent cache and rate-limit counters, so cache
     # invalidation and rate limits silently stop being consistent across requests. Set this to
     # match whatever --workers/-w value actually launches the app so main.py can fail fast
-    # instead of degrading silently. See NOTES_schema_audit.md §7 / README "Deployment".
+    # instead of degrading silently. See README "Deployment".
     web_concurrency: int = 1
-    
+
+    # ── Cache (utils/cache.py) ────────────────────────────────────────────
+    # Upper bound on the process-local cache's entry count — once exceeded, cache_set() evicts
+    # the least-recently-used entry. A second, independent safety net (a periodic background
+    # sweep, see main.py's startup/shutdown events) drops expired-but-never-re-read entries so
+    # the cache can't grow unbounded even when it stays under this cap.
+    cache_max_entries: int = 5000
+
     # ── Rate Limiting (requests/minute) ────────────────────────────────────
     rate_login: str = "5/minute"
     rate_register: str = "3/minute"
     rate_order: str = "10/minute"
     rate_general: str = "60/minute"
-    
+
     # ── Logging ────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_file: str = "logs/app.log"

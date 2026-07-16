@@ -9,6 +9,7 @@ from config import settings
 from database import engine
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
+from utils.cache import start_cache_sweeper, stop_cache_sweeper
 from routes import auth, products, orders, reviews, wishlist, promos, rider, admin
 from middleware.admin_auth import AdminAuthMiddleware
 import time
@@ -119,6 +120,7 @@ def check_single_worker_deployment() -> None:
 @app.on_event("startup")
 async def startup_db_check():
     check_single_worker_deployment()
+    start_cache_sweeper()
     print("\n    ╔════════════════════════════════════╗")
     print("    ║   🛍️  E-COMMERCE API v2.0  🛍️      ║")
     print("    ╠════════════════════════════════════╣")
@@ -146,7 +148,7 @@ app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
 # Note: admin_new merged into admin.py — only the canonical admin router is mounted.
 # Note: routes/users.py (duplicate ban/unban/delete gated only by role membership, not the
 # granular permission matrix) was deleted — /admin/users/* is the single path for user
-# management. See NOTES_schema_audit.md §5.
+# management.
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -154,6 +156,7 @@ async def root():
 
 @app.on_event("shutdown")
 async def shutdown_db():
+    await stop_cache_sweeper()
     try:
         await engine.dispose()
         print("MySQL connection pool closed.")

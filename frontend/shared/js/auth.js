@@ -28,12 +28,13 @@ function toggleTheme() {
   }
 }
 
-const TOKEN_KEY = 'ecom_token';
 const USER_KEY  = 'ecom_user';
 const ROLE_KEY  = 'ecom_role';
 
+// getToken() reflects the in-memory access token (see shared/js/api.js) — null right after a
+// page load until an authenticated call silently restores it via /auth/refresh.
 function getToken()  {
-  return localStorage.getItem(TOKEN_KEY);
+  return getAccessToken();
 }
 
 function getUser() {
@@ -45,12 +46,14 @@ function getRole() {
   return localStorage.getItem(ROLE_KEY);
 }
 
+// Based on the (non-sensitive) cached profile rather than the in-memory token, since the token
+// itself is intentionally empty right after a fresh page load.
 function isLoggedIn() {
-  return !!getToken();
+  return !!getUser();
 }
 
 function clearAuth() {
-  localStorage.removeItem(TOKEN_KEY);
+  setAccessToken(null);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(ROLE_KEY);
 }
@@ -82,7 +85,7 @@ function requireRole(requiredRoles) {
 async function login(email, password) {
   try {
     const data = await api.post('/auth/login', { email, password });
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    setAccessToken(data.access_token);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     localStorage.setItem(ROLE_KEY, data.user.role);
     return data.user;
@@ -100,7 +103,7 @@ async function register(name, email, password, phone) {
       password,
       phone
     });
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    setAccessToken(data.access_token);
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     localStorage.setItem(ROLE_KEY, data.user.role);
     return data.user;

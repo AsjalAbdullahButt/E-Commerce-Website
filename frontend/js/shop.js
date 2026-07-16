@@ -239,7 +239,6 @@ async function syncWishlistFromServer() {
     }
   } catch (err) {
     // Fail silently - wishlist sync is not critical
-    console.log('Wishlist sync skipped');
   }
 }
 

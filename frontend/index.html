@@ -38,7 +38,7 @@
   <script src="./shared/js/auth.js?v=20260716"></script>
   <script>
     // Single entry point: same site, different home per role. Reuses the token/role helpers
-    // from shared/js/auth.js rather than re-deriving session state — see NOTES_schema_audit.md.
+    // from shared/js/auth.js rather than re-deriving session state.
     (async function routeToHome() {
       const HOME_BY_ROLE = {
         customer: './customer/index.html',

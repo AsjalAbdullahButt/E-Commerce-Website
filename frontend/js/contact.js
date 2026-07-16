@@ -235,7 +235,7 @@ function initComplaintForm() {
       formData.append('file', fileInput.files[0]);
 
       // Submit to backend using fetch (for FormData support)
-      const token = localStorage.getItem('ecom_token');
+      const token = getAccessToken();
       const headers = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;

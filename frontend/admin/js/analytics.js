@@ -5,10 +5,11 @@ class AdminAnalyticsDashboard {
     }
 
     async init() {
-        const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        // The access token lives in memory only (see js/admin-api.js) and is restored lazily on
+        // the first API call, so it isn't checked here — only the cached (non-sensitive) profile.
         const user = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
 
-        if (!token || !user) {
+        if (!user) {
             window.location.replace('./login.html');
             return;
         }

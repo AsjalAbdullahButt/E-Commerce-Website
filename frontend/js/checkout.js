@@ -33,11 +33,10 @@ async function initializeCheckout() {
           }
         } catch (e) {
           // ignore DOM badge error
-          console.log('Badge render skipped', e);
         }
       }
     } catch (e) {
-      console.log('Profile prefill skipped', e);
+      // ignore profile prefill error
     }
   }
 
@@ -141,7 +140,7 @@ async function refreshCartPrices(cart) {
         changedItems.push({ name: item.name || product.name || 'Item', from: previousPrice, to: currentPrice });
       }
     } catch (error) {
-      console.log('Price refresh skipped for item', item.id, error);
+      // ignore price refresh error for this item
     }
   }
 

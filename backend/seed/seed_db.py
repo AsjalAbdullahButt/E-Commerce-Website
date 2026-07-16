@@ -26,9 +26,8 @@ from utils.helpers import hash_password
 # PRODUCTS: 20 Items (12 Clothing + 8 Accessories) - All prices in PKR
 #
 # Authored here in a flat sizes/colors/stock shorthand for readability, then converted to the
-# canonical variants[] shape (see NOTES_schema_audit.md §1) by build_variants_from_flat() before
-# insertion — the `products` table itself only ever stores variants (as product_variants rows)
-# and total_stock.
+# canonical variants[] shape by build_variants_from_flat() before insertion — the `products`
+# table itself only ever stores variants (as product_variants rows) and total_stock.
 # ═════════════════════════════════════════════════════════════════════════════
 
 PRODUCTS_AUTHORED = [
@@ -59,13 +58,12 @@ PRODUCTS_AUTHORED = [
 
 
 def slugify(value: str) -> str:
-    """Extracted from the now-deleted scripts/migrate_products_to_variants.py — still a genuine
-    dependency of this seed script's flat-shorthand-to-variants conversion below."""
+    """Turn a name into a URL/SKU-safe slug (lowercase, hyphen-separated)."""
     return "-".join("".join(c.lower() if c.isalnum() else " " for c in str(value)).split())
 
 
 def build_variants_from_flat(doc: dict) -> list[dict]:
-    """Extracted from the now-deleted scripts/migrate_products_to_variants.py."""
+    """Convert the flat sizes/colors/stock shorthand above into the canonical variants[] shape."""
     sizes = doc.get("sizes") or [""]
     colors = doc.get("colors") or [{"name": "Default"}]
     color_names = [c.get("name", "Default") if isinstance(c, dict) else str(c) for c in colors] or ["Default"]

@@ -14,8 +14,23 @@ function redirectToLogin() {
   }
 }
 
+// The access token is kept in memory only (never localStorage/disk) so it can't be lifted by an
+// XSS payload reading persistent storage. It's lost on every full page load by design; apiRequest
+// silently restores it from the httpOnly refresh_token cookie via refreshAccessToken() the first
+// time an authenticated call is made after a page loads. ecom_user/ecom_role hold no secrets
+// (display name, email, role) so they stay in localStorage for synchronous nav rendering.
+let _accessToken = null;
+
+function getAccessToken() {
+  return _accessToken;
+}
+
+function setAccessToken(token) {
+  _accessToken = token;
+}
+
 function clearAuthSession() {
-  localStorage.removeItem('ecom_token');
+  setAccessToken(null);
   localStorage.removeItem('ecom_user');
   localStorage.removeItem('ecom_role');
 }
@@ -41,7 +56,7 @@ async function refreshAccessToken() {
         });
         if (!res.ok) return false;
         const data = await res.json();
-        localStorage.setItem('ecom_token', data.access_token);
+        setAccessToken(data.access_token);
         return true;
       } catch (err) {
         console.error('[API] Token refresh failed:', err.message);
@@ -74,7 +89,13 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false, _
   const headers = { 'Content-Type': 'application/json' };
 
   if (requiresAuth) {
-    const token = localStorage.getItem('ecom_token');
+    let token = getAccessToken();
+    if (!token) {
+      // Nothing in memory yet (fresh page load) — try a silent restore from the httpOnly
+      // refresh_token cookie before giving up.
+      await refreshAccessToken();
+      token = getAccessToken();
+    }
     if (!token) {
       redirectToLogin();
       return null;
@@ -88,7 +109,6 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false, _
   // Required for the browser to send/store the httpOnly refresh_token cookie set by
   // /auth/login and /auth/refresh — frontend (:5500) and backend (:8000) are different origins,
   // and fetch's default credentials mode ("same-origin") silently drops cross-origin cookies.
-  // See NOTES_schema_audit.md §7.
   options.credentials = 'include';
   if (body) options.body = JSON.stringify(body);
 

@@ -189,7 +189,9 @@ async def rider_stats(request: Request, user=Depends(require_rider), db: AsyncSe
         select(func.count()).select_from(Order).where(Order.rider_id == rider_id, Order.status == "delivered")
     )).scalar_one()
     active = (await db.execute(
-        select(func.count()).select_from(Order).where(Order.rider_id == rider_id, Order.status != "delivered")
+        select(func.count()).select_from(Order).where(
+            Order.rider_id == rider_id, Order.status.notin_(["delivered", "cancelled", "returned"])
+        )
     )).scalar_one()
     earnings = delivered * RIDER_DELIVERY_FEE
     return {"delivered": delivered, "active": active, "earnings": earnings}
