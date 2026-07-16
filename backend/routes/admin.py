@@ -410,11 +410,17 @@ async def refresh(request: Request, response: Response):
 
 @router.post("/auth/logout")
 async def logout(request: Request, response: Response, admin_data: dict = Depends(verify_admin_token)):
-    """Admin logout"""
+    """Admin logout.
+
+    Computes the client IP directly rather than reading request.state.ip_address: that attribute
+    is only set by AdminAuthMiddleware, which deliberately skips every /admin/auth/* path (so the
+    unauthenticated login/refresh endpoints on that same prefix work) — meaning it was never set
+    here, and this endpoint 500'd on every call. See NOTES_schema_audit.md.
+    """
     try:
         await AdminAuthService.logout(
             admin_id=admin_data["admin_id"],
-            ip_address=request.state.ip_address
+            ip_address=request.client.host if request.client else "0.0.0.0"
         )
         response.delete_cookie(REFRESH_COOKIE_NAME, httponly=True, secure=settings.cookie_secure, samesite="strict")
         response.delete_cookie(CSRF_COOKIE_NAME, httponly=False, secure=settings.cookie_secure, samesite="strict")

@@ -20,8 +20,13 @@ class Settings(BaseSettings):
     api_version: str = "v1"
 
     # ── Database ───────────────────────────────────────────────────────────
-    mongodb_uri: str
-    database_name: str = "E_Commerce"
+    mysql_host: str = "localhost"
+    mysql_port: int = 3306
+    mysql_user: str = "root"
+    mysql_password: str
+    mysql_database: str = "ecommerce"
+    mysql_test_database: str = "ecommerce_test"
+    sql_echo: bool = False
 
     # ── JWT Authentication ─────────────────────────────────────────────────
     jwt_secret: str

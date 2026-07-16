@@ -100,4 +100,4 @@ def test_change_password_weak_new_password_rejected(client):
 def test_products_categories_reachable(client):
     resp = client.get("/products/categories")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    assert isinstance(resp.json()["categories"], list)
