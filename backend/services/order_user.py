@@ -99,7 +99,6 @@ class OrderService:
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
-            db,
             admin_id=admin_id,
             admin_name="System",
             action="update_order_status",
@@ -216,7 +215,6 @@ class UserService:
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
-            db,
             admin_id=admin_id,
             admin_name="System",
             action="ban_user",
@@ -245,7 +243,6 @@ class UserService:
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
-            db,
             admin_id=admin_id,
             admin_name="System",
             action="unban_user",

@@ -2,10 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from sqlalchemy import text
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from config import settings
-from database import client, users_col, products_col, orders_col, reviews_col, wishlist_col, promos_col, admin_users_col, riders_col, audit_logs_col
+from database import engine
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from routes import auth, products, orders, reviews, wishlist, promos, rider, admin
@@ -124,55 +125,14 @@ async def startup_db_check():
     print("    ║  📊 Connecting to Database...     ║")
     print("    ╚════════════════════════════════════╝\n")
     try:
-        await client.admin.command("ping")
-        print("    ✅  MongoDB connected — server ready on :8000\n")
-        try:
-            await create_indexes()
-            print("    ✅  Indexes ensured")
-        except Exception as ie:
-            print(f"    ⚠️  Index creation warning: {ie}")
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        print("    ✅  MySQL connected — server ready on :8000\n")
+        print("    ✅  Schema managed by Alembic (see backend/alembic/) — indexes/constraints")
+        print("        are declared on the SQLAlchemy models, not created at runtime.")
     except Exception as e:
-        print(f"    ❌  MongoDB FAILED: {e}\n")
-        raise RuntimeError(f"Cannot connect to MongoDB: {e}")
-
-
-async def create_indexes():
-    try:
-        await users_col.create_index("email", unique=True)
-        await users_col.create_index("role")
-        await users_col.create_index("is_active")
-        await users_col.create_index("is_banned")
-
-        await products_col.create_index("category")
-        await products_col.create_index("is_active")
-        await products_col.create_index("name")
-        await products_col.create_index([("is_active", 1), ("category", 1)])
-        await products_col.create_index([("name", "text"), ("description", "text")])
-
-        await orders_col.create_index("user_id")
-        await orders_col.create_index("status")
-        await orders_col.create_index("rider_id")
-        await orders_col.create_index("created_at")
-        await orders_col.create_index([("status", 1), ("created_at", -1)])
-        await orders_col.create_index([("rider_id", 1), ("status", 1)])
-
-        await reviews_col.create_index("product_id")
-        await reviews_col.create_index("user_id")
-
-        await wishlist_col.create_index([("user_id", 1), ("product_id", 1)], unique=True)
-
-        await promos_col.create_index("code", unique=True)
-        await promos_col.create_index("is_active")
-
-        await admin_users_col.create_index("email", unique=True)
-        await riders_col.create_index("status")
-
-        await audit_logs_col.create_index("timestamp")
-        await audit_logs_col.create_index("level")
-        await audit_logs_col.create_index("entity_type")
-    except Exception as e:
-        await log_to_db("WARNING", __name__, f"create_indexes failed: {e}")
-        logger.warning(f"create_indexes failed: {e}")
+        print(f"    ❌  MySQL FAILED: {e}\n")
+        raise RuntimeError(f"Cannot connect to MySQL: {e}")
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 app.include_router(auth.router,     prefix="/auth",     tags=["Auth"])
@@ -195,8 +155,8 @@ async def root():
 @app.on_event("shutdown")
 async def shutdown_db():
     try:
-        client.close()
-        print("MongoDB connection closed.")
+        await engine.dispose()
+        print("MySQL connection pool closed.")
     except Exception:
         pass
 

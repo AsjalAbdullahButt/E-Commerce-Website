@@ -130,7 +130,6 @@ class ProductService:
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
-            db,
             admin_id=admin_id,
             admin_name="System",
             action="update_product",
@@ -156,7 +155,6 @@ class ProductService:
         # Log audit
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(
-            db,
             admin_id=admin_id,
             admin_name="System",
             action="delete_product",

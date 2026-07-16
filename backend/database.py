@@ -1,5 +1,8 @@
+import os
+
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from config import settings
 
@@ -15,12 +18,23 @@ _url = URL.create(
     database=settings.mysql_database,
 )
 
-engine = create_async_engine(
-    _url,
-    pool_pre_ping=True,  # detect stale connections — MySQL's wait_timeout drops idle ones
-    pool_recycle=3600,   # recycle connections before that happens
-    echo=settings.sql_echo,
-)
+# pytest calls asyncio.run() once per fixture/test (a fresh event loop each time), and
+# TestClient's own portal runs yet another loop — a pooled connection created on one loop can't
+# safely be reused on another (surfaces as "NoneType has no attribute 'send'" on Windows'
+# Proactor loop, or "Future attached to a different loop" elsewhere). NullPool opens a fresh raw
+# connection per checkout instead of reusing one across loops. This is a testing-only concern:
+# a real uvicorn process keeps one event loop for its whole lifetime, so production keeps the
+# normal pooled engine. See tests/conftest.py, which sets this before importing anything.
+_testing = os.environ.get("TESTING") == "1"
+
+_engine_kwargs = {"echo": settings.sql_echo}
+if _testing:
+    _engine_kwargs["poolclass"] = NullPool
+else:
+    _engine_kwargs["pool_pre_ping"] = True   # detect stale connections — MySQL's wait_timeout drops idle ones
+    _engine_kwargs["pool_recycle"] = 3600    # recycle connections before that happens
+
+engine = create_async_engine(_url, **_engine_kwargs)
 
 # expire_on_commit=False: several call sites read attributes off a just-committed object without
 # an explicit re-fetch (matches how the app read a dict back immediately after insert_one under

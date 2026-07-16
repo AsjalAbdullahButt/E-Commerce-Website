@@ -9,7 +9,8 @@ class TestAuthRoute:
     def test_settings_loaded(self):
         """Verify settings are loaded correctly"""
         assert settings.jwt_secret is not None
-        assert settings.mongodb_uri is not None
+        assert settings.mysql_host is not None
+        assert settings.mysql_database is not None
     
     def test_environment_configuration(self):
         """Verify environment configuration"""

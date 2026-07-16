@@ -23,7 +23,11 @@ class Product(Base, IDMixin, TimestampMixin):
     total_stock: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_by: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
-    rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # Not nullable: ProductResponse's `rating: float = 0.0` is non-Optional (matches Mongo's
+    # behavior where an unrated product simply never had this key set, and Pydantic's response
+    # model then applied the field default — the equivalent here is 0.0, not NULL, since a NULL
+    # would fail Pydantic validation instead of falling back to the schema default).
+    rating: Mapped[float] = mapped_column(Float, default=0.0)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
 
 

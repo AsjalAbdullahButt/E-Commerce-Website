@@ -134,5 +134,10 @@ def test_dashboard_orders_today_query_matches_native_datetime_created_at(client)
     )
     assert order_resp.status_code == 200, order_resp.text
 
-    stats = asyncio.run(DashboardService.get_dashboard_stats())
+    async def _fetch_stats():
+        from database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            return await DashboardService.get_dashboard_stats(db)
+
+    stats = asyncio.run(_fetch_stats())
     assert stats["orders_today"] >= 1

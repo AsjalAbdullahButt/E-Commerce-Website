@@ -1,236 +1,216 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from database import orders_col, promos_col, products_col, client as mongo_client
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from db.order import Order, OrderItem, OrderStatusHistory
+from db.product import Product, ProductVariant
+from db.promo import Promo
 from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, require_admin
+from services.order_user import _order_to_dict
 from services.product import InventoryService
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
-from utils.db_transaction import maybe_transaction
-from datetime import datetime
-from bson import ObjectId
-from fastapi import Query
+from utils.ids import is_valid_id
 from schemas.order import OrderListResponse, OrderResponse
 
 logger = get_logger(__name__)
 
 router = APIRouter()
 
-def serialize(o: dict) -> dict:
-    result = dict(o)
-    result["id"] = str(result.pop("_id"))
-    return result
-
 TAX_RATE     = 0.10
 DELIVERY_FEE = 250
 
 @router.post("", response_model=OrderResponse)
 @limiter.limit("10/minute")
-async def place_order(request: Request, body: OrderCreate, user=Depends(get_current_user)):
+async def place_order(request: Request, body: OrderCreate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Place a new order.
-    
+
     SECURITY: Prices are fetched from the DB — never trusted from the client.
     A client sending price=1 for a Rs5000 item will be charged the real price.
+
+    Stock decrement, promo increment, and the order insert must all succeed or all fail
+    together. Under Mongo this needed an explicit transaction (or a manual compensating
+    rollback where sessions weren't available — see NOTES_schema_audit.md §9). Under MySQL,
+    one request = one session = one transaction: database.py::get_db() commits on clean exit
+    and rolls back on any exception, so a plain HTTPException raised partway through this
+    function already undoes every write above it — no manual tracking/rollback list needed.
     """
     resolved_items = []
-    decremented = []  # [(product_id, size, color, quantity)] — for compensating rollback when no
-                       # DB transaction is available (see utils/db_transaction.py)
     subtotal = 0.0
     discount = 0.0
 
-    # Stock decrement, promo increment, and the order insert must all succeed or all fail
-    # together — a promo code rejected *after* stock was already decremented (or a crash between
-    # the two) used to leave stock permanently decremented with no order to show for it. Wrapped
-    # in a real MongoDB transaction where the deployment supports it (replica set/Atlas); falls
-    # back to the compensating rollback below under mongomock (this repo's test environment,
-    # which cannot create sessions at all). See NOTES_schema_audit.md §9.
-    async with maybe_transaction(mongo_client) as session:
-        try:
-            for item in body.items:
-                # ── CRITICAL: fetch real price from DB ──────────────────────────────
-                try:
-                    oid = ObjectId(item.product_id)
-                except Exception as e:
-                    await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": str(e), "user_id": str(user["_id"])})
-                    raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
+    for item in body.items:
+        # ── CRITICAL: fetch real price from DB ──────────────────────────────
+        if not is_valid_id(item.product_id):
+            await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
+            raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
 
-                product = await products_col.find_one({"_id": oid, "is_active": True}, session=session)
-                if not product:
-                    raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
+        product = await db.get(Product, item.product_id)
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail=f"Product not found: {item.product_id}")
 
-                variant = next(
-                    (v for v in product.get("variants", []) if v.get("size") == item.size and v.get("color") == item.color),
-                    None,
-                )
-                if not variant:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"'{product['name']}' has no {item.size}/{item.color} variant",
-                    )
-                if int(variant.get("stock", 0)) < item.quantity:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Insufficient stock for '{product['name']}' ({item.size}/{item.color}). Available: {variant.get('stock', 0)}",
-                    )
+        variant_result = await db.execute(
+            select(ProductVariant).where(
+                ProductVariant.product_id == item.product_id,
+                ProductVariant.size == item.size,
+                ProductVariant.color == item.color,
+            )
+        )
+        variant = variant_result.scalar_one_or_none()
+        if not variant:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{product.name}' has no {item.size}/{item.color} variant",
+            )
+        if variant.stock < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock for '{product.name}' ({item.size}/{item.color}). Available: {variant.stock}",
+            )
 
-                # Atomically decrement the matching variant's stock to avoid race conditions
-                decremented_ok = await InventoryService.decrement_variant_stock(
-                    item.product_id, item.size, item.color, item.quantity, session=session
-                )
-                if not decremented_ok:
-                    raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product['name']}'. Please refresh.")
-                decremented.append((item.product_id, item.size, item.color, item.quantity))
+        # Atomically decrement the matching variant's stock to avoid race conditions
+        decremented_ok = await InventoryService.decrement_variant_stock(
+            db, item.product_id, item.size, item.color, item.quantity
+        )
+        if not decremented_ok:
+            raise HTTPException(status_code=400, detail=f"Stock was just taken for '{product.name}'. Please refresh.")
 
-                real_price = float(product["price"])
-                line_total = real_price * item.quantity
-                subtotal  += line_total
+        real_price = float(product.price)
+        line_total = real_price * item.quantity
+        subtotal  += line_total
 
-                resolved_items.append({
-                    "product_id": item.product_id,
-                    "name":       product["name"],
-                    "price":      real_price,          # ← always server price
-                    "quantity":   item.quantity,
-                    "size":       item.size,
-                    "color":      item.color,
-                    "image":      item.image,
-                })
+        resolved_items.append({
+            "product_id": item.product_id,
+            "name":       product.name,
+            "price":      real_price,          # ← always server price
+            "quantity":   item.quantity,
+            "size":       item.size,
+            "color":      item.color,
+            "image":      item.image,
+        })
 
-            # Apply promo code if provided
-            if body.promo_code:
-                promo = await promos_col.find_one({
-                    "code": body.promo_code.upper(),
-                    "is_active": True,
-                }, session=session)
-                if not promo:
-                    raise HTTPException(status_code=400, detail="Invalid or expired promo code")
+    # Apply promo code if provided
+    if body.promo_code:
+        promo_result = await db.execute(
+            select(Promo).where(Promo.code == body.promo_code.upper(), Promo.is_active == True)  # noqa: E712
+        )
+        promo = promo_result.scalar_one_or_none()
+        if not promo:
+            raise HTTPException(status_code=400, detail="Invalid or expired promo code")
 
-                # Robust expiry check: promo.expires_at may be stored as datetime
-                expires = promo.get("expires_at")
-                if expires:
-                    if isinstance(expires, str):
-                        try:
-                            expires = datetime.fromisoformat(expires)
-                        except Exception:
-                            expires = None
-                if expires and expires < datetime.utcnow():
-                    raise HTTPException(status_code=400, detail="Promo code has expired")
+        if promo.expires_at and promo.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Promo code has expired")
 
-                if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
-                    raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+        if promo.max_uses and promo.uses >= promo.max_uses:
+            raise HTTPException(status_code=400, detail="Promo code usage limit reached")
 
-                min_order = float(promo.get("min_order", 0) or 0)
-                if subtotal < min_order:
-                    raise HTTPException(status_code=400, detail=f"Minimum order of Rs {min_order} required")
+        min_order = float(promo.min_order or 0)
+        if subtotal < min_order:
+            raise HTTPException(status_code=400, detail=f"Minimum order of Rs {min_order} required")
 
-                if promo["discount_type"] == "percentage":
-                    discount = subtotal * (promo["discount_value"] / 100)
-                else:
-                    discount = float(promo["discount_value"])
+        if promo.discount_type == "percentage":
+            discount = subtotal * (promo.discount_value / 100)
+        else:
+            discount = float(promo.discount_value)
 
-                await promos_col.update_one({"_id": promo["_id"]}, {"$inc": {"uses": 1}}, session=session)
+        promo.uses += 1
 
-            after_discount = subtotal - discount
-            tax            = after_discount * TAX_RATE
-            total          = after_discount + tax + DELIVERY_FEE
+    after_discount = subtotal - discount
+    tax            = after_discount * TAX_RATE
+    total          = after_discount + tax + DELIVERY_FEE
 
-            doc = {
-                "user_id":           str(user["_id"]),
-                "items":             resolved_items,
-                "shipping_address":  body.shipping_address.dict(),
-                "payment_method":    (body.payment_method or "cod").lower(),
-                "payment_reference": body.payment_reference or None,
-                "promo_code":        body.promo_code or None,
-                "subtotal":          round(subtotal, 2),
-                "discount":          round(discount, 2),
-                "tax":               round(tax, 2),
-                "delivery_fee":      DELIVERY_FEE,
-                "total":             round(total, 2),
-                "status":            "pending",
-                "rider_id":          None,
-                "status_history":    [{
-                    "status":    "pending",
-                    "timestamp": datetime.utcnow(),
-                    "note":      "Order placed",
-                }],
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow(),
-            }
-            result = await orders_col.insert_one(doc, session=session)
-            order  = await orders_col.find_one({"_id": result.inserted_id}, session=session)
-        except HTTPException:
-            if session is None:
-                # No transaction support in this deployment (mongomock in tests) — manually
-                # undo the stock already decremented earlier in this request. When a real
-                # transaction IS active, exiting session.start_transaction() on this exception
-                # already aborted every write above atomically, so no manual undo is needed.
-                for product_id, size, color, quantity in decremented:
-                    await InventoryService.restore_variant_stock(product_id, size, color, quantity)
-            raise
+    order = Order(
+        user_id=str(user["_id"]),
+        status="pending",
+        rider_id=None,
+        subtotal=round(subtotal, 2),
+        discount=round(discount, 2),
+        tax=round(tax, 2),
+        delivery_fee=DELIVERY_FEE,
+        total=round(total, 2),
+        payment_method=(body.payment_method or "cod").lower(),
+        payment_reference=body.payment_reference or None,
+        promo_code=body.promo_code or None,
+        full_name=body.shipping_address.full_name,
+        phone=body.shipping_address.phone,
+        address=body.shipping_address.address,
+        city=body.shipping_address.city,
+        postal_code=body.shipping_address.postal_code,
+    )
+    db.add(order)
+    await db.flush()  # populate order.id
 
-    return serialize(order)
+    for ri in resolved_items:
+        db.add(OrderItem(order_id=order.id, **ri))
+
+    db.add(OrderStatusHistory(order_id=order.id, status="pending", timestamp=datetime.utcnow(), note="Order placed"))
+    await db.flush()
+
+    return await _order_to_dict(db, order)
 
 @router.get("/me", response_model=OrderListResponse)
 @limiter.limit("30/minute")
-async def my_orders(request: Request, page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user)):
+async def my_orders(request: Request, page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100), user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Get user's orders."""
-    query = {"user_id": str(user["_id"])}
-    total = await orders_col.count_documents(query)
+    user_id = str(user["_id"])
+    total = (await db.execute(select(func.count()).select_from(Order).where(Order.user_id == user_id))).scalar_one()
     skip = (page - 1) * limit
-    cursor = orders_col.find(query).sort("created_at", -1).skip(skip).limit(limit)
-    orders = await cursor.to_list(length=limit)
-    return {"data": [serialize(o) for o in orders], "total": total, "page": page, "pages": -(-total // limit)}
+    result = await db.execute(
+        select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).offset(skip).limit(limit)
+    )
+    orders = result.scalars().all()
+    data = [await _order_to_dict(db, o) for o in orders]
+    return {"data": data, "total": total, "page": page, "pages": -(-total // limit)}
 
 @router.get("", response_model=OrderListResponse)
 @limiter.limit("30/minute")
-async def all_orders(request: Request, page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=100), _=Depends(require_admin)):
+async def all_orders(request: Request, page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=100), _=Depends(require_admin), db: AsyncSession = Depends(get_db)):
     """Get all orders (admin only)."""
-    total = await orders_col.count_documents({})
+    total = (await db.execute(select(func.count()).select_from(Order))).scalar_one()
     skip = (page - 1) * limit
-    orders = await orders_col.find({}).sort("created_at", -1).skip(skip).limit(limit).to_list(length=limit)
-    return {"data": [serialize(o) for o in orders], "total": total, "page": page, "pages": -(-total // limit)}
+    result = await db.execute(select(Order).order_by(Order.created_at.desc()).offset(skip).limit(limit))
+    orders = result.scalars().all()
+    data = [await _order_to_dict(db, o) for o in orders]
+    return {"data": data, "total": total, "page": page, "pages": -(-total // limit)}
 
 @router.get("/{order_id}", response_model=OrderResponse)
 @limiter.limit("30/minute")
-async def get_order(request: Request, order_id: str, user=Depends(get_current_user)):
+async def get_order(request: Request, order_id: str, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Get single order — customers can only see their own."""
-    try:
-        oid = ObjectId(order_id)
-    except Exception as e:
-        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID requested {order_id}", {"error": str(e), "user_id": str(user["_id"])})
+    if not is_valid_id(order_id):
+        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID requested {order_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
-    o = await orders_col.find_one({"_id": oid})
+    o = await db.get(Order, order_id)
     if not o:
         raise HTTPException(status_code=404, detail="Order not found")
-    if user["role"] == "customer" and o["user_id"] != str(user["_id"]):
+    if user["role"] == "customer" and o.user_id != str(user["_id"]):
         raise HTTPException(status_code=403, detail="Access denied")
-    return serialize(o)
+    return await _order_to_dict(db, o)
 
 @router.patch("/{order_id}/status")
 @limiter.limit("20/minute")
-async def update_status(request: Request, order_id: str, body: OrderStatusUpdate, user=Depends(get_current_user)):
+async def update_status(request: Request, order_id: str, body: OrderStatusUpdate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Update order status (admin/rider only)."""
     if user["role"] not in ["admin", "rider"]:
         raise HTTPException(status_code=403, detail="Not authorized")
-    try:
-        oid = ObjectId(order_id)
-    except Exception:
+    if not is_valid_id(order_id):
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
-    order = await orders_col.find_one({"_id": oid})
+    order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    assert_valid_transition(order["status"], body.status)
+    assert_valid_transition(order.status, body.status)
 
-    history_entry = {
-        "status":    body.status,
-        "timestamp": datetime.utcnow(),
-        "note":      body.note or "",
-    }
-    await orders_col.update_one(
-        {"_id": oid},
-        {"$set": {"status": body.status, "updated_at": datetime.utcnow()}, "$push": {"status_history": history_entry}},
-    )
+    order.status = body.status
+    order.updated_at = datetime.utcnow()
+    db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.utcnow(), note=body.note or ""))
+
     return {"message": "Status updated"}
 
 # NOTE: rider assignment lives at PATCH /admin/orders/{id}/assign-rider (routes/admin.py),
@@ -240,53 +220,45 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
 
 @router.post("/{order_id}/cancel")
 @limiter.limit("10/minute")
-async def cancel_order(request: Request, order_id: str, user=Depends(get_current_user)):
+async def cancel_order(request: Request, order_id: str, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Cancel a pending order. Customers can only cancel their own orders."""
-    try:
-        oid = ObjectId(order_id)
-    except Exception as e:
-        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID on cancel {order_id}", {"error": str(e), "user_id": str(user["_id"])})
+    if not is_valid_id(order_id):
+        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID on cancel {order_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
-    
-    order = await orders_col.find_one({"_id": oid})
+
+    order = await db.get(Order, order_id)
     if not order:
         await log_to_db("ORDER_NOT_FOUND", __name__, f"order not found for cancellation {order_id}", {"user_id": str(user["_id"])})
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     # Customers can only cancel their own orders
-    if user["role"] == "customer" and order["user_id"] != str(user["_id"]):
+    if user["role"] == "customer" and order.user_id != str(user["_id"]):
         await log_to_db("UNAUTHORIZED_CANCEL", __name__, f"user {str(user['_id'])} tried to cancel another user's order {order_id}", {"order_id": order_id, "user_id": str(user["_id"])})
         raise HTTPException(status_code=403, detail="Cannot cancel another user's order")
-    
-    assert_valid_transition(order["status"], "cancelled")
+
+    assert_valid_transition(order.status, "cancelled")
 
     try:
-        history_entry = {
-            "status": "cancelled",
-            "timestamp": datetime.utcnow(),
-            "note": "Cancelled by user",
-        }
-        await orders_col.update_one(
-            {"_id": oid},
-            {"$set": {"status": "cancelled", "updated_at": datetime.utcnow()}, "$push": {"status_history": history_entry}}
-        )
+        order.status = "cancelled"
+        order.updated_at = datetime.utcnow()
+        db.add(OrderStatusHistory(order_id=order_id, status="cancelled", timestamp=datetime.utcnow(), note="Cancelled by user"))
+
         # Restore variant stock for items in cancelled order
-        for it in order.get("items", []):
+        items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == order_id))
+        for it in items_result.scalars().all():
             try:
-                restored = await InventoryService.restore_variant_stock(
-                    it.get("product_id"), it.get("size"), it.get("color"), it.get("quantity", 0)
-                )
+                restored = await InventoryService.restore_variant_stock(db, it.product_id, it.size, it.color, it.quantity)
                 if not restored:
-                    await log_to_db("STOCK_RESTORE_FAILED", __name__, "no matching variant to restore stock on cancel", {"order_id": order_id, "item": it})
+                    await log_to_db("STOCK_RESTORE_FAILED", __name__, "no matching variant to restore stock on cancel", {"order_id": order_id, "item": it.product_id})
             except Exception:
                 # Ignore stock restore failures but log
-                await log_to_db("STOCK_RESTORE_FAILED", __name__, "failed to restore stock on cancel", {"order_id": order_id, "item": it})
-        await log_to_db("ORDER_CANCELLED", __name__, f"order {order_id} cancelled by user {str(user['_id'])}", {"order_id": str(oid), "user_id": str(user["_id"])})
+                await log_to_db("STOCK_RESTORE_FAILED", __name__, "failed to restore stock on cancel", {"order_id": order_id, "item": it.product_id})
+        await log_to_db("ORDER_CANCELLED", __name__, f"order {order_id} cancelled by user {str(user['_id'])}", {"order_id": order_id, "user_id": str(user["_id"])})
         return {
             "success": True,
             "message": "Order cancelled successfully"
         }
     except Exception as e:
-        await log_to_db("ORDER_CANCEL_ERROR", __name__, f"failed to cancel order {order_id}", {"error": str(e), "order_id": str(oid), "user_id": str(user["_id"])})
+        await log_to_db("ORDER_CANCEL_ERROR", __name__, f"failed to cancel order {order_id}", {"error": str(e), "order_id": order_id, "user_id": str(user["_id"])})
         logger.error(f"Order cancellation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to cancel order")

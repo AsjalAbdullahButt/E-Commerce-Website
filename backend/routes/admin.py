@@ -1,4 +1,14 @@
+from datetime import datetime
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from db.order import Order, OrderItem
+from db.product import Product
+from db.user import User
 from middleware.admin_auth import verify_admin_token, check_permission
 from schemas.admin import *
 from services.admin_auth import AdminAuthService, AdminAuditService
@@ -8,13 +18,9 @@ from services.discount import DiscountService
 from services.dashboard import DashboardService
 from services.rider import RiderService
 from schemas.rider import RiderCreate
-from typing import Optional
 from utils.logger import get_logger, log_to_db
 from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
-from utils.order_transitions import assert_valid_transition
-from database import products_col, orders_col, users_col
-from bson import ObjectId
-from datetime import datetime
+from utils.ids import is_valid_id
 from config import settings
 from utils.limiter import limiter
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
@@ -29,28 +35,26 @@ router = APIRouter(tags=["Admin"])
 # Simple stats endpoint (kept from legacy admin module) mounted at /admin/stats
 @router.get("/stats")
 @limiter.limit("30/minute")
-async def legacy_stats(request: Request, _=Depends(verify_admin_token)):
+async def legacy_stats(request: Request, _=Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Get admin dashboard statistics (admin only)"""
     try:
-        total_products = await products_col.count_documents({"is_active": True})
-        total_orders = await orders_col.count_documents({})
-        total_users = await users_col.count_documents({"role": "customer"})
+        total_products = (await db.execute(select(func.count()).select_from(Product).where(Product.is_active == True))).scalar_one()  # noqa: E712
+        total_orders = (await db.execute(select(func.count()).select_from(Order))).scalar_one()
+        total_users = (await db.execute(select(func.count()).select_from(User).where(User.role == "customer"))).scalar_one()
 
         # Named explicitly: revenue excluding cancelled orders (a cancelled order was never
         # actually fulfilled/paid for, so it shouldn't inflate revenue). See NOTES_schema_audit.md §9.
-        revenue_agg = await orders_col.aggregate([
-            {"$match": {"status": {"$ne": "cancelled"}}},
-            {"$group": {"_id": None, "total_revenue": {"$sum": "$total"}}}
-        ]).to_list(length=1)
-        total_revenue = revenue_agg[0]["total_revenue"] if revenue_agg else 0
+        total_revenue = (await db.execute(
+            select(func.coalesce(func.sum(Order.total), 0)).where(Order.status != "cancelled")
+        )).scalar_one()
 
-        pending_orders = await orders_col.count_documents({"status": "pending"})
+        pending_orders = (await db.execute(select(func.count()).select_from(Order).where(Order.status == "pending"))).scalar_one()
 
-        categories = await products_col.aggregate([
-            {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-            {"$limit": 5}
-        ]).to_list(length=5)
+        cat_result = await db.execute(
+            select(Product.category, func.count().label("count"))
+            .group_by(Product.category).order_by(func.count().desc()).limit(5)
+        )
+        categories = cat_result.all()
 
         return {
             "total_products": total_products,
@@ -58,7 +62,7 @@ async def legacy_stats(request: Request, _=Depends(verify_admin_token)):
             "total_users": total_users,
             "total_revenue": round(total_revenue, 2),
             "pending_orders": pending_orders,
-            "top_categories": [{"category": c["_id"], "count": c["count"]} for c in categories]
+            "top_categories": [{"category": c.category, "count": c.count} for c in categories]
         }
     except Exception as e:
         await log_to_db("ERROR", __name__, f"Legacy stats error: {e}", {"endpoint": "legacy_stats"})
@@ -68,7 +72,7 @@ async def legacy_stats(request: Request, _=Depends(verify_admin_token)):
 
 @router.get("/dashboard/summary")
 @limiter.limit("30/minute")
-async def dashboard_summary(request: Request, _=Depends(verify_admin_token)):
+async def dashboard_summary(request: Request, _=Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Get the combined dashboard summary payload for charts and KPIs."""
     try:
         cache_key = "admin:dashboard:summary"
@@ -76,65 +80,46 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token)):
         if cached is not None:
             return cached
 
-        total_products = await products_col.count_documents({})
-        active_products = await products_col.count_documents({"is_active": True})
+        total_products = (await db.execute(select(func.count()).select_from(Product))).scalar_one()
+        active_products = (await db.execute(select(func.count()).select_from(Product).where(Product.is_active == True))).scalar_one()  # noqa: E712
 
-        total_orders = await orders_col.count_documents({})
-        total_users = await users_col.count_documents({})
-        active_users = await users_col.count_documents({"is_active": True})
-        banned_users = await users_col.count_documents({"is_banned": True})
+        total_orders = (await db.execute(select(func.count()).select_from(Order))).scalar_one()
+        total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+        active_users = (await db.execute(select(func.count()).select_from(User).where(User.is_active == True))).scalar_one()  # noqa: E712
+        banned_users = (await db.execute(select(func.count()).select_from(User).where(User.is_banned == True))).scalar_one()  # noqa: E712
 
-        status_agg = await orders_col.aggregate([
-            {
-                "$group": {
-                    "_id": "$status",
-                    "count": {"$sum": 1},
-                    "revenue": {"$sum": "$total"},
-                }
-            }
-        ]).to_list(length=20)
+        status_result = await db.execute(
+            select(Order.status, func.count().label("count"), func.sum(Order.total).label("revenue")).group_by(Order.status)
+        )
+        status_agg = status_result.all()
         # status_agg (and the orders_by_status/revenue_by_status chart data built from it below)
         # intentionally keeps every status, including cancelled — that breakdown is exactly where
         # an admin would want to see cancelled-order revenue. The single total_revenue KPI is a
         # different question ("how much did we actually make") and must exclude it.
         total_revenue = round(
-            sum(float(item["revenue"] or 0) for item in status_agg if item["_id"] != "cancelled"), 2
+            sum(float(row.revenue or 0) for row in status_agg if row.status != "cancelled"), 2
         )
 
-        product_agg = await orders_col.aggregate([
-            {"$unwind": "$items"},
-            {
-                "$group": {
-                    "_id": "$items.product_id",
-                    "name": {"$first": "$items.name"},
-                    "quantity_sold": {"$sum": "$items.quantity"},
-                    "revenue": {"$sum": {"$multiply": ["$items.quantity", "$items.price"]}},
-                }
-            },
-            {"$sort": {"revenue": -1}},
-            {"$limit": 5},
-        ]).to_list(length=5)
+        product_result = await db.execute(
+            select(
+                OrderItem.product_id,
+                func.any_value(OrderItem.name).label("name"),
+                func.sum(OrderItem.quantity).label("quantity_sold"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+            )
+            .group_by(OrderItem.product_id).order_by(func.sum(OrderItem.quantity * OrderItem.price).desc()).limit(5)
+        )
+        product_agg = product_result.all()
 
-        recent_orders = await orders_col.find({}, {"order_number": 1, "status": 1, "total": 1, "created_at": 1, "user_id": 1}) \
-            .sort("created_at", -1) \
-            .limit(5) \
-            .to_list(length=5)
+        recent_result = await db.execute(select(Order).order_by(Order.created_at.desc()).limit(5))
+        recent_orders = recent_result.scalars().all()
 
-        monthly_growth = await users_col.aggregate([
-            {
-                "$group": {
-                    "_id": {
-                        "$dateToString": {
-                            "format": "%Y-%m",
-                            "date": {"$toDate": "$created_at"}
-                        }
-                    },
-                    "count": {"$sum": 1}
-                }
-            },
-            {"$sort": {"_id": 1}},
-            {"$limit": 12}
-        ]).to_list(length=12)
+        month_bucket = func.date_format(User.created_at, "%Y-%m")
+        growth_result = await db.execute(
+            select(month_bucket.label("month"), func.count().label("count"))
+            .group_by(month_bucket).order_by(month_bucket).limit(12)
+        )
+        monthly_growth = growth_result.all()
 
         payload = {
             "stats": {
@@ -142,41 +127,41 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token)):
                 "active_products": active_products,
                 "total_orders": total_orders,
                 "total_revenue": total_revenue,
-                "pending_orders": next((item["count"] for item in status_agg if item["_id"] == "pending"), 0),
+                "pending_orders": next((row.count for row in status_agg if row.status == "pending"), 0),
                 "total_users": total_users,
                 "active_users": active_users,
                 "banned_users": banned_users,
             },
             "orders_by_status": [
-                {"status": item["_id"], "count": item["count"]}
-                for item in sorted(status_agg, key=lambda item: item["_id"] or "")
+                {"status": row.status, "count": row.count}
+                for row in sorted(status_agg, key=lambda row: row.status or "")
             ],
             "revenue_by_status": [
-                {"status": item["_id"], "revenue": round(float(item["revenue"] or 0), 2)}
-                for item in sorted(status_agg, key=lambda item: item["_id"] or "")
+                {"status": row.status, "revenue": round(float(row.revenue or 0), 2)}
+                for row in sorted(status_agg, key=lambda row: row.status or "")
             ],
             "top_products": [
                 {
-                    "product_id": str(item["_id"]),
-                    "name": item["name"],
-                    "quantity_sold": item["quantity_sold"],
-                    "revenue": round(float(item["revenue"]), 2),
+                    "product_id": row.product_id,
+                    "name": row.name,
+                    "quantity_sold": row.quantity_sold,
+                    "revenue": round(float(row.revenue), 2),
                 }
-                for item in product_agg
+                for row in product_agg
             ],
             "monthly_growth": [
-                {"month": item["_id"], "signups": item["count"]}
-                for item in monthly_growth
+                {"month": row.month, "signups": row.count}
+                for row in monthly_growth
             ],
             "recent_orders": [
                 {
-                    "order_id": str(order.get("_id", "")),
-                    "order_number": order.get("order_number") or str(order.get("_id", ""))[:8],
-                    "status": order.get("status"),
-                    "total": round(float(order.get("total", 0) or 0), 2),
-                    "created_at": order.get("created_at"),
+                    "order_id": o.id,
+                    "order_number": o.id[:8],
+                    "status": o.status,
+                    "total": round(float(o.total or 0), 2),
+                    "created_at": o.created_at,
                 }
-                for order in recent_orders
+                for o in recent_orders
             ],
         }
         await cache_set(cache_key, payload, ttl_seconds=45)
@@ -188,60 +173,39 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token)):
 
 @router.get("/analytics/revenue")
 @limiter.limit("30/minute")
-async def revenue_analytics(request: Request, _=Depends(verify_admin_token)):
+async def revenue_analytics(request: Request, _=Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Get revenue analytics (total and by status)"""
     try:
-        # Revenue by order status
-        pipeline = [
-            {
-                "$group": {
-                    "_id": "$status",
-                    "count": {"$sum": 1},
-                    "revenue": {"$sum": "$total"}
-                }
-            },
-            {"$sort": {"revenue": -1}}
-        ]
-        status_revenue = await orders_col.aggregate(pipeline).to_list(length=10)
+        status_result = await db.execute(
+            select(Order.status, func.count().label("count"), func.sum(Order.total).label("revenue"))
+            .group_by(Order.status).order_by(func.sum(Order.total).desc())
+        )
+        status_revenue = status_result.all()
 
         # Same "excludes cancelled" semantic as legacy_stats/dashboard_summary — see NOTES_schema_audit.md §9.
-        total_revenue_agg = await orders_col.aggregate([
-            {"$match": {"status": {"$ne": "cancelled"}}},
-            {"$group": {"_id": None, "total": {"$sum": "$total"}}}
-        ]).to_list(length=1)
-        total_revenue = total_revenue_agg[0]["total"] if total_revenue_agg else 0
+        total_revenue = (await db.execute(
+            select(func.coalesce(func.sum(Order.total), 0)).where(Order.status != "cancelled")
+        )).scalar_one()
 
-        top_products = await orders_col.aggregate([
-            {"$unwind": "$items"},
-            {
-                "$group": {
-                    "_id": "$items.product_id",
-                    "name": {"$first": "$items.name"},
-                    "quantity": {"$sum": "$items.quantity"},
-                    "revenue": {"$sum": {"$multiply": ["$items.quantity", "$items.price"]}},
-                }
-            },
-            {"$sort": {"revenue": -1}},
-            {"$limit": 5},
-        ]).to_list(length=5)
-        
+        top_result = await db.execute(
+            select(
+                OrderItem.product_id,
+                func.any_value(OrderItem.name).label("name"),
+                func.sum(OrderItem.quantity).label("quantity"),
+                func.sum(OrderItem.quantity * OrderItem.price).label("revenue"),
+            )
+            .group_by(OrderItem.product_id).order_by(func.sum(OrderItem.quantity * OrderItem.price).desc()).limit(5)
+        )
+        top_products = top_result.all()
+
         return {
             "total_revenue": round(total_revenue, 2),
             "by_status": [
-                {
-                    "status": s["_id"],
-                    "count": s["count"],
-                    "revenue": round(s["revenue"], 2)
-                }
+                {"status": s.status, "count": s.count, "revenue": round(s.revenue or 0, 2)}
                 for s in status_revenue
             ],
             "top_products": [
-                {
-                    "product_id": str(p["_id"]),
-                    "name": p["name"],
-                    "quantity_sold": p["quantity"],
-                    "revenue": round(p["revenue"], 2)
-                }
+                {"product_id": p.product_id, "name": p.name, "quantity_sold": p.quantity, "revenue": round(p.revenue, 2)}
                 for p in top_products
             ]
         }
@@ -252,21 +216,12 @@ async def revenue_analytics(request: Request, _=Depends(verify_admin_token)):
 
 @router.get("/analytics/orders")
 @limiter.limit("30/minute")
-async def order_analytics(request: Request, _=Depends(verify_admin_token)):
+async def order_analytics(request: Request, _=Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Get order analytics by status"""
     try:
-        pipeline = [
-            {
-                "$group": {
-                    "_id": "$status",
-                    "count": {"$sum": 1}
-                }
-            }
-        ]
-        status_counts = await orders_col.aggregate(pipeline).to_list(length=10)
-        
-        status_map = {s["_id"]: s["count"] for s in status_counts}
-        
+        result = await db.execute(select(Order.status, func.count().label("count")).group_by(Order.status))
+        status_map = {row.status: row.count for row in result.all()}
+
         return {
             "total_orders": sum(status_map.values()),
             "pending": status_map.get("pending", 0),
@@ -283,42 +238,28 @@ async def order_analytics(request: Request, _=Depends(verify_admin_token)):
 
 @router.get("/analytics/users")
 @limiter.limit("30/minute")
-async def user_analytics(request: Request, _=Depends(verify_admin_token)):
+async def user_analytics(request: Request, _=Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Get user analytics (growth, active users)"""
     try:
-        total_users = await users_col.count_documents({})
-        active_users = await users_col.count_documents({"is_active": True})
-        banned_users = await users_col.count_documents({"is_banned": True})
-        
-        # User growth by month (created_at)
-        pipeline = [
-            {
-                "$group": {
-                    "_id": {
-                        "$dateToString": {
-                            "format": "%Y-%m",
-                            "date": {"$toDate": "$created_at"}
-                        }
-                    },
-                    "count": {"$sum": 1}
-                }
-            },
-            {"$sort": {"_id": 1}},
-            {"$limit": 12}
-        ]
-        monthly_growth = await users_col.aggregate(pipeline).to_list(length=12)
-        
+        total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+        active_users = (await db.execute(select(func.count()).select_from(User).where(User.is_active == True))).scalar_one()  # noqa: E712
+        banned_users = (await db.execute(select(func.count()).select_from(User).where(User.is_banned == True))).scalar_one()  # noqa: E712
+
+        month_bucket = func.date_format(User.created_at, "%Y-%m")
+        result = await db.execute(
+            select(month_bucket.label("month"), func.count().label("count"))
+            .group_by(month_bucket).order_by(month_bucket).limit(12)
+        )
+        monthly_growth = result.all()
+
         return {
             "total_users": total_users,
             "active_users": active_users,
             "banned_users": banned_users,
             "inactive_users": total_users - active_users,
             "monthly_growth": [
-                {
-                    "month": m["_id"],
-                    "signups": m["count"]
-                }
-                for m in monthly_growth
+                {"month": row.month, "signups": row.count}
+                for row in monthly_growth
             ]
         }
     except Exception as e:
@@ -354,7 +295,7 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 
 @router.post("/auth/login")
-async def login(credentials: AdminLogin, request: Request, response: Response):
+async def login(credentials: AdminLogin, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Admin login.
 
     Refresh token contract matches the customer flow (routes/auth.py): httpOnly cookie, never
@@ -366,6 +307,7 @@ async def login(credentials: AdminLogin, request: Request, response: Response):
     """
     try:
         result = await AdminAuthService.authenticate(
+            db,
             email=credentials.email,
             password=credentials.password,
             ip_address=request.client.host if request.client else "0.0.0.0"
@@ -385,7 +327,7 @@ async def login(credentials: AdminLogin, request: Request, response: Response):
         raise HTTPException(status_code=500, detail="Login failed")
 
 @router.post("/auth/refresh")
-async def refresh(request: Request, response: Response):
+async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Refresh access token using the httpOnly refresh cookie set at login."""
     refresh_token_str = request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_token_str:
@@ -394,7 +336,7 @@ async def refresh(request: Request, response: Response):
     verify_csrf(request, CSRF_COOKIE_NAME)
 
     try:
-        result = await AdminAuthService.refresh_token(refresh_token_str)
+        result = await AdminAuthService.refresh_token(db, refresh_token_str)
         _set_refresh_cookie(response, result.pop("refresh_token"))
         return {
             "success": True,
@@ -436,11 +378,13 @@ async def logout(request: Request, response: Response, admin_data: dict = Depend
 @router.post("/auth/change-password")
 async def change_password(
     body: AdminChangePasswordRequest,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Change admin password. Body, not query params — mirrors routes/auth.py's ChangePasswordRequest."""
     try:
         await AdminAuthService.change_password(
+            db,
             admin_id=admin_data["admin_id"],
             old_password=body.old_password,
             new_password=body.new_password
@@ -457,14 +401,14 @@ async def change_password(
         raise HTTPException(status_code=500, detail="Password change failed")
 
 @router.post("/auth/unlock/{admin_id}")
-async def unlock_admin_account(admin_id: str, admin_data: dict = Depends(verify_admin_token)):
+async def unlock_admin_account(admin_id: str, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Unlock a locked admin account. Super-admin only — "admin:update" is reserved for
     super_admin in utils/permissions.py. AdminAuthService.unlock_account already existed but had
     no route calling it. See NOTES_schema_audit.md §7."""
     if not await check_permission(admin_data, "admin:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        await AdminAuthService.unlock_account(admin_id=admin_id, super_admin_id=admin_data["admin_id"])
+        await AdminAuthService.unlock_account(db, admin_id=admin_id, super_admin_id=admin_data["admin_id"])
         return {"success": True, "message": "Account unlocked"}
     except HTTPException:
         raise
@@ -481,14 +425,16 @@ async def unlock_admin_account(admin_id: str, admin_data: dict = Depends(verify_
 async def create_product(
     product: ProductCreate,
     request: Request,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Create new product"""
     if not await check_permission(admin_data, "product:create"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         product_id = await ProductService.create_product(
+            db,
             name=product.name,
             description=product.description,
             category=product.category,
@@ -514,14 +460,15 @@ async def create_product(
 @router.get("/products/{product_id}")
 async def get_product(
     product_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get product details"""
     if not await check_permission(admin_data, "product:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        product = await ProductService.get_product(product_id)
+        product = await ProductService.get_product(db, product_id)
         return {
             "success": True,
             "data": product
@@ -538,18 +485,20 @@ async def update_product(
     product_id: str,
     product: ProductUpdate,
     request: Request,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update product"""
     if not await check_permission(admin_data, "product:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         updates = product.model_dump(exclude_unset=True)
         if "variants" in updates:
             updates["variants"] = [v.model_dump() if hasattr(v, "model_dump") else v for v in updates["variants"]]
-        
+
         updated = await ProductService.update_product(
+            db,
             product_id=product_id,
             updates=updates,
             admin_id=admin_data["admin_id"],
@@ -571,14 +520,15 @@ async def update_product(
 @router.delete("/products/{product_id}")
 async def delete_product(
     product_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete (soft) product"""
     if not await check_permission(admin_data, "product:delete"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        await ProductService.delete_product(product_id, admin_data["admin_id"])
+        await ProductService.delete_product(db, product_id, admin_data["admin_id"])
         await cache_clear_prefix("products:list:")
         await cache_delete("products:categories")
         return {
@@ -598,14 +548,16 @@ async def list_products(
     is_active: Optional[bool] = None,
     limit: int = 50,
     skip: int = 0,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """List products"""
     if not await check_permission(admin_data, "product:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         products, total = await ProductService.list_products(
+            db,
             category=category,
             is_active=is_active,
             limit=limit,
@@ -625,14 +577,15 @@ async def list_products(
 
 @router.get("/products/low-stock/items")
 async def get_low_stock(
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get low stock items"""
     if not await check_permission(admin_data, "inventory:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        items = await ProductService.get_low_stock_items()
+        items = await ProductService.get_low_stock_items(db)
         return {
             "success": True,
             "data": items,
@@ -653,7 +606,8 @@ async def adjust_stock(
     variant_sku: str,
     quantity_change: int,
     reason: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Adjust stock for variant"""
     if not await check_permission(admin_data, "inventory:update"):
@@ -666,6 +620,7 @@ async def adjust_stock(
 
     try:
         await InventoryService.adjust_stock(
+            db,
             product_id=product_id,
             variant_sku=variant_sku,
             quantity_change=quantity_change,
@@ -687,14 +642,15 @@ async def adjust_stock(
 async def get_inventory_history(
     product_id: str,
     limit: int = 100,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get inventory history for product"""
     if not await check_permission(admin_data, "inventory:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        history = await InventoryService.get_inventory_history(product_id, limit)
+        history = await InventoryService.get_inventory_history(db, product_id, limit)
         return {
             "success": True,
             "data": history
@@ -711,14 +667,15 @@ async def get_inventory_history(
 @router.get("/orders/{order_id}")
 async def get_order(
     order_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get order details"""
     if not await check_permission(admin_data, "order:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        order = await OrderService.get_order(order_id)
+        order = await OrderService.get_order(db, order_id)
         return {
             "success": True,
             "data": order
@@ -735,14 +692,16 @@ async def update_order_status(
     order_id: str,
     update: OrderStatusUpdate,
     request: Request,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update order status"""
     if not await check_permission(admin_data, "order:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         order = await OrderService.update_order_status(
+            db,
             order_id=order_id,
             new_status=update.status,
             note=update.note,
@@ -766,14 +725,16 @@ async def list_orders(
     user_id: Optional[str] = None,
     limit: int = 50,
     skip: int = 0,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """List orders"""
     if not await check_permission(admin_data, "order:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         orders, total = await OrderService.list_orders(
+            db,
             status=status,
             user_id=user_id,
             limit=limit,
@@ -795,7 +756,8 @@ async def list_orders(
 async def add_order_note(
     order_id: str,
     note: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Add note to order"""
     if not await check_permission(admin_data, "order:update"):
@@ -808,6 +770,7 @@ async def add_order_note(
 
     try:
         order = await OrderService.add_order_note(
+            db,
             order_id=order_id,
             note=note,
             admin_id=admin_data["admin_id"],
@@ -831,14 +794,15 @@ async def add_order_note(
 @router.get("/users/{user_id}")
 async def get_user(
     user_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get user details"""
     if not await check_permission(admin_data, "user:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        user = await UserService.get_user(user_id)
+        user = await UserService.get_user(db, user_id)
         return {
             "success": True,
             "data": user
@@ -855,14 +819,16 @@ async def list_users(
     is_banned: Optional[bool] = None,
     limit: int = 50,
     skip: int = 0,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """List users"""
     if not await check_permission(admin_data, "user:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         users, total = await UserService.list_users(
+            db,
             is_banned=is_banned,
             limit=limit,
             skip=skip
@@ -882,7 +848,8 @@ async def list_users(
 async def ban_user(
     user_id: str,
     reason: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Ban user"""
     if not await check_permission(admin_data, "user:ban"):
@@ -895,6 +862,7 @@ async def ban_user(
 
     try:
         user = await UserService.ban_user(
+            db,
             user_id=user_id,
             reason=reason,
             admin_id=admin_data["admin_id"],
@@ -913,14 +881,16 @@ async def ban_user(
 @router.post("/users/{user_id}/unban")
 async def unban_user(
     user_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Unban user"""
     if not await check_permission(admin_data, "user:ban"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         user = await UserService.unban_user(
+            db,
             user_id=user_id,
             admin_id=admin_data["admin_id"],
         )
@@ -939,14 +909,15 @@ async def unban_user(
 async def get_user_orders(
     user_id: str,
     limit: int = 20,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get user's order history"""
     if not await check_permission(admin_data, "user:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        orders = await UserService.get_user_order_history(user_id, limit)
+        orders = await UserService.get_user_order_history(db, user_id, limit)
         return {
             "success": True,
             "data": orders,
@@ -961,12 +932,13 @@ async def get_user_orders(
 # ════════════════════════════════════════════════════════════════════════════
 
 @router.post("/riders")
-async def create_rider(rider: RiderCreate, admin_data: dict = Depends(verify_admin_token)):
+async def create_rider(rider: RiderCreate, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Create a new rider account"""
     if not await check_permission(admin_data, "rider:create"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
         created = await RiderService.create_rider(
+            db,
             name=rider.name, email=rider.email, password=rider.password,
             phone=rider.phone, admin_id=admin_data["admin_id"],
         )
@@ -979,24 +951,24 @@ async def create_rider(rider: RiderCreate, admin_data: dict = Depends(verify_adm
         raise HTTPException(status_code=500, detail="Failed to create rider")
 
 @router.get("/riders")
-async def list_riders(is_active: Optional[bool] = None, admin_data: dict = Depends(verify_admin_token)):
+async def list_riders(is_active: Optional[bool] = None, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """List riders with their live status/availability"""
     if not await check_permission(admin_data, "rider:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        riders = await RiderService.list_riders(is_active=is_active)
+        riders = await RiderService.list_riders(db, is_active=is_active)
         return {"success": True, "data": riders, "total": len(riders)}
     except Exception as e:
         logger.error(f"List riders error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch riders")
 
 @router.get("/riders/{rider_id}/active-orders")
-async def get_rider_active_orders(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+async def get_rider_active_orders(rider_id: str, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Count of a rider's currently active (not delivered/cancelled) orders"""
     if not await check_permission(admin_data, "rider:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        count = await RiderService.get_active_order_count(rider_id)
+        count = await RiderService.get_active_order_count(db, rider_id)
         return {"success": True, "data": {"rider_id": rider_id, "active_orders": count}}
     except HTTPException:
         raise
@@ -1005,12 +977,12 @@ async def get_rider_active_orders(rider_id: str, admin_data: dict = Depends(veri
         raise HTTPException(status_code=500, detail="Failed to fetch rider's active orders")
 
 @router.patch("/riders/{rider_id}/activate")
-async def activate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+async def activate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Activate a rider account"""
     if not await check_permission(admin_data, "rider:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        updated = await RiderService.set_active(rider_id, True, admin_data["admin_id"])
+        updated = await RiderService.set_active(db, rider_id, True, admin_data["admin_id"])
         return {"success": True, "message": "Rider activated", "data": updated}
     except HTTPException:
         raise
@@ -1019,12 +991,12 @@ async def activate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_
         raise HTTPException(status_code=500, detail="Failed to activate rider")
 
 @router.patch("/riders/{rider_id}/deactivate")
-async def deactivate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+async def deactivate_rider(rider_id: str, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Deactivate a rider account"""
     if not await check_permission(admin_data, "rider:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     try:
-        updated = await RiderService.set_active(rider_id, False, admin_data["admin_id"])
+        updated = await RiderService.set_active(db, rider_id, False, admin_data["admin_id"])
         return {"success": True, "message": "Rider deactivated", "data": updated}
     except HTTPException:
         raise
@@ -1033,7 +1005,7 @@ async def deactivate_rider(rider_id: str, admin_data: dict = Depends(verify_admi
         raise HTTPException(status_code=500, detail="Failed to deactivate rider")
 
 @router.patch("/orders/{order_id}/assign-rider")
-async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(verify_admin_token)):
+async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Assign a rider to an order (admin only).
 
     Canonical assign-rider path — validates the rider exists and is active/available, and that
@@ -1043,24 +1015,20 @@ async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(
     """
     if not await check_permission(admin_data, "order:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    try:
-        oid = ObjectId(order_id)
-    except Exception:
+    if not is_valid_id(order_id):
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
-    order = await orders_col.find_one({"_id": oid})
+    order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order["status"] in ("delivered", "cancelled", "returned"):
-        raise HTTPException(status_code=400, detail=f"Cannot assign a rider to a {order['status']} order")
+    if order.status in ("delivered", "cancelled", "returned"):
+        raise HTTPException(status_code=400, detail=f"Cannot assign a rider to a {order.status} order")
 
-    if not await RiderService.is_available_for_assignment(rider_id):
+    if not await RiderService.is_available_for_assignment(db, rider_id):
         raise HTTPException(status_code=400, detail="Rider does not exist or is not active/available")
 
-    await orders_col.update_one(
-        {"_id": oid},
-        {"$set": {"rider_id": rider_id, "updated_at": datetime.utcnow()}},
-    )
+    order.rider_id = rider_id
+    order.updated_at = datetime.utcnow()
     return {"success": True, "message": "Rider assigned"}
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1070,14 +1038,16 @@ async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(
 @router.post("/discounts")
 async def create_discount(
     discount: DiscountCreate,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Create new discount"""
     if not await check_permission(admin_data, "promo:create"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         discount_id = await DiscountService.create_discount(
+            db,
             code=discount.code,
             description=discount.description,
             discount_type=discount.discount_type,
@@ -1101,14 +1071,15 @@ async def create_discount(
 @router.get("/discounts/{discount_id}")
 async def get_discount(
     discount_id: str,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get discount details"""
     if not await check_permission(admin_data, "promo:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        discount = await DiscountService.get_discount(discount_id)
+        discount = await DiscountService.get_discount(db, discount_id)
         return {
             "success": True,
             "data": discount
@@ -1123,15 +1094,17 @@ async def get_discount(
 async def update_discount(
     discount_id: str,
     update: DiscountUpdate,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update discount"""
     if not await check_permission(admin_data, "promo:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         updates = update.model_dump(exclude_unset=True)
         discount = await DiscountService.update_discount(
+            db,
             discount_id=discount_id,
             updates=updates,
             admin_id=admin_data["admin_id"],
@@ -1152,14 +1125,16 @@ async def list_discounts(
     is_active: Optional[bool] = None,
     limit: int = 50,
     skip: int = 0,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """List discounts"""
     if not await check_permission(admin_data, "promo:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         discounts, total = await DiscountService.list_discounts(
+            db,
             is_active=is_active,
             limit=limit,
             skip=skip
@@ -1181,14 +1156,15 @@ async def list_discounts(
 
 @router.get("/dashboard/stats")
 async def get_stats(
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get dashboard statistics"""
     if not await check_permission(admin_data, "dashboard:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        stats = await DashboardService.get_dashboard_stats()
+        stats = await DashboardService.get_dashboard_stats(db)
         return {
             "success": True,
             "data": stats
@@ -1200,14 +1176,15 @@ async def get_stats(
 @router.get("/dashboard/revenue-trend")
 async def get_revenue_trend(
     days: int = 30,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get revenue trend"""
     if not await check_permission(admin_data, "dashboard:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        trend = await DashboardService.get_revenue_trend(days)
+        trend = await DashboardService.get_revenue_trend(db, days)
         return {
             "success": True,
             "data": trend
@@ -1219,14 +1196,15 @@ async def get_revenue_trend(
 @router.get("/dashboard/top-products")
 async def get_top_products(
     limit: int = 10,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get top selling products"""
     if not await check_permission(admin_data, "dashboard:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        products = await DashboardService.get_top_products(limit)
+        products = await DashboardService.get_top_products(db, limit)
         return {
             "success": True,
             "data": products
@@ -1237,14 +1215,15 @@ async def get_top_products(
 
 @router.get("/dashboard/low-stock")
 async def get_low_stock_dashboard(
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get low stock items for dashboard"""
     if not await check_permission(admin_data, "dashboard:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        items = await DashboardService.get_low_stock_items()
+        items = await DashboardService.get_low_stock_items(db)
         return {
             "success": True,
             "data": items,
@@ -1257,14 +1236,15 @@ async def get_low_stock_dashboard(
 @router.get("/dashboard/recent-orders")
 async def get_recent_orders_dashboard(
     limit: int = 10,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get recent orders for dashboard"""
     if not await check_permission(admin_data, "dashboard:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
-        orders = await DashboardService.get_recent_orders(limit)
+        orders = await DashboardService.get_recent_orders(db, limit)
         return {
             "success": True,
             "data": orders,
@@ -1284,14 +1264,16 @@ async def get_audit_logs(
     admin_id: Optional[str] = None,
     limit: int = 100,
     skip: int = 0,
-    admin_data: dict = Depends(verify_admin_token)
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get audit logs"""
     if not await check_permission(admin_data, "audit:read"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
     try:
         logs, total = await AdminAuditService.get_logs(
+            db,
             entity_type=entity_type,
             admin_id=admin_id,
             limit=limit,

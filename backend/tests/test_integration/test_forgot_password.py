@@ -1,12 +1,14 @@
 """
 Regression test for the customer forgot-password flow (NOTES_schema_audit.md §7 / task 8).
 No SMTP/email provider is configured, so routes/auth.py logs the reset link via log_to_db
-instead of emailing it (a documented dev stand-in) — this test reads it back from
-audit_logs_col, the same way a real email would carry the token, to drive the flow end-to-end.
+instead of emailing it (a documented dev stand-in) — this test reads it back from the
+audit_logs table, the same way a real email would carry the token, to drive the flow
+end-to-end.
 """
 from urllib.parse import urlparse, parse_qs
 
 import database
+from db.admin import AuditLog
 
 
 def _register_customer(client, email="forgot@test.com", password="OldPass123"):
@@ -18,16 +20,19 @@ def _register_customer(client, email="forgot@test.com", password="OldPass123"):
 
 def _latest_reset_token(email):
     import asyncio
+    from sqlalchemy import select
 
     async def _fetch():
-        doc = await database.audit_logs_col.find_one(
-            {"level": "PASSWORD_RESET_REQUESTED"}, sort=[("timestamp", -1)]
-        )
-        return doc
+        async with database.AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(AuditLog).where(AuditLog.level == "PASSWORD_RESET_REQUESTED")
+                .order_by(AuditLog.timestamp.desc()).limit(1)
+            )
+            return result.scalar_one_or_none()
 
-    doc = asyncio.run(_fetch())
-    assert doc is not None, "no PASSWORD_RESET_REQUESTED audit entry was logged"
-    link = doc["meta"]["reset_link"]
+    entry = asyncio.run(_fetch())
+    assert entry is not None, "no PASSWORD_RESET_REQUESTED audit entry was logged"
+    link = entry.meta["reset_link"]
     token = parse_qs(urlparse(link).query)["token"][0]
     return token
 

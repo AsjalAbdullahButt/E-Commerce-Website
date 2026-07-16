@@ -183,13 +183,20 @@ def test_super_admin_can_unlock_locked_admin_account(client):
     locked_login = client.post("/admin/auth/login", json={"email": email, "password": password})
     assert locked_login.status_code == 423  # Locked — AdminAuthService.authenticate's explicit signal
 
-    from database import admin_users_col
-    locked_admin = asyncio.run(admin_users_col.find_one({"email": email}))
-    assert locked_admin["is_locked"] is True
+    async def _fetch_locked_admin():
+        from sqlalchemy import select
+        from database import AsyncSessionLocal
+        from db.admin import AdminUser
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+            return result.scalar_one()
+
+    locked_admin = asyncio.run(_fetch_locked_admin())
+    assert locked_admin.is_locked is True
 
     super_admin_token = _admin_token(client, email="remainingsuperadmin3@test.com", role="super_admin")
     unlock_resp = client.post(
-        f"/admin/auth/unlock/{str(locked_admin['_id'])}",
+        f"/admin/auth/unlock/{locked_admin.id}",
         headers={"Authorization": f"Bearer {super_admin_token}"},
     )
     assert unlock_resp.status_code == 200, unlock_resp.text

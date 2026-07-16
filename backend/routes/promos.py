@@ -1,11 +1,16 @@
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Depends, Request
-from database import promos_col
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from db.promo import Promo
 from models.promo import PromoCreate, PromoValidate
 from middleware.auth_middleware import get_current_user, require_admin
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
-from datetime import datetime
-from bson import ObjectId
+from utils.ids import is_valid_id
 
 logger = get_logger(__name__)
 
@@ -13,61 +18,60 @@ router = APIRouter()
 
 @router.post("/validate")
 @limiter.limit("10/minute")
-async def validate_promo(request: Request, body: PromoValidate, _=Depends(get_current_user)):
-    promo = await promos_col.find_one({"code": body.code.upper(), "is_active": True})
+async def validate_promo(request: Request, body: PromoValidate, _=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Promo).where(Promo.code == body.code.upper(), Promo.is_active == True))  # noqa: E712
+    promo = result.scalar_one_or_none()
     if not promo:
         raise HTTPException(status_code=404, detail="Invalid or expired promo code")
-    # Robust expiry check: handle datetimes or ISO strings
-    expires = promo.get("expires_at")
-    if expires:
-        if isinstance(expires, str):
-            try:
-                expires = datetime.fromisoformat(expires)
-            except Exception:
-                expires = None
-    if expires and expires < datetime.utcnow():
+    if promo.expires_at and promo.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Promo code has expired")
-    if promo.get("max_uses") and promo.get("uses", 0) >= promo["max_uses"]:
+    if promo.max_uses and promo.uses >= promo.max_uses:
         raise HTTPException(status_code=400, detail="Promo code usage limit reached")
-    if body.order_total < promo.get("min_order", 0):
-        raise HTTPException(status_code=400, detail=f"Minimum order of Rs {promo.get('min_order', 0)} required")
+    if body.order_total < promo.min_order:
+        raise HTTPException(status_code=400, detail=f"Minimum order of Rs {promo.min_order} required")
 
-    discount = (body.order_total * promo["discount_value"] / 100
-                if promo["discount_type"] == "percentage"
-                else float(promo["discount_value"]))
+    discount = (body.order_total * promo.discount_value / 100
+                if promo.discount_type == "percentage"
+                else float(promo.discount_value))
     return {
         "valid":           True,
-        "discount_type":   promo["discount_type"],
-        "discount_value":  promo["discount_value"],
+        "discount_type":   promo.discount_type,
+        "discount_value":  promo.discount_value,
         "discount_amount": round(discount, 2),
-        "code":            promo["code"],
+        "code":            promo.code,
     }
 
 @router.post("")
 @limiter.limit("20/minute")
-async def create_promo(request: Request, body: PromoCreate, _=Depends(require_admin)):
-    existing = await promos_col.find_one({"code": body.code.upper()})
-    if existing:
+async def create_promo(request: Request, body: PromoCreate, _=Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    existing = await db.execute(select(Promo).where(Promo.code == body.code.upper()))
+    if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Promo code already exists")
-    doc = {**body.dict(), "code": body.code.upper(), "uses": 0, "is_active": True, "created_at": datetime.utcnow()}
-    await promos_col.insert_one(doc)
+    promo = Promo(
+        code=body.code.upper(), discount_type=body.discount_type, discount_value=body.discount_value,
+        min_order=body.min_order, max_uses=body.max_uses, uses=0, expires_at=body.expires_at,
+        is_active=True,
+    )
+    db.add(promo)
     return {"message": "Promo created"}
 
 @router.get("")
 @limiter.limit("30/minute")
-async def list_promos(request: Request, _=Depends(require_admin)):
-    promos = await promos_col.find({}).to_list(length=100)
-    for p in promos:
-        p["id"] = str(p.pop("_id"))
-    return promos
+async def list_promos(request: Request, _=Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Promo))
+    promos = result.scalars().all()
+    return [
+        {c.name: getattr(p, c.name) for c in Promo.__table__.columns}
+        for p in promos
+    ]
 
 @router.delete("/{promo_id}")
 @limiter.limit("20/minute")
-async def delete_promo(request: Request, promo_id: str, _=Depends(require_admin)):
-    try:
-        oid = ObjectId(promo_id)
-    except Exception as e:
-        await log_to_db("INVALID_PROMO_ID", __name__, f"admin tried invalid promo ID {promo_id}", {"error": str(e)})
+async def delete_promo(request: Request, promo_id: str, _=Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if not is_valid_id(promo_id):
+        await log_to_db("INVALID_PROMO_ID", __name__, f"admin tried invalid promo ID {promo_id}", {})
         raise HTTPException(status_code=400, detail="Invalid promo ID")
-    await promos_col.delete_one({"_id": oid})
+    promo = await db.get(Promo, promo_id)
+    if promo:
+        await db.delete(promo)
     return {"message": "Promo deleted"}

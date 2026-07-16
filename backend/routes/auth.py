@@ -1,14 +1,20 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
-from database import users_col, admin_users_col, riders_col
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_db
+from db.admin import AdminUser
+from db.rider import Rider
+from db.user import User
 from models.user import UserCreate, UserLogin, UserUpdate
 from utils.helpers import hash_password, verify_password, create_access_token, create_refresh_token, sanitize_input
 from middleware.auth_middleware import get_current_user
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
+from utils.ids import is_valid_id
 from config import settings
 from datetime import datetime, timedelta
-from bson import ObjectId
 from pydantic import BaseModel, EmailStr
 import hashlib
 import re
@@ -36,42 +42,48 @@ def _set_session_cookies(response: Response, refresh_token: str) -> None:
     set_csrf_cookie(response, "csrf_token", generate_csrf_token(), settings.cookie_secure, REFRESH_COOKIE_MAX_AGE)
 
 
-def serialize_user(u: dict) -> dict:
+def serialize_user(u) -> dict:
+    """Accepts either a User ORM row or the dict shape middleware.auth_middleware::get_current_user
+    returns (which already has string `id`)."""
+    if isinstance(u, dict):
+        return {
+            "id":      u.get("id") or u.get("_id"),
+            "name":    u["name"],
+            "email":   u["email"],
+            "role":    u["role"],
+            "phone":   u.get("phone"),
+            "address": u.get("address"),
+        }
     return {
-        "id":      str(u["_id"]),
-        "name":    u["name"],
-        "email":   u["email"],
-        "role":    u["role"],
-        "phone":   u.get("phone"),
-        "address": u.get("address"),
+        "id":      u.id,
+        "name":    u.name,
+        "email":   u.email,
+        "role":    u.role,
+        "phone":   u.phone,
+        "address": u.address,
     }
 
 @router.post("/register")
 @limiter.limit("3/minute")
-async def register(request: Request, body: UserCreate, response: Response):
+async def register(request: Request, body: UserCreate, response: Response, db: AsyncSession = Depends(get_db)):
     """Register a new customer. Rate limited: 3 per minute per IP."""
     # Sanitize inputs
     name = sanitize_input(body.name)
     email = sanitize_input(body.email)
-    
-    existing = await users_col.find_one({"email": email})
-    if existing:
+
+    existing = await db.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    doc = {
-        "name":       name,
-        "email":      email,
-        "password":   hash_password(body.password),
-        "phone":      body.phone,
-        "role":       "customer",
-        "is_active":  True,
-        "created_at": datetime.utcnow(),
-    }
-    result = await users_col.insert_one(doc)
-    user   = await users_col.find_one({"_id": result.inserted_id})
-    
-    access_token = create_access_token(str(result.inserted_id), "customer")
-    refresh_token = create_refresh_token(str(result.inserted_id), "customer")
+    user = User(
+        name=name, email=email, password=hash_password(body.password),
+        phone=body.phone, role="customer", is_active=True,
+    )
+    db.add(user)
+    await db.flush()
+
+    access_token = create_access_token(user.id, "customer")
+    refresh_token = create_refresh_token(user.id, "customer")
 
     # Match /login's cookie contract exactly — previously this returned refresh_token in the
     # JSON body (a secret leaking into the response) and never set the cookie at all, so a
@@ -86,21 +98,22 @@ async def register(request: Request, body: UserCreate, response: Response):
 
 @router.post("/login")
 @limiter.limit("5/minute")
-async def login(request: Request, body: UserLogin, response: Response):
+async def login(request: Request, body: UserLogin, response: Response, db: AsyncSession = Depends(get_db)):
     """Unified login endpoint for customer, admin, and rider. Rate limited: 5 per minute per IP."""
     email = sanitize_input(body.email)
-    
+
     # Try to find user in customers first
-    user = await users_col.find_one({"email": email})
-    if user and verify_password(body.password, user.get("password")):
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user and verify_password(body.password, user.password):
         # Check active / banned flags
-        if not user.get("is_active", True):
+        if not user.is_active:
             raise HTTPException(status_code=403, detail="Account is deactivated")
-        if user.get("is_banned"):
+        if user.is_banned:
             raise HTTPException(status_code=403, detail="Account is banned")
 
-        access_token = create_access_token(str(user["_id"]), user.get("role", "customer"))
-        refresh_token = create_refresh_token(str(user["_id"]), user.get("role", "customer"))
+        access_token = create_access_token(user.id, user.role or "customer")
+        refresh_token = create_refresh_token(user.id, user.role or "customer")
 
         _set_session_cookies(response, refresh_token)
 
@@ -109,26 +122,24 @@ async def login(request: Request, body: UserLogin, response: Response):
             "token_type": "bearer",
             "user": serialize_user(user)
         }
-    
-    # Try admin_users collection
-    admin = await admin_users_col.find_one({"email": email})
-    admin_password = None
-    if admin:
-        admin_password = admin.get("password") or admin.get("password_hash")
 
-    if admin and admin_password and verify_password(body.password, admin_password):
+    # Try admin_users table
+    admin_result = await db.execute(select(AdminUser).where(AdminUser.email == email))
+    admin = admin_result.scalar_one_or_none()
+
+    if admin and verify_password(body.password, admin.password_hash):
         # Check admin flags
-        if not admin.get("is_active", True) or admin.get("is_locked"):
+        if not admin.is_active or admin.is_locked:
             raise HTTPException(status_code=403, detail="Account is deactivated or locked")
-        access_token = create_access_token(str(admin["_id"]), "admin")
-        refresh_token = create_refresh_token(str(admin["_id"]), "admin")
+        access_token = create_access_token(admin.id, "admin")
+        refresh_token = create_refresh_token(admin.id, "admin")
 
         _set_session_cookies(response, refresh_token)
 
         admin_serialized = {
-            "id": str(admin["_id"]),
-            "name": admin.get("name", "Admin"),
-            "email": admin["email"],
+            "id": admin.id,
+            "name": admin.name or "Admin",
+            "email": admin.email,
             "role": "admin",
         }
 
@@ -137,24 +148,23 @@ async def login(request: Request, body: UserLogin, response: Response):
             "token_type": "bearer",
             "user": admin_serialized
         }
-    
-    # Try riders collection
-    rider = await riders_col.find_one({"email": email})
-    if rider and verify_password(body.password, rider.get("password")):
+
+    # Try riders table
+    rider_result = await db.execute(select(Rider).where(Rider.email == email))
+    rider = rider_result.scalar_one_or_none()
+    if rider and verify_password(body.password, rider.password):
         # Check rider flags
-        if not rider.get("is_active", True):
+        if not rider.is_active:
             raise HTTPException(status_code=403, detail="Account is deactivated")
-        if rider.get("is_banned"):
-            raise HTTPException(status_code=403, detail="Account is banned")
-        access_token = create_access_token(str(rider["_id"]), "rider")
-        refresh_token = create_refresh_token(str(rider["_id"]), "rider")
+        access_token = create_access_token(rider.id, "rider")
+        refresh_token = create_refresh_token(rider.id, "rider")
 
         _set_session_cookies(response, refresh_token)
 
         rider_serialized = {
-            "id": str(rider["_id"]),
-            "name": rider.get("name", "Rider"),
-            "email": rider["email"],
+            "id": rider.id,
+            "name": rider.name or "Rider",
+            "email": rider.email,
             "role": "rider",
         }
 
@@ -163,13 +173,13 @@ async def login(request: Request, body: UserLogin, response: Response):
             "token_type": "bearer",
             "user": rider_serialized
         }
-    
+
     # Constant-time comparison even on missing user
     raise HTTPException(status_code=401, detail="Invalid email or password")
 
 @router.post("/refresh")
 @limiter.limit("10/minute")
-async def refresh(request: Request, response: Response):
+async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Refresh access token using refresh token from cookie. This is the only endpoint that
     authenticates purely off a cookie (no bearer header), so it's the one that needs an explicit
     CSRF check — see utils/csrf.py."""
@@ -187,25 +197,25 @@ async def refresh(request: Request, response: Response):
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm]
         )
-        
+
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        
+
         user_id = payload.get("sub")
         role = payload.get("role")
-        
-        # Find user in appropriate collection based on role
-        user = None
+
+        # Find user in appropriate table based on role
+        user_obj = None
         if role == "admin":
-            user = await admin_users_col.find_one({"_id": ObjectId(user_id)})
+            user_obj = await db.get(AdminUser, user_id)
         elif role == "rider":
-            user = await riders_col.find_one({"_id": ObjectId(user_id)})
+            user_obj = await db.get(Rider, user_id)
         else:  # customer
-            user = await users_col.find_one({"_id": ObjectId(user_id)})
-        
-        if not user:
+            user_obj = await db.get(User, user_id)
+
+        if not user_obj:
             raise HTTPException(status_code=401, detail="User not found")
-        
+
         new_access_token = create_access_token(user_id, role)
         new_refresh_token = create_refresh_token(user_id, role)
 
@@ -235,11 +245,11 @@ async def me(request: Request, user=Depends(get_current_user)):
 
 @router.put("/profile")
 @limiter.limit("20/minute")
-async def update_profile(request: Request, body: UserUpdate, user=Depends(get_current_user)):
+async def update_profile(request: Request, body: UserUpdate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Update user profile (name, phone, address). Customers only."""
     if user["role"] != "customer":
         raise HTTPException(status_code=403, detail="Only customers can update their profile")
-    
+
     updates = {}
     if body.name:
         updates["name"] = sanitize_input(body.name)
@@ -247,21 +257,19 @@ async def update_profile(request: Request, body: UserUpdate, user=Depends(get_cu
         updates["phone"] = sanitize_input(body.phone)
     if body.address:
         updates["address"] = sanitize_input(body.address)
-    
+
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
-    
+
     try:
-        await users_col.update_one(
-            {"_id": ObjectId(user["_id"])},
-            {"$set": updates}
-        )
-        updated_user = await users_col.find_one({"_id": ObjectId(user["_id"])})
+        user_obj = await db.get(User, user["_id"])
+        for key, value in updates.items():
+            setattr(user_obj, key, value)
         await log_to_db("PROFILE_UPDATE", __name__, f"user {str(user['_id'])} updated profile", {"user_id": str(user["_id"]), "fields": list(updates.keys())})
         return {
             "success": True,
             "message": "Profile updated successfully",
-            "user": serialize_user(updated_user)
+            "user": serialize_user(user_obj)
         }
     except Exception as e:
         await log_to_db("PROFILE_UPDATE_ERROR", __name__, f"failed to update user profile", {"error": str(e), "user_id": str(user["_id"])})
@@ -275,22 +283,24 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/change-password")
 @limiter.limit("5/minute")
-async def change_password(request: Request, body: ChangePasswordRequest, user=Depends(get_current_user)):
+async def change_password(request: Request, body: ChangePasswordRequest, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Change user password. Passwords provided in request body, not query params."""
     try:
-        # Fetch current user from appropriate collection
+        # Fetch current user from appropriate table
         role = user.get("role")
-        uid = ObjectId(str(user.get("_id") or user.get("id")))
-        current_user = None
+        uid = str(user.get("_id") or user.get("id"))
         if role == "admin":
-            current_user = await admin_users_col.find_one({"_id": uid})
+            current_user = await db.get(AdminUser, uid)
+            current_password = current_user.password_hash if current_user else None
         elif role == "rider":
-            current_user = await riders_col.find_one({"_id": uid})
+            current_user = await db.get(Rider, uid)
+            current_password = current_user.password if current_user else None
         else:
-            current_user = await users_col.find_one({"_id": uid})
+            current_user = await db.get(User, uid)
+            current_password = current_user.password if current_user else None
 
-        if not current_user or not verify_password(body.old_password, current_user.get("password")):
-            await log_to_db("PASSWORD_CHANGE_FAILED", __name__, "invalid old password", {"user_id": str(uid)})
+        if not current_user or not verify_password(body.old_password, current_password):
+            await log_to_db("PASSWORD_CHANGE_FAILED", __name__, "invalid old password", {"user_id": uid})
             raise HTTPException(status_code=401, detail="Current password is incorrect")
 
         # Validate new password strength
@@ -298,17 +308,15 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
         if len(new_pw) < 8 or not re.search(r"[A-Z]", new_pw) or not re.search(r"\d", new_pw):
             raise HTTPException(status_code=422, detail="New password must be at least 8 characters, include an uppercase letter and a digit")
 
-        # Hash new password
+        # Hash new password, update in correct table
         hashed = hash_password(new_pw)
-        # Update in correct collection
         if role == "admin":
-            await admin_users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
-        elif role == "rider":
-            await riders_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
+            current_user.password_hash = hashed
         else:
-            await users_col.update_one({"_id": uid}, {"$set": {"password": hashed, "updated_at": datetime.utcnow()}})
+            current_user.password = hashed
+        current_user.updated_at = datetime.utcnow()
 
-        await log_to_db("PASSWORD_CHANGED", __name__, f"user {str(uid)} changed password", {"user_id": str(uid)})
+        await log_to_db("PASSWORD_CHANGED", __name__, f"user {uid} changed password", {"user_id": uid})
         return {"success": True, "message": "Password changed successfully"}
     except HTTPException:
         raise
@@ -331,22 +339,21 @@ class ResetPasswordRequest(BaseModel):
 
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
-async def forgot_password(request: Request, body: ForgotPasswordRequest):
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Request a password reset link. Customers only (admin/rider passwords are managed by an
     admin). Always returns the same generic message regardless of whether the email exists, to
     avoid leaking which emails are registered."""
     email = sanitize_input(body.email)
-    user = await users_col.find_one({"email": email})
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
 
     if user:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         expires_at = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
 
-        await users_col.update_one(
-            {"_id": user["_id"]},
-            {"$set": {"reset_token_hash": token_hash, "reset_token_expires": expires_at}},
-        )
+        user.reset_token_hash = token_hash
+        user.reset_token_expires = expires_at
 
         reset_link = f"{settings.frontend_url}/auth/reset-password.html?token={raw_token}"
         # No SMTP/email provider is configured for this app — log the link instead of emailing
@@ -354,7 +361,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
         # (e.g. SendGrid/SES) before relying on this in production.
         logger.info(f"[DEV] Password reset link for {email}: {reset_link}")
         await log_to_db("PASSWORD_RESET_REQUESTED", __name__, f"password reset requested for {email}", {
-            "user_id": str(user["_id"]), "reset_link": reset_link,
+            "user_id": user.id, "reset_link": reset_link,
         })
 
     return {"message": "If an account with that email exists, a password reset link has been sent."}
@@ -362,20 +369,16 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
 
 @router.post("/reset-password")
 @limiter.limit("5/minute")
-async def reset_password(request: Request, body: ResetPasswordRequest):
+async def reset_password(request: Request, body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Complete a password reset with the token from /forgot-password. Single-use: the token
     fields are cleared on success, so replaying the same token fails."""
     token_hash = hashlib.sha256(body.token.encode()).hexdigest()
-    user = await users_col.find_one({"reset_token_hash": token_hash})
+    result = await db.execute(select(User).where(User.reset_token_hash == token_hash))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-    expires_at = user.get("reset_token_expires")
-    if isinstance(expires_at, str):
-        try:
-            expires_at = datetime.fromisoformat(expires_at)
-        except Exception:
-            expires_at = None
+    expires_at = user.reset_token_expires
     if not expires_at or expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
@@ -383,20 +386,18 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
     if len(new_pw) < 8 or not re.search(r"[A-Z]", new_pw) or not re.search(r"\d", new_pw):
         raise HTTPException(status_code=422, detail="New password must be at least 8 characters, include an uppercase letter and a digit")
 
-    await users_col.update_one(
-        {"_id": user["_id"]},
-        {
-            "$set": {"password": hash_password(new_pw), "updated_at": datetime.utcnow()},
-            "$unset": {"reset_token_hash": "", "reset_token_expires": ""},
-        },
-    )
-    await log_to_db("PASSWORD_RESET_COMPLETED", __name__, f"password reset completed for user {str(user['_id'])}", {"user_id": str(user["_id"])})
+    user.password = hash_password(new_pw)
+    user.updated_at = datetime.utcnow()
+    user.reset_token_hash = None
+    user.reset_token_expires = None
+
+    await log_to_db("PASSWORD_RESET_COMPLETED", __name__, f"password reset completed for user {user.id}", {"user_id": user.id})
     return {"message": "Password reset successfully. You can now log in with your new password."}
 
 
 @router.patch("/me")
 @limiter.limit("10/minute")
-async def update_me(request: Request, body: UserUpdate, user=Depends(get_current_user)):
+async def update_me(request: Request, body: UserUpdate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Update own profile. Supports customers and riders. Admin profile edits are not allowed here."""
     update_data = {k: v for k, v in body.dict().items() if v is not None}
     if update_data:
@@ -405,20 +406,24 @@ async def update_me(request: Request, body: UserUpdate, user=Depends(get_current
             update_data["name"] = sanitize_input(update_data["name"])
         if "address" in update_data:
             update_data["address"] = sanitize_input(update_data["address"])
-        update_data["updated_at"] = datetime.utcnow()
 
-        # Determine collection based on role
+        # Determine table based on role
         role = user.get("role")
-        uid = ObjectId(str(user.get("_id") or user.get("id")))
+        uid = str(user.get("_id") or user.get("id"))
         if role == "admin":
             # Do not allow admin profile edits via this endpoint
             raise HTTPException(status_code=403, detail="Admins must use admin profile endpoints")
         elif role == "rider":
-            await riders_col.update_one({"_id": uid}, {"$set": update_data})
-            updated = await riders_col.find_one({"_id": uid})
+            updated = await db.get(Rider, uid)
+            for key, value in update_data.items():
+                if hasattr(updated, key):
+                    setattr(updated, key, value)
+            updated.updated_at = datetime.utcnow()
         else:
-            await users_col.update_one({"_id": uid}, {"$set": update_data})
-            updated = await users_col.find_one({"_id": uid})
+            updated = await db.get(User, uid)
+            for key, value in update_data.items():
+                setattr(updated, key, value)
+            updated.updated_at = datetime.utcnow()
         return serialize_user(updated)
     # Nothing to update: return current user
     return serialize_user(user)
