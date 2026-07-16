@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from enum import Enum
+from utils.helpers import sanitize_input
 
 class OrderStatus(str, Enum):
     pending   = "pending"
@@ -33,6 +34,43 @@ class ShippingAddress(BaseModel):
     city: str
     postal_code: str
 
+    @field_validator('full_name')
+    @classmethod
+    def full_name_valid(cls, v):
+        v = sanitize_input(v, max_length=100)
+        if not v:
+            raise ValueError('Full name cannot be empty')
+        return v
+
+    @field_validator('phone')
+    @classmethod
+    def phone_valid(cls, v):
+        v = sanitize_input(v, max_length=20)
+        if not v:
+            raise ValueError('Phone cannot be empty')
+        return v
+
+    @field_validator('address')
+    @classmethod
+    def address_valid(cls, v):
+        v = sanitize_input(v, max_length=300)
+        if not v:
+            raise ValueError('Address cannot be empty')
+        return v
+
+    @field_validator('city')
+    @classmethod
+    def city_valid(cls, v):
+        v = sanitize_input(v, max_length=100)
+        if not v:
+            raise ValueError('City cannot be empty')
+        return v
+
+    @field_validator('postal_code')
+    @classmethod
+    def postal_code_valid(cls, v):
+        return sanitize_input(v, max_length=20)
+
 class OrderCreate(BaseModel):
     items: List[OrderItem]
     shipping_address: ShippingAddress
@@ -43,3 +81,10 @@ class OrderCreate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
     note: Optional[str] = None
+
+    @field_validator('note')
+    @classmethod
+    def note_valid(cls, v):
+        if v is None:
+            return v
+        return sanitize_input(v, max_length=500)

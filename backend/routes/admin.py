@@ -18,6 +18,7 @@ from datetime import datetime
 from config import settings
 from utils.limiter import limiter
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
+from utils.helpers import sanitize_input
 
 logger = get_logger(__name__)
 
@@ -651,7 +652,12 @@ async def adjust_stock(
     """Adjust stock for variant"""
     if not await check_permission(admin_data, "inventory:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
+    try:
+        reason = sanitize_input(reason, max_length=300)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     try:
         await InventoryService.adjust_stock(
             product_id=product_id,
@@ -788,7 +794,12 @@ async def add_order_note(
     """Add note to order"""
     if not await check_permission(admin_data, "order:update"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
+    try:
+        note = sanitize_input(note, max_length=1000)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     try:
         order = await OrderService.add_order_note(
             order_id=order_id,
@@ -870,7 +881,12 @@ async def ban_user(
     """Ban user"""
     if not await check_permission(admin_data, "user:ban"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
+
+    try:
+        reason = sanitize_input(reason, max_length=300)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     try:
         user = await UserService.ban_user(
             user_id=user_id,

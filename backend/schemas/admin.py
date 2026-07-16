@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator, Conf
 from typing import Optional, List
 from enum import Enum
 from datetime import datetime, timezone
+from utils.helpers import sanitize_input
 
 # ════════════════════════════════════════════════════════════════════════════
 # ENUMS
@@ -76,6 +77,27 @@ class ProductCreate(BaseModel):
             raise ValueError('Discount must be between 0 and 100')
         return v
 
+    @field_validator('name')
+    @classmethod
+    def name_valid(cls, v):
+        v = sanitize_input(v, max_length=200)
+        if not v:
+            raise ValueError('Name cannot be empty')
+        return v
+
+    @field_validator('description')
+    @classmethod
+    def description_valid(cls, v):
+        return sanitize_input(v, max_length=5000)
+
+    @field_validator('category')
+    @classmethod
+    def category_valid(cls, v):
+        v = sanitize_input(v, max_length=100)
+        if not v:
+            raise ValueError('Category cannot be empty')
+        return v
+
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
@@ -86,6 +108,33 @@ class ProductUpdate(BaseModel):
     images: Optional[List[str]] = None
     variants: Optional[List[ProductVariantUpdate]] = None
     is_active: Optional[bool] = None
+
+    @field_validator('name')
+    @classmethod
+    def name_valid(cls, v):
+        if v is None:
+            return v
+        v = sanitize_input(v, max_length=200)
+        if not v:
+            raise ValueError('Name cannot be empty')
+        return v
+
+    @field_validator('description')
+    @classmethod
+    def description_valid(cls, v):
+        if v is None:
+            return v
+        return sanitize_input(v, max_length=5000)
+
+    @field_validator('category')
+    @classmethod
+    def category_valid(cls, v):
+        if v is None:
+            return v
+        v = sanitize_input(v, max_length=100)
+        if not v:
+            raise ValueError('Category cannot be empty')
+        return v
 
 class ProductResponse(BaseModel):
     id: str

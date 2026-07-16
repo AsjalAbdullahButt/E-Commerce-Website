@@ -44,20 +44,31 @@ def decode_token(token: str) -> dict:
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
 
-def sanitize_input(value: str) -> str:
-    """Prevent NoSQL injection by rejecting MongoDB operators"""
+def sanitize_input(value: str, max_length: int = 500) -> str:
+    """Prevent NoSQL injection by rejecting MongoDB operators, strip control characters, and
+    enforce a maximum length. Used on every free-text field accepted from a client (names,
+    addresses, review comments, admin notes/reasons) beyond whatever type-level validation
+    Pydantic already does."""
     if not isinstance(value, str):
         return value
-    
+
+    value = value.strip()
+
+    # Strip control characters (keep \n and \t, which are legitimate in multi-line free text)
+    value = ''.join(ch for ch in value if ch in '\n\t' or ord(ch) >= 32)
+
+    if len(value) > max_length:
+        raise ValueError(f"Input exceeds maximum length of {max_length} characters")
+
     # Reject strings containing MongoDB operators
     dangerous_patterns = [
         r'\$where', r'\$regex', r'\$ne', r'\$gt', r'\$gte', r'\$lt', r'\$lte',
         r'\$in', r'\$nin', r'\$and', r'\$or', r'\$not', r'\$nor', r'\$exists',
         r'\$type', r'\$text'
     ]
-    
+
     for pattern in dangerous_patterns:
         if re.search(pattern, value, re.IGNORECASE):
             raise ValueError("Input contains forbidden MongoDB operators")
-    
-    return value.strip()
+
+    return value

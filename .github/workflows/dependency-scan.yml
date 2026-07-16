@@ -1,0 +1,38 @@
+name: Dependency vulnerability scan
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/requirements.txt"
+      - ".github/workflows/dependency-scan.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/requirements.txt"
+      - ".github/workflows/dependency-scan.yml"
+  schedule:
+    # Catch newly-disclosed CVEs against the pinned versions even when nothing in the repo changes.
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  pip-audit:
+    name: pip-audit (backend/requirements.txt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      - name: Audit backend dependencies
+        run: python -m pip_audit -r backend/requirements.txt
+
+  # No frontend/package.json exists yet (frontend is currently vanilla JS with no npm
+  # dependencies) — add an `npm audit` job here once a package manifest is introduced
+  # (see Phase 5 lint/build tooling).
