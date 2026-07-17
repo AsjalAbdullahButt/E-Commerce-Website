@@ -90,6 +90,39 @@ class AdminAPI {
         }
     }
 
+    /**
+     * Upload a product image (multipart) — separate from request() because a file body needs
+     * FormData with no Content-Type header set manually (the browser fills in the multipart
+     * boundary itself); JSON.stringify-ing a File would just serialize "{}".
+     */
+    async uploadImage(file) {
+        if (!this.accessToken) {
+            await this.refreshAccessToken();
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${this.baseURL}${ADMIN_CONFIG.ENDPOINTS.PRODUCTS.UPLOAD_IMAGE}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.accessToken}` },
+            credentials: 'include',
+            body: formData,
+        });
+
+        if (response.status === 401) {
+            await this.refreshAccessToken();
+            return this.uploadImage(file); // retry once with the refreshed token
+        }
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // AUTHENTICATION
     // ════════════════════════════════════════════════════════════════════════

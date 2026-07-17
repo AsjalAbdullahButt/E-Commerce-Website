@@ -151,6 +151,20 @@ class Settings(BaseSettings):
     # below this value — see services.product.InventoryService.decrement_variant_stock.
     low_stock_email_threshold: int = 10
 
+    # ── Product Image Storage ─────────────────────────────────────────────
+    # Defaults to local disk storage (backend/uploads/, served at /uploads) — fully functional
+    # for local dev with zero credentials. Flip s3_enabled once real S3-compatible credentials
+    # are set (works with AWS S3 or any S3-compatible provider — DigitalOcean Spaces, Backblaze
+    # B2, MinIO — via s3_endpoint_url) to upload there instead.
+    s3_enabled: bool = False
+    s3_bucket: Optional[str] = None
+    s3_region: str = "us-east-1"
+    s3_access_key: Optional[str] = None
+    s3_secret_key: Optional[str] = None
+    s3_endpoint_url: Optional[str] = None       # set for non-AWS S3-compatible providers
+    s3_public_url_base: Optional[str] = None    # CDN domain or bucket public URL prefix
+    max_image_upload_mb: int = 5
+
     @model_validator(mode="after")
     def validate_integration_config(self) -> "Settings":
         _require_configured(self.stripe_enabled, "stripe",
@@ -162,6 +176,9 @@ class Settings(BaseSettings):
                              easypaisa_store_id=self.easypaisa_store_id, easypaisa_hash_key=self.easypaisa_hash_key)
         _require_configured(self.sendgrid_enabled, "sendgrid",
                              sendgrid_api_key=self.sendgrid_api_key, sendgrid_from_email=self.sendgrid_from_email)
+        _require_configured(self.s3_enabled, "s3",
+                             s3_bucket=self.s3_bucket, s3_access_key=self.s3_access_key,
+                             s3_secret_key=self.s3_secret_key, s3_public_url_base=self.s3_public_url_base)
         return self
 
     class Config:

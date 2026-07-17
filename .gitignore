@@ -15,8 +15,10 @@ build/
 Thumbs.db
 *.log
 *.log.*
-logs/*
-!logs/.gitkeep
+**/logs/**
+!**/logs/.gitkeep
+**/uploads/**
+!**/uploads/.gitkeep
 node_modules/
 .idea/
 .vscode/

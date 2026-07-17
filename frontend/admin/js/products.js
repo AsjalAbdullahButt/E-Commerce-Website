@@ -95,6 +95,13 @@ function createImageRow(url = '') {
   row.className = 'builder-row compact-row image-row';
   const rowId = `image-url-${++_builderRowId}`;
 
+  const preview = document.createElement('img');
+  preview.className = 'image-row-preview';
+  preview.alt = '';
+  preview.style.cssText = 'width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;';
+  preview.style.display = url ? 'block' : 'none';
+  if (url) preview.src = url;
+
   const field = document.createElement('div');
   field.className = 'builder-field';
   const label = document.createElement('label');
@@ -103,10 +110,47 @@ function createImageRow(url = '') {
   const input = document.createElement('input');
   input.id = rowId;
   input.type = 'url';
-  input.placeholder = 'https://example.com/image.jpg';
+  input.placeholder = 'https://example.com/image.jpg — or click Upload';
   input.value = url;
+  input.addEventListener('input', () => {
+    preview.style.display = input.value ? 'block' : 'none';
+    if (input.value) preview.src = input.value;
+  });
   field.appendChild(label);
   field.appendChild(input);
+
+  // Hidden file input driven by the visible "Upload" button — POSTs to
+  // /admin/products/upload-image (multipart) and fills the URL field above with the result,
+  // so the rest of the form (and the payload sent to POST/PUT /admin/products) is unchanged.
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/jpeg,image/png,image/webp';
+  fileInput.style.display = 'none';
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    try {
+      const result = await adminAPI.uploadImage(file);
+      input.value = result.data.url;
+      preview.src = result.data.thumbnail_url;
+      preview.style.display = 'block';
+    } catch (err) {
+      showToast(err.message || 'Image upload failed', 'error');
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
+      fileInput.value = '';
+    }
+  });
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'builder-icon-button';
+  uploadBtn.title = 'Upload image file';
+  uploadBtn.innerHTML = '<i class="fas fa-upload"></i>';
+  uploadBtn.addEventListener('click', () => fileInput.click());
 
   const remove = document.createElement('button');
   remove.type = 'button';
@@ -117,7 +161,10 @@ function createImageRow(url = '') {
     ensureRows('image');
   });
 
+  row.appendChild(preview);
   row.appendChild(field);
+  row.appendChild(fileInput);
+  row.appendChild(uploadBtn);
   row.appendChild(remove);
   return row;
 }

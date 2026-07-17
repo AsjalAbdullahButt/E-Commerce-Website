@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -142,6 +145,14 @@ async def startup_db_check():
     except Exception as e:
         print(f"    ❌  MySQL FAILED: {e}\n")
         raise RuntimeError(f"Cannot connect to MySQL: {e}")
+
+# ── Uploaded product images (local-disk storage fallback) ──────────────────────
+# Only ever serves files under backend/uploads/ — populated exclusively by
+# services/image_storage.py, never user-addressable for writes. Irrelevant once S3_ENABLED is
+# set (services/image_storage.py uploads to S3 instead and returns S3/CDN URLs directly).
+_uploads_dir = Path(__file__).parent / "uploads"
+_uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
 app.include_router(auth.router,     prefix="/auth",     tags=["Auth"])

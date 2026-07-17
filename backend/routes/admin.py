@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, status, Request, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,9 @@ from services.order_user import OrderService, UserService
 from services.discount import DiscountService
 from services.dashboard import DashboardService
 from services.rider import RiderService
+from services.image_storage import ImageStorageService
 from schemas.rider import RiderCreate
+from schemas.upload import ImageUploadResponse
 from utils.logger import get_logger, log_to_db
 from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
 from utils.ids import is_valid_id
@@ -420,6 +422,31 @@ async def unlock_admin_account(admin_id: str, admin_data: dict = Depends(verify_
 # ════════════════════════════════════════════════════════════════════════════
 # PRODUCT ROUTES
 # ════════════════════════════════════════════════════════════════════════════
+
+@router.post("/products/upload-image", response_model=ImageUploadResponse)
+@limiter.limit("20/minute")
+async def upload_product_image(
+    request: Request,
+    file: UploadFile = File(...),
+    admin_data: dict = Depends(verify_admin_token),
+):
+    """Upload a product image (admin only) — validates type/size, generates a thumbnail, and
+    stores to S3 (if configured) or local disk otherwise (services/image_storage.py). Returns
+    both URLs to attach to a product's `images` list via POST/PUT /admin/products, which still
+    just takes a list of URL strings — this only replaces how the admin gets one.
+
+    Rate-limited tighter than the plain-JSON product routes below (which have none) since file
+    uploads are a heavier, more abuse-prone surface (larger payloads, storage cost per call)."""
+    if not await check_permission(admin_data, "product:create"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    url, thumbnail_url = await ImageStorageService.upload(file, str(request.base_url))
+    await log_to_db(
+        "PRODUCT_IMAGE_UPLOADED", __name__, f"image uploaded by admin {admin_data.get('admin_id')}",
+        {"admin_id": admin_data.get("admin_id"), "url": url},
+    )
+    return {"success": True, "data": {"url": url, "thumbnail_url": thumbnail_url}}
+
 
 @router.post("/products")
 async def create_product(

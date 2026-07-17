@@ -18,6 +18,7 @@ const ADMIN_CONFIG = {
             UPDATE: (id) => `/admin/products/${id}`,
             DELETE: (id) => `/admin/products/${id}`,
             LOW_STOCK: '/admin/products/low-stock/items',
+            UPLOAD_IMAGE: '/admin/products/upload-image',
         },
         ORDERS: {
             LIST: '/admin/orders',
