@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -9,7 +10,7 @@ from db.order import Order, OrderItem, OrderStatusHistory
 from db.product import Product, ProductVariant
 from db.promo import Promo
 from models.order import OrderCreate, OrderStatusUpdate
-from middleware.auth_middleware import get_current_user, require_admin
+from middleware.auth_middleware import get_current_user, get_current_user_optional, require_admin
 from services.email import EmailService
 from services.email_templates import order_confirmation_email
 from services.order_user import _order_to_dict, notify_order_status_change
@@ -29,8 +30,8 @@ DELIVERY_FEE = 250
 
 @router.post("", response_model=OrderResponse)
 @limiter.limit("10/minute")
-async def place_order(request: Request, body: OrderCreate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Place a new order.
+async def place_order(request: Request, body: OrderCreate, user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db)):
+    """Place a new order — logged-in customer or guest (see GUEST CHECKOUT below).
 
     SECURITY: Prices are fetched from the DB — never trusted from the client.
     A client sending price=1 for a Rs5000 item will be charged the real price.
@@ -45,12 +46,24 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     IDEMPOTENCY: an optional Idempotency-Key header lets a retried checkout submission (e.g. the
     client times out waiting for a response and resubmits) return the order already created
     instead of double-placing it and double-decrementing stock. See db/order.py::idempotency_key.
+
+    GUEST CHECKOUT: no Authorization header -> `user` is None (get_current_user_optional) and
+    `body.guest_email` is required instead — the order is created with user_id=None and
+    guest_email set. Order confirmation/status emails go to that address; there's no persistent
+    "my orders" list for guests (nothing to key it on without an account), but the order
+    returned here is the same shape either way, and the frontend prompts the guest to create an
+    account with that email right after checkout (frontend/js/checkout.js).
     """
+    if not user and not body.guest_email:
+        raise HTTPException(status_code=400, detail="guest_email is required when checking out without an account")
+
+    requester_id = str(user["_id"]) if user else None
+
     idempotency_key = request.headers.get("Idempotency-Key")
     if idempotency_key:
-        existing = (await db.execute(
-            select(Order).where(Order.idempotency_key == idempotency_key, Order.user_id == str(user["_id"]))
-        )).scalar_one_or_none()
+        idem_query = select(Order).where(Order.idempotency_key == idempotency_key)
+        idem_query = idem_query.where(Order.user_id == requester_id) if user else idem_query.where(Order.guest_email == body.guest_email)
+        existing = (await db.execute(idem_query)).scalar_one_or_none()
         if existing:
             return await _order_to_dict(db, existing)
 
@@ -61,7 +74,7 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     for item in body.items:
         # ── CRITICAL: fetch real price from DB ──────────────────────────────
         if not is_valid_id(item.product_id):
-            await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
+            await log_to_db("INVALID_PRODUCT_ID", __name__, f"order placement with invalid ID {item.product_id}", {"error": "invalid id format", "user_id": requester_id})
             raise HTTPException(status_code=400, detail=f"Invalid product ID: {item.product_id}")
 
         product = await db.get(Product, item.product_id)
@@ -140,7 +153,8 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
 
     payment_method = (body.payment_method or "cod").lower()
     order = Order(
-        user_id=str(user["_id"]),
+        user_id=requester_id,
+        guest_email=None if user else body.guest_email,
         status="pending",
         rider_id=None,
         subtotal=round(subtotal, 2),
@@ -172,7 +186,7 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
 
     subject, html = order_confirmation_email(order, resolved_items)
     await EmailService.send(
-        user["email"], subject, html,
+        user["email"] if user else body.guest_email, subject, html,
         event_code="ORDER_CONFIRMATION_EMAIL_SENT", meta={"order_id": order.id},
     )
 
@@ -205,15 +219,24 @@ async def all_orders(request: Request, page: int = Query(1, ge=1), limit: int = 
 
 @router.get("/{order_id}", response_model=OrderResponse)
 @limiter.limit("30/minute")
-async def get_order(request: Request, order_id: str, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Get single order — customers can only see their own."""
+async def get_order(
+    request: Request, order_id: str, email: Optional[str] = Query(None),
+    user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
+):
+    """Get single order — customers can only see their own; a guest order (no account) can only
+    be looked up unauthenticated, by also supplying the guest_email it was placed with."""
     if not is_valid_id(order_id):
-        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID requested {order_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
+        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID requested {order_id}", {"error": "invalid id format", "user_id": str(user["_id"]) if user else None})
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
     o = await db.get(Order, order_id)
     if not o:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user:
+        if not o.guest_email or not email or email.lower() != o.guest_email.lower():
+            raise HTTPException(status_code=403, detail="Access denied")
+        return await _order_to_dict(db, o)
     if user["role"] == "customer" and o.user_id != str(user["_id"]):
         raise HTTPException(status_code=403, detail="Access denied")
     return await _order_to_dict(db, o)

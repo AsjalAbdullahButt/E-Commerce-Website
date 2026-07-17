@@ -14,7 +14,10 @@ class Order(Base, IDMixin, TimestampMixin):
         Index("ix_orders_rider_status", "rider_id", "status"),
     )
 
-    user_id: Mapped[str] = mapped_column(String(24), index=True)
+    # Nullable for guest checkout — a guest order has user_id=None and guest_email set instead.
+    # Never both unset: routes/orders.py::place_order requires one or the other.
+    user_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, index=True)
+    guest_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     rider_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, index=True)
 

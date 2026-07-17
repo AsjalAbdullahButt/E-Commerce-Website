@@ -28,7 +28,8 @@ class ShippingAddressResponse(BaseModel):
 
 class OrderResponse(BaseModel):
     id: str
-    user_id: str
+    user_id: Optional[str] = None  # None for a guest order — see guest_email instead
+    guest_email: Optional[str] = None
     items: List[OrderItemResponse]
     shipping_address: ShippingAddressResponse
     payment_method: str

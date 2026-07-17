@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional
 from enum import Enum
 from utils.helpers import sanitize_input
@@ -77,6 +77,10 @@ class OrderCreate(BaseModel):
     promo_code: Optional[str] = None
     payment_method: Optional[str] = "cod"  # cod, jazzcash, easypaisa
     payment_reference: Optional[str] = None  # Transaction ID for mobile payments
+    # Required only for guest checkout (no Authorization header) — routes/orders.py::place_order
+    # rejects an unauthenticated request that omits this. Ignored for logged-in customers, whose
+    # account email is used instead.
+    guest_email: Optional[EmailStr] = None
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus

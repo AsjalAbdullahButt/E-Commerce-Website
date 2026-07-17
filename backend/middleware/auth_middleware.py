@@ -10,6 +10,7 @@ from db.rider import Rider
 from db.user import User
 
 security = HTTPBearer()
+_optional_security = HTTPBearer(auto_error=False)
 
 
 def _row_to_dict(obj) -> dict:
@@ -20,38 +21,55 @@ def _row_to_dict(obj) -> dict:
     return data
 
 
+async def _resolve_user_from_token(token: str, db: AsyncSession) -> dict:
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    user_id = payload.get("sub")
+    role = payload.get("role")
+
+    if not user_id or not role:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Find user in appropriate table based on role
+    user_obj = None
+    if role == "admin":
+        user_obj = await db.get(AdminUser, user_id)
+    elif role == "rider":
+        user_obj = await db.get(Rider, user_id)
+    else:  # customer
+        user_obj = await db.get(User, user_id)
+
+    if not user_obj:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    user = _row_to_dict(user_obj)
+    user["role"] = role  # Ensure role is set from JWT
+    return user
+
+
 async def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ):
     """Extract and validate JWT token - works for all roles"""
     try:
-        payload = jwt.decode(
-            creds.credentials,
-            settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm]
-        )
-        user_id = payload.get("sub")
-        role = payload.get("role")
+        return await _resolve_user_from_token(creds.credentials, db)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
 
-        if not user_id or not role:
-            raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Find user in appropriate table based on role
-        user_obj = None
-        if role == "admin":
-            user_obj = await db.get(AdminUser, user_id)
-        elif role == "rider":
-            user_obj = await db.get(Rider, user_id)
-        else:  # customer
-            user_obj = await db.get(User, user_id)
-
-        if not user_obj:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        user = _row_to_dict(user_obj)
-        user["role"] = role  # Ensure role is set from JWT
-        return user
+async def get_current_user_optional(
+    creds: HTTPAuthorizationCredentials = Depends(_optional_security),
+    db: AsyncSession = Depends(get_db),
+):
+    """Same as get_current_user, but returns None instead of raising when no Authorization
+    header is present at all — for endpoints that support both logged-in and guest callers
+    (e.g. guest checkout, routes/orders.py::place_order). A header that IS present but invalid
+    still raises 401 rather than silently downgrading to guest, so a stale/tampered token never
+    masquerades as an intentional guest checkout."""
+    if creds is None:
+        return None
+    try:
+        return await _resolve_user_from_token(creds.credentials, db)
     except JWTError:
         raise HTTPException(status_code=401, detail="Token expired or invalid")
 

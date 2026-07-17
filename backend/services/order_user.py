@@ -26,12 +26,17 @@ async def notify_order_status_change(db: AsyncSession, order: Order, new_status:
     failures the same way utils/logger.py::log_to_db does."""
     if new_status not in _CUSTOMER_NOTIFIED_STATUSES:
         return
-    user = await db.get(User, order.user_id)
-    if not user:
+
+    recipient = order.guest_email
+    if order.user_id:
+        user = await db.get(User, order.user_id)
+        recipient = user.email if user else None
+    if not recipient:
         return
+
     subject, html = order_status_update_email(order, new_status)
     await EmailService.send(
-        user.email, subject, html,
+        recipient, subject, html,
         event_code="ORDER_STATUS_EMAIL_SENT", meta={"order_id": order.id, "status": new_status},
     )
 
@@ -55,6 +60,7 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
     return {
         "id": order.id,
         "user_id": order.user_id,
+        "guest_email": order.guest_email,
         "items": items,
         "shipping_address": {
             "full_name": order.full_name, "phone": order.phone, "address": order.address,
