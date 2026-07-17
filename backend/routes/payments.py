@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from db.order import Order
-from middleware.auth_middleware import get_current_user
+from middleware.auth_middleware import get_current_user_optional
 from schemas.payment import (
     PaymentInitiateRequest, PaymentInitiateResponse, PaymentMethodsResponse, PaymentStatusResponse,
 )
@@ -31,11 +31,13 @@ async def payment_methods(request: Request):
 @limiter.limit("10/minute")
 async def initiate_payment(
     request: Request, order_id: str, body: PaymentInitiateRequest,
-    user=Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
 ):
-    """Start a payment attempt for an order. Never returns a "succeeded" state itself — a
-    gateway's own signature-verified webhook (POST /payments/webhook/{gateway}) is the only
-    thing that can mark a payment paid."""
+    """Start a payment attempt for an order — logged-in owner, or anyone for a guest order (no
+    account to check ownership against; same trust model as the guest order lookup on
+    GET /orders/{id}?email=..., which also just trusts knowledge of the order_id). Never returns
+    a "succeeded" state itself — a gateway's own signature-verified webhook
+    (POST /payments/webhook/{gateway}) is the only thing that can mark a payment paid."""
     if not is_valid_id(order_id):
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
@@ -44,7 +46,8 @@ async def initiate_payment(
         raise HTTPException(status_code=404, detail="Order not found")
 
     idempotency_key = request.headers.get("Idempotency-Key") or body.idempotency_key
-    return await PaymentService.initiate_payment(db, order, body.gateway, idempotency_key, str(user["_id"]))
+    requester_id = str(user["_id"]) if user else None
+    return await PaymentService.initiate_payment(db, order, body.gateway, idempotency_key, requester_id)
 
 
 @router.post("/webhook/{gateway}")
@@ -89,7 +92,7 @@ async def payment_return(request: Request, gateway: str, db: AsyncSession = Depe
 @router.get("/{order_id}/status", response_model=PaymentStatusResponse)
 @limiter.limit("30/minute")
 async def payment_status(
-    request: Request, order_id: str, user=Depends(get_current_user), db: AsyncSession = Depends(get_db),
+    request: Request, order_id: str, user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
 ):
     """Poll target for the frontend after a redirect back from a gateway — the redirect itself is
     UX only and is never treated as proof of payment."""
@@ -99,7 +102,11 @@ async def payment_status(
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if user["role"] == "customer" and order.user_id != str(user["_id"]):
+    if user:
+        if user["role"] == "customer" and order.user_id != str(user["_id"]):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif order.user_id is not None:
+        # Not a guest order — an unauthenticated caller has no way to prove ownership of it.
         raise HTTPException(status_code=403, detail="Access denied")
 
     return await PaymentService.get_status(db, order)

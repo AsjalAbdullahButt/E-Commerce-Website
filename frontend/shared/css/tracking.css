@@ -36,6 +36,24 @@ main {
 .payment-status-banner.success { background: rgba(22, 163, 74, 0.15); color: #16a34a; }
 .payment-status-banner.error   { background: rgba(230, 55, 55, 0.15); color: #e63737; }
 
+.guest-account-prompt {
+  margin: 1rem auto 0;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  max-width: 480px;
+}
+
+.guest-account-prompt-link {
+  color: var(--gold);
+  font-weight: 600;
+  text-decoration: underline;
+  margin-left: 0.35rem;
+}
+
 .status-timeline {
   background: var(--bg-card);
   padding: 2rem;

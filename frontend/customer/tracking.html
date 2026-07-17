@@ -9,10 +9,12 @@
       // Pre-render guard only, to avoid a flash of protected content — the access token itself
       // lives in memory only (see shared/js/api.js) and isn't available this early, so this
       // checks the non-sensitive cached profile instead. Actual auth is enforced server-side on
-      // every API call regardless.
+      // every API call regardless. A guest order's tracking link carries ?guest_email=... instead
+      // of a session — see js/checkout.js and js/tracking.js.
       const user = localStorage.getItem('ecom_user');
       const role = localStorage.getItem('ecom_role');
-      if (!user || role !== 'customer') {
+      const isGuestLink = new URLSearchParams(window.location.search).has('guest_email');
+      if ((!user || role !== 'customer') && !isGuestLink) {
         window.location.replace('../auth/login.html');
       }
     })();
@@ -60,6 +62,7 @@
       <h1 class="tracking-title">Track Your Order</h1>
       <p class="order-id"></p>
       <div id="payment-status-banner" class="payment-status-banner" style="display:none;"></div>
+      <div id="guest-account-prompt" class="guest-account-prompt" style="display:none;"></div>
     </div>
 
     <div class="tracking-container">

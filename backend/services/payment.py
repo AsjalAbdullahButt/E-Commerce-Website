@@ -37,9 +37,12 @@ class PaymentService:
 
     @staticmethod
     async def initiate_payment(
-        db: AsyncSession, order: Order, gateway_name: str, idempotency_key: Optional[str], user_id: str
+        db: AsyncSession, order: Order, gateway_name: str, idempotency_key: Optional[str], user_id: Optional[str]
     ) -> dict:
-        if order.user_id != user_id:
+        # A guest order (order.user_id is None) has no account to check ownership against — same
+        # trust model as the guest order lookup on GET /orders/{id}?email=..., which also just
+        # trusts knowledge of the order_id. A logged-in order still requires the matching owner.
+        if order.user_id is not None and order.user_id != user_id:
             raise HTTPException(status_code=403, detail="Cannot pay for another user's order")
         if order.status == "cancelled":
             raise HTTPException(status_code=400, detail="Cannot pay for a cancelled order")

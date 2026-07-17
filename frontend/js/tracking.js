@@ -1,18 +1,27 @@
 // === TRACKING.JS ===
 async function loadTrackingData() {
   try {
-    const orderId = new URLSearchParams(window.location.search).get('id');
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('id');
+    const guestEmail = params.get('guest_email');
     if (!orderId) {
       showToast('Order not found', 'error');
       return;
     }
 
-    const order = await api.get(`/orders/${orderId}`, isLoggedIn());
-    
+    // A guest order has no session to authenticate the lookup with — GET /orders/{id} accepts
+    // ?email=... instead, matching how it was placed (js/checkout.js, routes/orders.py).
+    const orderUrl = guestEmail ? `/orders/${orderId}?email=${encodeURIComponent(guestEmail)}` : `/orders/${orderId}`;
+    const order = await api.get(orderUrl, !guestEmail && isLoggedIn());
+
     // Null check for order
     if (!order) {
       showToast('Order data is invalid', 'error');
       return;
+    }
+
+    if (guestEmail) {
+      renderGuestAccountPrompt(guestEmail);
     }
 
     // Safe: use textContent instead of innerHTML for user data
@@ -191,6 +200,25 @@ async function loadTrackingData() {
     // Don't expose raw backend errors to users
     showToast('Failed to load order. Please try again later.', 'error');
   }
+}
+
+// ════════════════════════════════════════════════════
+// GUEST CHECKOUT — POST-PURCHASE ACCOUNT PROMPT
+// ════════════════════════════════════════════════════
+function renderGuestAccountPrompt(guestEmail) {
+  const el = document.getElementById('guest-account-prompt');
+  if (!el) return;
+
+  el.textContent = '';
+  const text = document.createElement('span');
+  text.textContent = 'Checked out as a guest. Create an account to track this and future orders faster: ';
+  const link = document.createElement('a');
+  link.href = `../auth/register.html?email=${encodeURIComponent(guestEmail)}`;
+  link.className = 'guest-account-prompt-link';
+  link.textContent = 'Create Account';
+  el.appendChild(text);
+  el.appendChild(link);
+  el.style.display = 'block';
 }
 
 // ════════════════════════════════════════════════════

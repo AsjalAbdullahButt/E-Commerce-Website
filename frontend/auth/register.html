@@ -177,6 +177,14 @@
           handleRegister();
         }
       });
+
+      // Prefills from the post-guest-checkout "Create Account" link (js/tracking.js) so a guest
+      // doesn't have to retype the email their order confirmation was already sent to.
+      const prefillEmail = new URLSearchParams(window.location.search).get('email');
+      if (prefillEmail) {
+        const emailInput = document.getElementById('register-email');
+        if (emailInput) emailInput.value = prefillEmail;
+      }
     });
   </script>
 

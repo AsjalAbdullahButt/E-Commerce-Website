@@ -26,6 +26,12 @@ async function initializeCheckout() {
 
   const { cart: refreshedCart, changedItems } = await refreshCartPrices(cart);
   displayOrderSummary(refreshedCart, changedItems);
+
+  // Guest email field is only needed (and only shown) when there's no session to attach the
+  // order to — see placeOrder()'s guest-checkout branch.
+  const guestEmailGroup = document.getElementById('guest-email-group');
+  if (guestEmailGroup) guestEmailGroup.style.display = isLoggedIn() ? 'none' : '';
+
   // If user is logged in, fetch latest profile from backend and prefill shipping fields
   if (isLoggedIn()) {
     try {
@@ -283,27 +289,36 @@ async function setupPromoCode() {
 
 async function placeOrder() {
   const user = getUser();
-  if (!user) {
-    showToast('Please login first', 'warning');
-    window.location.href = './login.html';
-    return;
-  }
+  const loggedIn = Boolean(user);
+  let guestEmail = null;
 
-  // Re-verify user data with backend to ensure token is valid and data is current
-  try {
-    const profile = await api.get('/auth/me', true);
-    if (!profile || profile.email !== user.email) {
-      // Session mismatch - force re-login
+  if (loggedIn) {
+    // Re-verify user data with backend to ensure token is valid and data is current
+    try {
+      const profile = await api.get('/auth/me', true);
+      if (!profile || profile.email !== user.email) {
+        // Session mismatch - force re-login
+        clearAuth();
+        showToast('Session expired. Please login again.', 'warning');
+        setTimeout(() => window.location.href = '../auth/login.html', 600);
+        return;
+      }
+    } catch (e) {
+      showToast('Authentication check failed. Please login again.', 'error');
       clearAuth();
-      showToast('Session expired. Please login again.', 'warning');
-      setTimeout(() => window.location.href = './login.html', 600);
+      setTimeout(() => window.location.href = '../auth/login.html', 800);
       return;
     }
-  } catch (e) {
-    showToast('Authentication check failed. Please login again.', 'error');
-    clearAuth();
-    setTimeout(() => window.location.href = './login.html', 800);
-    return;
+  } else {
+    // Guest checkout — no account required. GET /orders/{id}?email=... (backend) is how a
+    // guest can look their order back up afterwards, since there's no session to key it on.
+    guestEmail = document.querySelector('[name="guestEmail"]')?.value.trim();
+    if (!guestEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+      const group = document.querySelector('[name="guestEmail"]')?.closest('.form-group');
+      if (group) shakeInvalidFields(['guestEmail']);
+      showToast('Enter a valid email to checkout as a guest, or log in.', 'warning');
+      return;
+    }
   }
 
   const fields = { fullName: 'fullName', phone: 'phone', address: 'address', city: 'city', postal: 'postal' };
@@ -349,14 +364,15 @@ async function placeOrder() {
       },
       promo_code: appliedPromo?.code || null,
       payment_method: method,
-      payment_reference: getPaymentData().reference
-    }, true, { 'Idempotency-Key': checkoutIdempotencyKey });
+      payment_reference: getPaymentData().reference,
+      guest_email: guestEmail || undefined,
+    }, loggedIn, { 'Idempotency-Key': checkoutIdempotencyKey });
 
     // Online gateways: the order already exists (pending/unpaid) — only a signature-verified
     // webhook (never this page) ever marks it paid. See routes/payments.py.
     if (method === 'jazzcash' || method === 'easypaisa') {
       try {
-        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: method }, true);
+        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: method }, loggedIn);
         if (payment?.redirect_url) {
           clearCart();
           updateCartBadge();
@@ -368,7 +384,7 @@ async function placeOrder() {
       }
     } else if (method === 'card') {
       try {
-        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: 'stripe' }, true);
+        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: 'stripe' }, loggedIn);
         await ensureCardElement();
         const result = await stripeInstance.confirmCardPayment(payment.client_secret, {
           payment_method: { card: cardElement },
@@ -395,8 +411,15 @@ async function placeOrder() {
     }
     document.querySelectorAll('.progress-step').forEach(step => step.classList.add('completed'));
 
+    // Guest orders have no session to track them with — tracking.html falls back to the
+    // GET /orders/{id}?email=... lookup (guest_email in the URL) and, once there, offers to
+    // create an account with that email (frontend/js/tracking.js::renderGuestAccountPrompt).
+    const trackingUrl = loggedIn
+      ? `./tracking.html?id=${order.id}`
+      : `./tracking.html?id=${order.id}&guest_email=${encodeURIComponent(guestEmail)}`;
+
     setTimeout(() => {
-      window.location.href = `./tracking.html?id=${order.id}`;
+      window.location.href = trackingUrl;
     }, 2000);
   } catch (err) {
     // If server returned structured error, show server message

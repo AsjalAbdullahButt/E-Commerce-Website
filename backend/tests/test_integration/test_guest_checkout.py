@@ -33,7 +33,7 @@ def _create_product(client, admin_token, sku="guest-item"):
     return resp.json()["data"]["product_id"]
 
 
-def _guest_order_payload(product_id, guest_email="guest1@test.com"):
+def _guest_order_payload(product_id, guest_email="guest1@test.com", payment_method="cod"):
     return {
         "items": [{
             "product_id": product_id, "name": "x", "price": 800,
@@ -43,7 +43,7 @@ def _guest_order_payload(product_id, guest_email="guest1@test.com"):
             "full_name": "Guest Shopper", "phone": "03001234567",
             "address": "1 Guest Rd", "city": "Lahore", "postal_code": "54000",
         },
-        "payment_method": "cod",
+        "payment_method": payment_method,
         "guest_email": guest_email,
     }
 
@@ -117,6 +117,41 @@ def test_guest_checkout_idempotency_key_returns_same_order(client):
     order1 = client.post("/orders", json=_guest_order_payload(product_id, "guest7@test.com"), headers=headers).json()
     order2 = client.post("/orders", json=_guest_order_payload(product_id, "guest7@test.com"), headers=headers).json()
     assert order1["id"] == order2["id"]
+
+
+def test_guest_can_initiate_payment_for_own_order(client):
+    """No account to check ownership against for a guest order — proves the endpoint doesn't
+    401/403 an unauthenticated guest before even reaching the "gateway not configured" check."""
+    admin_token = _admin_token(client, email="guestadmin9@test.com")
+    product_id = _create_product(client, admin_token, sku="guest-item-9")
+    order = client.post("/orders", json=_guest_order_payload(product_id, "guest9@test.com", "jazzcash")).json()
+
+    resp = client.post(f"/payments/{order['id']}/initiate", json={"gateway": "jazzcash"})
+    assert resp.status_code == 503  # unconfigured, not 401/403 — proves auth wasn't the blocker
+
+
+def test_guest_can_poll_payment_status_for_own_order(client):
+    admin_token = _admin_token(client, email="guestadmin10@test.com")
+    product_id = _create_product(client, admin_token, sku="guest-item-10")
+    order = client.post("/orders", json=_guest_order_payload(product_id, "guest10@test.com", "jazzcash")).json()
+
+    resp = client.get(f"/payments/{order['id']}/status")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["payment_status"] == "unpaid"
+
+
+def test_stranger_cannot_poll_payment_status_for_a_logged_in_customers_order(client):
+    admin_token = _admin_token(client, email="guestadmin11@test.com")
+    product_id = _create_product(client, admin_token, sku="guest-item-11")
+    customer_token = _register_customer(client, email="guestordercustomer3@test.com")
+    order = client.post(
+        "/orders",
+        json={**_guest_order_payload(product_id, "unused@test.com"), "guest_email": None},
+        headers={"Authorization": f"Bearer {customer_token}"},
+    ).json()
+
+    resp = client.get(f"/payments/{order['id']}/status")  # unauthenticated
+    assert resp.status_code == 403
 
 
 def test_admin_order_list_includes_guest_orders(client):
