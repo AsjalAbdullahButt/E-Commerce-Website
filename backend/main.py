@@ -69,13 +69,15 @@ async def add_security_headers(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     response.headers["Referrer-Policy"]           = "strict-origin-when-cross-origin"
     response.headers["Cache-Control"]             = "no-store"
-    # Content Security Policy — allow trusted CDNs used by frontend
+    # Content Security Policy — allow trusted CDNs used by frontend, plus Stripe.js/Elements
+    # (js.stripe.com script + its iframe-hosted card input) for the Stripe card payment option.
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
         "font-src https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
+        "frame-src https://js.stripe.com https://hooks.stripe.com; "
         "connect-src 'self' https: ws:;"
     )
     response.headers["X-Response-Time"]           = f"{round((time.time()-start)*1000,2)}ms"

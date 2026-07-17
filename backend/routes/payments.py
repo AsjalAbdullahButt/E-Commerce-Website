@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from database import get_db
 from db.order import Order
 from middleware.auth_middleware import get_current_user
-from schemas.payment import PaymentInitiateRequest, PaymentInitiateResponse, PaymentStatusResponse
+from schemas.payment import (
+    PaymentInitiateRequest, PaymentInitiateResponse, PaymentMethodsResponse, PaymentStatusResponse,
+)
 from services.payment import PaymentService
 from utils.ids import is_valid_id
 from utils.limiter import limiter
@@ -13,6 +17,14 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/methods", response_model=PaymentMethodsResponse)
+@limiter.limit("60/minute")
+async def payment_methods(request: Request):
+    """Public — which payment methods are actually usable right now, so the storefront never
+    offers one that would just 503 (every gateway defaults off with no real credentials)."""
+    return PaymentService.available_methods()
 
 
 @router.post("/{order_id}/initiate", response_model=PaymentInitiateResponse)
@@ -50,6 +62,28 @@ async def payment_webhook(request: Request, gateway: str, db: AsyncSession = Dep
         pass  # non-form payloads (e.g. Stripe's JSON) are read from `body` inside the gateway
 
     return await PaymentService.handle_webhook(db, gateway.lower(), dict(request.headers), body, params)
+
+
+@router.api_route("/return/{gateway}", methods=["GET", "POST"])
+@limiter.limit("30/minute")
+async def payment_return(request: Request, gateway: str, db: AsyncSession = Depends(get_db)):
+    """Where a customer's browser lands back after JazzCash/EasyPaisa's hosted checkout page —
+    set as pp_ReturnURL / postBackURL in services/gateways/*. This is a "thank you page"
+    redirect only: it looks up which order the gateway's own reference field belongs to purely
+    to send the browser to the right tracking page, and NEVER marks anything paid — that's
+    exclusively POST /payments/webhook/{gateway}'s job, verified server-to-server."""
+    params = dict(request.query_params)
+    try:
+        form = await request.form()
+        params.update({k: str(v) for k, v in form.items()})
+    except Exception:
+        pass
+
+    order_id = await PaymentService.resolve_order_id_for_return(db, gateway.lower(), params)
+    target = f"{settings.frontend_url}/customer/tracking.html"
+    if order_id:
+        target += f"?id={order_id}"
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.get("/{order_id}/status", response_model=PaymentStatusResponse)

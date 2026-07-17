@@ -152,6 +152,29 @@
               <span class="pay-check"><i class="fas fa-check-circle"></i></span>
             </label>
 
+            <label class="payment-option" data-method="card">
+              <input type="radio" name="payment_method" value="card">
+              <span class="pay-icon" style="color:#635bff"><i class="fas fa-credit-card"></i></span>
+              <span class="pay-info">
+                <strong>Credit / Debit Card</strong>
+                <small>Powered by Stripe</small>
+              </span>
+              <span class="pay-check"><i class="fas fa-check-circle"></i></span>
+            </label>
+
+          </div>
+
+          <!-- JazzCash / Easypaisa / card options that aren't configured server-side are hidden
+               at runtime by initPaymentMethods() (checkout.js) — GET /payments/methods is the
+               source of truth for which gateways actually work. -->
+
+          <!-- Stripe card details (hidden by default) -->
+          <div class="mobile-wallet-fields" id="card-fields" style="display:none;">
+            <div class="form-group">
+              <label for="card-element">Card Details</label>
+              <div id="card-element" class="stripe-card-element"></div>
+              <div id="card-errors" class="field-error" role="alert"></div>
+            </div>
           </div>
 
           <!-- JazzCash details (hidden by default) -->

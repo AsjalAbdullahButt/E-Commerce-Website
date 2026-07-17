@@ -12,6 +12,7 @@ from services.gateways.base import PaymentGateway
 from services.gateways.easypaisa_gateway import EasyPaisaGateway
 from services.gateways.jazzcash_gateway import JazzCashGateway
 from services.gateways.stripe_gateway import StripeGateway
+from utils.ids import is_valid_id
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
 from utils.payment_transitions import assert_valid_payment_transition
@@ -203,6 +204,36 @@ class PaymentService:
         )
 
         return {"received": True, "duplicate": False}
+
+    @staticmethod
+    def available_methods() -> dict:
+        """Which gateways are actually usable right now — lets the frontend hide payment
+        options that would just 503, instead of guessing from static config it can't see."""
+        return {
+            "cod": True,
+            "stripe": GATEWAYS["stripe"].is_configured(),
+            "jazzcash": GATEWAYS["jazzcash"].is_configured(),
+            "easypaisa": GATEWAYS["easypaisa"].is_configured(),
+            "stripe_publishable_key": settings.stripe_publishable_key if GATEWAYS["stripe"].is_configured() else None,
+        }
+
+    @staticmethod
+    async def resolve_order_id_for_return(db: AsyncSession, gateway_name: str, params: dict) -> Optional[str]:
+        """Figure out which order a browser landing back from a redirect-based gateway
+        (JazzCash/EasyPaisa) belongs to, purely to know where to send it next — this is a "thank
+        you page" lookup, never proof of payment. That's exclusively handle_webhook()'s job."""
+        payment_ref = None
+        if gateway_name == "jazzcash":
+            txn_ref = params.get("pp_TxnRefNo", "")
+            payment_ref = txn_ref[1:] if txn_ref.startswith("T") else None
+        elif gateway_name == "easypaisa":
+            payment_ref = params.get("orderRefNum")
+
+        if not payment_ref or not is_valid_id(payment_ref):
+            return None
+
+        payment = await db.get(Payment, payment_ref)
+        return payment.order_id if payment else None
 
     @staticmethod
     async def get_status(db: AsyncSession, order: Order) -> dict:

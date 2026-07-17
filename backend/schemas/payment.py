@@ -31,6 +31,16 @@ class PaymentInitiateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaymentMethodsResponse(BaseModel):
+    cod: bool = True
+    stripe: bool = False
+    jazzcash: bool = False
+    easypaisa: bool = False
+    stripe_publishable_key: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaymentStatusResponse(BaseModel):
     order_id: str
     payment_status: str

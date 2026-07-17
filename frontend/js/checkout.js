@@ -1,10 +1,28 @@
 // === CHECKOUT.JS ===
+
+// Which gateways GET /payments/methods says are actually usable right now — every gateway
+// defaults off server-side (no real credentials), so this hides options that would just 503.
+let availableMethods = { cod: true, jazzcash: false, easypaisa: false, stripe: false, stripe_publishable_key: null };
+
+// Generated once per page load and reused across every placeOrder() call on this page (e.g. a
+// retry after a declined card) — matching Idempotency-Key on POST /orders means a retry returns
+// the order already created instead of double-placing it and double-decrementing stock.
+let checkoutIdempotencyKey = null;
+
+function newIdempotencyKey() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 async function initializeCheckout() {
   const cart = getCart();
   if (cart.length === 0) {
     window.location.href = './shop.html';
     return;
   }
+
+  checkoutIdempotencyKey = newIdempotencyKey();
+  await initPaymentMethods();
 
   const { cart: refreshedCart, changedItems } = await refreshCartPrices(cart);
   displayOrderSummary(refreshedCart, changedItems);
@@ -308,6 +326,9 @@ async function placeOrder() {
     return;
   }
 
+  const method = getPaymentData().method;
+  const btn = document.querySelector('.checkout-btn');
+
   try {
     const order = await api.post('/orders', {
       items: cart.map(i => ({
@@ -327,15 +348,47 @@ async function placeOrder() {
         postal_code: postal
       },
       promo_code: appliedPromo?.code || null,
-      payment_method: getPaymentData().method,
+      payment_method: method,
       payment_reference: getPaymentData().reference
-    }, true);
+    }, true, { 'Idempotency-Key': checkoutIdempotencyKey });
+
+    // Online gateways: the order already exists (pending/unpaid) — only a signature-verified
+    // webhook (never this page) ever marks it paid. See routes/payments.py.
+    if (method === 'jazzcash' || method === 'easypaisa') {
+      try {
+        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: method }, true);
+        if (payment?.redirect_url) {
+          clearCart();
+          updateCartBadge();
+          submitGatewayRedirect(payment.redirect_url, payment.form_fields);
+          return; // browser is navigating away to the gateway's hosted page
+        }
+      } catch (payErr) {
+        showToast('Order placed — online payment is unavailable right now. You can retry payment from your order page.', 'warning');
+      }
+    } else if (method === 'card') {
+      try {
+        const payment = await api.post(`/payments/${order.id}/initiate`, { gateway: 'stripe' }, true);
+        await ensureCardElement();
+        const result = await stripeInstance.confirmCardPayment(payment.client_secret, {
+          payment_method: { card: cardElement },
+        });
+        if (result.error) {
+          const errorEl = document.getElementById('card-errors');
+          if (errorEl) errorEl.textContent = result.error.message;
+          showToast(result.error.message || 'Card payment failed', 'error');
+          return; // stay on the page — same order/idempotency key, so a retry won't double-book
+        }
+      } catch (payErr) {
+        showToast(payErr.message || 'Card payment failed', 'error');
+        return;
+      }
+    }
 
     clearCart();
     updateCartBadge();
     showToast('Order placed successfully!');
 
-    const btn = document.querySelector('.checkout-btn');
     if (btn) {
       btn.disabled = true;
       btn.classList.add('success');
@@ -353,10 +406,78 @@ async function placeOrder() {
   }
 }
 
+// Builds and submits a hidden auto-submitting POST form — how the browser is handed off to
+// JazzCash/EasyPaisa's hosted checkout page with the signed fields from initiate().
+function submitGatewayRedirect(url, fields) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+  Object.entries(fields || {}).forEach(([key, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = value;
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Which payment options actually work right now, per the backend's own config — hides
+// JazzCash/Easypaisa/card entirely rather than letting a shopper pick one that just 503s.
+async function initPaymentMethods() {
+  try {
+    availableMethods = await api.get('/payments/methods');
+  } catch (e) {
+    availableMethods = { cod: true, jazzcash: false, easypaisa: false, stripe: false, stripe_publishable_key: null };
+  }
+
+  const optionEls = {
+    jazzcash: document.querySelector('.payment-option[data-method="jazzcash"]'),
+    easypaisa: document.querySelector('.payment-option[data-method="easypaisa"]'),
+    card: document.querySelector('.payment-option[data-method="card"]'),
+  };
+  if (optionEls.jazzcash) optionEls.jazzcash.style.display = availableMethods.jazzcash ? '' : 'none';
+  if (optionEls.easypaisa) optionEls.easypaisa.style.display = availableMethods.easypaisa ? '' : 'none';
+  if (optionEls.card) optionEls.card.style.display = availableMethods.stripe ? '' : 'none';
+}
+
+let stripeInstance = null;
+let cardElement = null;
+
+function loadStripeJs() {
+  return new Promise((resolve, reject) => {
+    if (window.Stripe) { resolve(window.Stripe); return; }
+    const script = document.createElement('script');
+    script.src = 'https://js.stripe.com/v3/';
+    script.onload = () => resolve(window.Stripe);
+    script.onerror = () => reject(new Error('Could not load the card payment form'));
+    document.head.appendChild(script);
+  });
+}
+
+// Lazily loads Stripe.js and mounts the Card Element the first time "card" is selected — never
+// loaded/requested at all if Stripe isn't configured or the shopper never picks that option.
+async function ensureCardElement() {
+  if (cardElement) return;
+  if (!availableMethods.stripe_publishable_key) throw new Error('Card payment is not available');
+
+  const Stripe = await loadStripeJs();
+  stripeInstance = Stripe(availableMethods.stripe_publishable_key);
+  const elements = stripeInstance.elements();
+  cardElement = elements.create('card');
+  cardElement.mount('#card-element');
+  cardElement.on('change', (event) => {
+    const errorEl = document.getElementById('card-errors');
+    if (errorEl) errorEl.textContent = event.error ? event.error.message : '';
+  });
+}
+
 // Payment method toggle and data collection
 function initPaymentToggle() {
   const options = document.querySelectorAll('.payment-option');
-  
+
   options.forEach(option => {
     option.addEventListener('change', (e) => {
       if (e.target.type === 'radio') {
@@ -364,15 +485,19 @@ function initPaymentToggle() {
         options.forEach(o => o.classList.remove('active'));
         option.classList.add('active');
 
-        // Show/hide wallet fields
+        // Show/hide wallet/card fields
         document.getElementById('jazzcash-fields').style.display = 'none';
         document.getElementById('easypaisa-fields').style.display = 'none';
+        document.getElementById('card-fields').style.display = 'none';
 
         const method = e.target.value;
         if (method === 'jazzcash') {
           document.getElementById('jazzcash-fields').style.display = 'block';
         } else if (method === 'easypaisa') {
           document.getElementById('easypaisa-fields').style.display = 'block';
+        } else if (method === 'card') {
+          document.getElementById('card-fields').style.display = 'block';
+          ensureCardElement().catch(err => showToast(err.message || 'Could not load card form', 'error'));
         }
       }
     });

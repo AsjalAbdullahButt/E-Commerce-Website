@@ -154,6 +154,12 @@ async function loadTrackingData() {
       });
     }
 
+    // Online-gateway payment status — never trust the redirect the browser just landed from;
+    // poll GET /payments/{id}/status (backed by the webhook-verified Payment record) instead.
+    if (order.payment_status && order.payment_status !== 'not_required') {
+      pollPaymentStatus(orderId, order.payment_status);
+    }
+
     // Shipping info with sanitized data
     const shippingDiv = document.querySelector('.shipping-info');
     if (shippingDiv) {
@@ -185,6 +191,46 @@ async function loadTrackingData() {
     // Don't expose raw backend errors to users
     showToast('Failed to load order. Please try again later.', 'error');
   }
+}
+
+// ════════════════════════════════════════════════════
+// PAYMENT STATUS POLLING
+// ════════════════════════════════════════════════════
+// A gateway redirect back to this page is UX only — the customer's browser could close, retry,
+// or land here before the gateway's own server-to-server webhook has even arrived. This polls
+// the webhook-verified status instead of ever trusting the redirect itself.
+function renderPaymentBanner(status) {
+  const banner = document.getElementById('payment-status-banner');
+  if (!banner) return;
+  const copy = {
+    unpaid:     { text: 'Awaiting payment confirmation…', cls: 'pending' },
+    processing: { text: 'Confirming your payment…', cls: 'pending' },
+    paid:       { text: 'Payment confirmed', cls: 'success' },
+    failed:     { text: 'Payment failed — please retry from checkout or choose Cash on Delivery.', cls: 'error' },
+    refunded:   { text: 'Payment refunded', cls: 'pending' },
+  }[status];
+  if (!copy) { banner.style.display = 'none'; return; }
+  banner.textContent = copy.text;
+  banner.className = `payment-status-banner ${copy.cls}`;
+  banner.style.display = 'block';
+}
+
+function pollPaymentStatus(orderId, initialStatus, attempt = 0) {
+  renderPaymentBanner(initialStatus);
+  if (initialStatus === 'paid' || initialStatus === 'failed' || initialStatus === 'refunded') return;
+  if (attempt >= 15) return; // ~45s of polling — stop rather than poll forever
+
+  setTimeout(async () => {
+    try {
+      const status = await api.get(`/payments/${orderId}/status`, isLoggedIn());
+      renderPaymentBanner(status.payment_status);
+      if (status.payment_status === 'unpaid' || status.payment_status === 'processing') {
+        pollPaymentStatus(orderId, status.payment_status, attempt + 1);
+      }
+    } catch (e) {
+      // Silent — the main order timeline above already loaded successfully.
+    }
+  }, 3000);
 }
 
 // ════════════════════════════════════════════════════

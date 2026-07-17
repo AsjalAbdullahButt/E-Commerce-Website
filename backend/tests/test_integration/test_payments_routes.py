@@ -105,6 +105,50 @@ def test_retried_checkout_with_same_idempotency_key_returns_same_order(client):
     assert len(matches) == 1  # stock was decremented once, not twice
 
 
+# ── Payment methods / return redirect ───────────────────────────────────
+
+def test_payment_methods_defaults_to_cod_only(client):
+    resp = client.get("/payments/methods")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["cod"] is True
+    assert data["stripe"] is False
+    assert data["jazzcash"] is False
+    assert data["easypaisa"] is False
+    assert data["stripe_publishable_key"] is None
+
+
+def test_payment_return_redirects_to_tracking_page_with_resolved_order(client, monkeypatch):
+    monkeypatch.setattr(settings, "jazzcash_enabled", True)
+    monkeypatch.setattr(settings, "jazzcash_merchant_id", "TESTMERCHANT")
+    monkeypatch.setattr(settings, "jazzcash_password", "testpass")
+    monkeypatch.setattr(settings, "jazzcash_integrity_salt", "testsalt123")
+
+    admin_token = _admin_token(client, email="paymentsadmin11@test.com")
+    customer_token = _register_customer(client, email="paymentscustomer11@test.com")
+    product_id = _create_product(client, admin_token, sku="payments-item-11")
+    order = _place_order(client, customer_token, product_id, payment_method="jazzcash")
+
+    initiate_resp = client.post(
+        f"/payments/{order['id']}/initiate",
+        json={"gateway": "jazzcash"},
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+    payment_id = initiate_resp.json()["payment_id"]
+
+    resp = client.post(
+        "/payments/return/jazzcash", data={"pp_TxnRefNo": f"T{payment_id}"}, follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == f"{settings.frontend_url}/customer/tracking.html?id={order['id']}"
+
+
+def test_payment_return_with_unresolvable_reference_redirects_without_id(client):
+    resp = client.get("/payments/return/jazzcash", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == f"{settings.frontend_url}/customer/tracking.html"
+
+
 # ── Payment initiate ─────────────────────────────────────────────────────
 
 def test_initiate_payment_requires_matching_order_owner(client):

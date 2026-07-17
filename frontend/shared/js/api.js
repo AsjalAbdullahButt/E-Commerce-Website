@@ -85,8 +85,8 @@ function showToast(message, type = 'success', duration = 3000) {
   }, duration);
 }
 
-async function apiRequest(method, endpoint, body = null, requiresAuth = false, _isRetry = false) {
-  const headers = { 'Content-Type': 'application/json' };
+async function apiRequest(method, endpoint, body = null, requiresAuth = false, _isRetry = false, extraHeaders = null) {
+  const headers = { 'Content-Type': 'application/json', ...(extraHeaders || {}) };
 
   if (requiresAuth) {
     let token = getAccessToken();
@@ -127,7 +127,7 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false, _
       if (requiresAuth && !_isRetry) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
-          return apiRequest(method, endpoint, body, requiresAuth, true);
+          return apiRequest(method, endpoint, body, requiresAuth, true, extraHeaders);
         }
       }
       clearAuthSession();
@@ -162,9 +162,9 @@ async function apiRequest(method, endpoint, body = null, requiresAuth = false, _
 }
 
 const api = {
-  get:    (url, auth = false)        => apiRequest('GET',    url, null, auth),
-  post:   (url, body, auth = false)  => apiRequest('POST',   url, body, auth),
-  put:    (url, body, auth = false)  => apiRequest('PUT',    url, body, auth),
-  patch:  (url, body, auth = false)  => apiRequest('PATCH',  url, body, auth),
-  delete: (url, auth = false)        => apiRequest('DELETE', url, null, auth),
+  get:    (url, auth = false)                    => apiRequest('GET',    url, null, auth),
+  post:   (url, body, auth = false, headers = null) => apiRequest('POST', url, body, auth, false, headers),
+  put:    (url, body, auth = false)              => apiRequest('PUT',    url, body, auth),
+  patch:  (url, body, auth = false)              => apiRequest('PATCH',  url, body, auth),
+  delete: (url, auth = false)                    => apiRequest('DELETE', url, null, auth),
 };

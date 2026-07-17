@@ -465,6 +465,20 @@ textarea {
   font-size: 0.8rem;
 }
 
+.stripe-card-element {
+  background: var(--bg-card, #fff);
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: var(--radius-md, 8px);
+}
+
+.field-error {
+  color: #e63737;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  min-height: 1.1em;
+}
+
 .checkout-btn {
   padding: 1rem;
   background: var(--gold);
