@@ -13,6 +13,8 @@ from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
 from utils.ids import is_valid_id
+from services.email import EmailService
+from services.email_templates import password_reset_email
 from config import settings
 from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr
@@ -356,13 +358,13 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest, db: Asy
         user.reset_token_expires = expires_at
 
         reset_link = f"{settings.frontend_url}/auth/reset-password.html?token={raw_token}"
-        # No SMTP/email provider is configured for this app — log the link instead of emailing
-        # it, so the flow is still fully testable end-to-end. Wire up a real provider here
-        # (e.g. SendGrid/SES) before relying on this in production.
-        logger.info(f"[DEV] Password reset link for {email}: {reset_link}")
-        await log_to_db("PASSWORD_RESET_REQUESTED", __name__, f"password reset requested for {email}", {
-            "user_id": user.id, "reset_link": reset_link,
-        })
+        # EmailService.send() falls back to logging the link when SendGrid isn't configured, so
+        # this flow stays fully testable end-to-end without a real account — see services/email.py.
+        subject, html = password_reset_email(user.name, reset_link)
+        await EmailService.send(
+            email, subject, html,
+            event_code="PASSWORD_RESET_REQUESTED", meta={"user_id": user.id, "reset_link": reset_link},
+        )
 
     return {"message": "If an account with that email exists, a password reset link has been sent."}
 

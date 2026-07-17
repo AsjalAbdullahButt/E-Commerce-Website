@@ -7,10 +7,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.order import Order, OrderItem, OrderNote, OrderStatusHistory
 from db.user import User
+from services.email import EmailService
+from services.email_templates import order_status_update_email
 from utils.logger import get_logger
 from utils.order_transitions import assert_valid_transition
 
 logger = get_logger(__name__)
+
+# Which order-status transitions are worth emailing the customer about — not every transition in
+# utils/order_transitions.py is customer-meaningful ("packed" is an internal warehouse step).
+_CUSTOMER_NOTIFIED_STATUSES = {"confirmed", "shipped", "delivered", "cancelled", "returned"}
+
+
+async def notify_order_status_change(db: AsyncSession, order: Order, new_status: str) -> None:
+    """Best-effort order-status email to the customer. Called from every place order.status
+    changes (routes/orders.py, routes/rider.py, services/order_user.py, services/payment.py's
+    webhook-driven confirmation) — never raises, EmailService.send() already swallows its own
+    failures the same way utils/logger.py::log_to_db does."""
+    if new_status not in _CUSTOMER_NOTIFIED_STATUSES:
+        return
+    user = await db.get(User, order.user_id)
+    if not user:
+        return
+    subject, html = order_status_update_email(order, new_status)
+    await EmailService.send(
+        user.email, subject, html,
+        event_code="ORDER_STATUS_EMAIL_SENT", meta={"order_id": order.id, "status": new_status},
+    )
 
 
 async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
@@ -96,6 +119,7 @@ class OrderService:
         db.add(OrderStatusHistory(
             order_id=order_id, status=new_status, timestamp=datetime.utcnow(), note=note or "",
         ))
+        await notify_order_status_change(db, order, new_status)
 
         # Log audit
         from services.admin_auth import AdminAuditService

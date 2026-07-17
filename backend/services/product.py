@@ -5,10 +5,43 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
+from db.admin import AdminUser
 from db.product import InventoryHistoryEntry, Product, ProductVariant
+from services.email import EmailService
+from services.email_templates import low_stock_alert_email
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Roles that actually act on restocking — "support" is excluded, low stock isn't their concern.
+_LOW_STOCK_ALERT_ROLES = ("super_admin", "admin", "manager")
+
+
+async def _maybe_send_low_stock_alert(db: AsyncSession, product_id: str, stock_before: int, stock_after: int) -> None:
+    """Fires exactly once per crossing (not on every order once a product is already low) — only
+    when stock_after is at/below the threshold AND stock_before was still above it."""
+    threshold = settings.low_stock_email_threshold
+    if stock_after > threshold or stock_before <= threshold:
+        return
+
+    product = await db.get(Product, product_id)
+    if not product:
+        return
+
+    admins_result = await db.execute(
+        select(AdminUser).where(AdminUser.role.in_(_LOW_STOCK_ALERT_ROLES), AdminUser.is_active == True)  # noqa: E712
+    )
+    admins = admins_result.scalars().all()
+    if not admins:
+        return
+
+    subject, html = low_stock_alert_email([{"name": product.name, "total_stock": stock_after}])
+    for admin in admins:
+        await EmailService.send(
+            admin.email, subject, html,
+            event_code="LOW_STOCK_ALERT_SENT", meta={"product_id": product_id, "stock": stock_after},
+        )
 
 
 def _variant_to_dict(v: ProductVariant) -> dict:
@@ -253,6 +286,10 @@ class InventoryService:
             update(Product).where(Product.id == product_id)
             .values(total_stock=Product.total_stock - quantity)
         )
+
+        product = await db.get(Product, product_id)
+        if product:
+            await _maybe_send_low_stock_alert(db, product_id, product.total_stock + quantity, product.total_stock)
         return True
 
     @staticmethod

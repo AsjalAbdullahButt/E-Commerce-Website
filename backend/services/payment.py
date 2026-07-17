@@ -12,6 +12,7 @@ from services.gateways.base import PaymentGateway
 from services.gateways.easypaisa_gateway import EasyPaisaGateway
 from services.gateways.jazzcash_gateway import JazzCashGateway
 from services.gateways.stripe_gateway import StripeGateway
+from services.order_user import notify_order_status_change
 from utils.ids import is_valid_id
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
@@ -193,6 +194,7 @@ class PaymentService:
                     order_id=order.id, status="confirmed", timestamp=datetime.utcnow(),
                     note=f"Payment confirmed via {gateway_name}",
                 ))
+                await notify_order_status_change(db, order, "confirmed")
 
         await log_to_db(
             "PAYMENT_CONFIRMED" if new_status == "paid" else "PAYMENT_FAILED",

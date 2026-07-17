@@ -24,6 +24,22 @@ def _looks_like_placeholder(value: Optional[str]) -> bool:
     lowered = value.strip().lower()
     return any(marker in lowered for marker in _PLACEHOLDER_SECRET_MARKERS)
 
+
+def _require_configured(enabled: bool, service: str, **fields: Optional[str]) -> None:
+    """Fail fast on boot if `service`'s *_enabled flag is on but a required field is still
+    missing or a placeholder — same precedent as jwt_secret's validator above. Shared by every
+    optional third-party integration (payment gateways, email) so the app runs with zero real
+    credentials until each is deliberately turned on."""
+    if not enabled:
+        return
+    for field_name, value in fields.items():
+        if _looks_like_placeholder(value):
+            raise ValueError(
+                f"{service.upper()}_ENABLED is true but {field_name.upper()} is missing or "
+                f"still a placeholder — set a real value or leave {service.upper()}_ENABLED=false "
+                f"to run without it"
+            )
+
 class Settings(BaseSettings):
     """Application settings loaded from .env file"""
 
@@ -122,26 +138,30 @@ class Settings(BaseSettings):
     easypaisa_sandbox: bool = True
     easypaisa_return_url: Optional[str] = None
 
-    @model_validator(mode="after")
-    def validate_payment_gateway_config(self) -> "Settings":
-        def require(enabled: bool, gateway: str, **fields: Optional[str]) -> None:
-            if not enabled:
-                return
-            for field_name, value in fields.items():
-                if _looks_like_placeholder(value):
-                    raise ValueError(
-                        f"{gateway.upper()}_ENABLED is true but {field_name.upper()} is missing "
-                        f"or still a placeholder — set a real value or leave "
-                        f"{gateway.upper()}_ENABLED=false to run without it"
-                    )
+    # ── Email (transactional) ─────────────────────────────────────────────
+    # SendGrid — chosen over SES/Postmark for this app: a plain HTTPS REST API (no SMTP setup,
+    # no AWS account/IAM to provision), a free tier generous enough for a small store's volume,
+    # and good deliverability out of the box. Defaults off; forgot-password/order emails fall
+    # back to logging the content (see services/email.py) until real credentials are set.
+    sendgrid_enabled: bool = False
+    sendgrid_api_key: Optional[str] = None
+    sendgrid_from_email: Optional[str] = None
+    sendgrid_from_name: str = "E-COM"
+    # Fires the low-stock admin alert email the moment a product's total_stock crosses at or
+    # below this value — see services.product.InventoryService.decrement_variant_stock.
+    low_stock_email_threshold: int = 10
 
-        require(self.stripe_enabled, "stripe",
-                 stripe_secret_key=self.stripe_secret_key, stripe_webhook_secret=self.stripe_webhook_secret)
-        require(self.jazzcash_enabled, "jazzcash",
-                 jazzcash_merchant_id=self.jazzcash_merchant_id, jazzcash_password=self.jazzcash_password,
-                 jazzcash_integrity_salt=self.jazzcash_integrity_salt)
-        require(self.easypaisa_enabled, "easypaisa",
-                 easypaisa_store_id=self.easypaisa_store_id, easypaisa_hash_key=self.easypaisa_hash_key)
+    @model_validator(mode="after")
+    def validate_integration_config(self) -> "Settings":
+        _require_configured(self.stripe_enabled, "stripe",
+                             stripe_secret_key=self.stripe_secret_key, stripe_webhook_secret=self.stripe_webhook_secret)
+        _require_configured(self.jazzcash_enabled, "jazzcash",
+                             jazzcash_merchant_id=self.jazzcash_merchant_id, jazzcash_password=self.jazzcash_password,
+                             jazzcash_integrity_salt=self.jazzcash_integrity_salt)
+        _require_configured(self.easypaisa_enabled, "easypaisa",
+                             easypaisa_store_id=self.easypaisa_store_id, easypaisa_hash_key=self.easypaisa_hash_key)
+        _require_configured(self.sendgrid_enabled, "sendgrid",
+                             sendgrid_api_key=self.sendgrid_api_key, sendgrid_from_email=self.sendgrid_from_email)
         return self
 
     class Config:

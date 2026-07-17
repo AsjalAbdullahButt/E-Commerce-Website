@@ -10,7 +10,9 @@ from db.product import Product, ProductVariant
 from db.promo import Promo
 from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, require_admin
-from services.order_user import _order_to_dict
+from services.email import EmailService
+from services.email_templates import order_confirmation_email
+from services.order_user import _order_to_dict, notify_order_status_change
 from services.product import InventoryService
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
@@ -168,6 +170,12 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     db.add(OrderStatusHistory(order_id=order.id, status="pending", timestamp=datetime.utcnow(), note="Order placed"))
     await db.flush()
 
+    subject, html = order_confirmation_email(order, resolved_items)
+    await EmailService.send(
+        user["email"], subject, html,
+        event_code="ORDER_CONFIRMATION_EMAIL_SENT", meta={"order_id": order.id},
+    )
+
     return await _order_to_dict(db, order)
 
 @router.get("/me", response_model=OrderListResponse)
@@ -227,6 +235,7 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
     order.status = body.status
     order.updated_at = datetime.utcnow()
     db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.utcnow(), note=body.note or ""))
+    await notify_order_status_change(db, order, body.status)
 
     return {"message": "Status updated"}
 
@@ -259,6 +268,7 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
         order.status = "cancelled"
         order.updated_at = datetime.utcnow()
         db.add(OrderStatusHistory(order_id=order_id, status="cancelled", timestamp=datetime.utcnow(), note="Cancelled by user"))
+        await notify_order_status_change(db, order, "cancelled")
 
         # Restore variant stock for items in cancelled order
         items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == order_id))

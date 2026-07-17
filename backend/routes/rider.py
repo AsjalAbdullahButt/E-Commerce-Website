@@ -14,7 +14,7 @@ from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
 from utils.ids import is_valid_id
-from services.order_user import _order_to_dict
+from services.order_user import _order_to_dict, notify_order_status_change
 
 logger = get_logger(__name__)
 
@@ -53,6 +53,7 @@ async def update_delivery_status(request: Request, order_id: str, body: OrderSta
     order.status = body.status
     order.updated_at = datetime.utcnow()
     db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.utcnow(), note=body.note or ""))
+    await notify_order_status_change(db, order, body.status)
     return {"message": "Status updated"}
 
 
@@ -169,6 +170,7 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
         order.status = "delivered"
         order.updated_at = datetime.utcnow()
         db.add(OrderStatusHistory(order_id=order_id, status="delivered", timestamp=datetime.utcnow(), note="Delivered by rider"))
+        await notify_order_status_change(db, order, "delivered")
 
         await log_to_db("DELIVERY_COMPLETED", __name__, f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": order_id, "user_id": str(user["_id"])})
 
