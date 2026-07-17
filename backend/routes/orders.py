@@ -15,11 +15,13 @@ from services.email import EmailService
 from services.email_templates import order_confirmation_email
 from services.order_user import _order_to_dict, notify_order_status_change
 from services.product import InventoryService
+from services.return_request import submit_return_request
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
 from utils.ids import is_valid_id
 from schemas.order import OrderListResponse, OrderResponse
+from schemas.return_request import ReturnRequestCreate, ReturnRequestResponse
 
 logger = get_logger(__name__)
 
@@ -312,3 +314,31 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
         await log_to_db("ORDER_CANCEL_ERROR", __name__, f"failed to cancel order {order_id}", {"error": str(e), "order_id": order_id, "user_id": str(user["_id"])})
         logger.error(f"Order cancellation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to cancel order")
+
+
+@router.post("/{order_id}/return-request", response_model=ReturnRequestResponse)
+@limiter.limit("5/minute")
+async def create_return_request(
+    request: Request, order_id: str, body: ReturnRequestCreate, email: Optional[str] = Query(None),
+    user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
+):
+    """Request a return/refund on a delivered order — logged-in owner, or a guest supplying the
+    email the order was placed with (same lookup convention as GET /orders/{id}?email=...).
+    Only one pending request per order at a time; admin resolves it via
+    PATCH /admin/returns/{return_id} (routes/admin.py), which restores stock and transitions the
+    order to "returned" on approval."""
+    if not is_valid_id(order_id):
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user:
+        if not order.guest_email or not email or email.lower() != order.guest_email.lower():
+            raise HTTPException(status_code=403, detail="Access denied")
+        requester_id = None
+    else:
+        requester_id = str(user["_id"])
+
+    return await submit_return_request(db, order, requester_id, body.reason)

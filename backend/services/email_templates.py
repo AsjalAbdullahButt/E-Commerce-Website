@@ -77,6 +77,33 @@ def order_status_update_email(order, new_status: str) -> tuple[str, str]:
     return subject, _wrap(body)
 
 
+def return_request_submitted_email(order) -> tuple[str, str]:
+    subject = f"Return request received — Order #{order.id[:8]}"
+    body = f"""
+      <p>Hi {order.full_name},</p>
+      <p>We've received your return request and it's being reviewed. We'll email you once it's approved or rejected.</p>
+      <p>Order reference: <code>{order.id}</code></p>
+    """
+    return subject, _wrap(body)
+
+
+def return_request_resolved_email(order, approved: bool, admin_note: str = None) -> tuple[str, str]:
+    subject = f"Return request {'approved' if approved else 'rejected'} — Order #{order.id[:8]}"
+    message = (
+        "Your return has been approved and a refund will be processed."
+        if approved else
+        "Your return request was not approved."
+    )
+    note_html = f"<p><strong>Note from our team:</strong> {admin_note}</p>" if admin_note else ""
+    body = f"""
+      <p>Hi {order.full_name},</p>
+      <p>{message}</p>
+      {note_html}
+      <p>Order reference: <code>{order.id}</code></p>
+    """
+    return subject, _wrap(body)
+
+
 def low_stock_alert_email(products: Iterable[dict]) -> tuple[str, str]:
     products = list(products)
     subject = f"Low stock alert — {len(products)} product(s) need restocking"

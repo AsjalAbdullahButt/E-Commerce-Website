@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from db.order import Order, OrderItem
 from db.product import Product
+from db.return_request import ReturnRequest
 from db.user import User
 from middleware.admin_auth import verify_admin_token, check_permission
 from schemas.admin import *
@@ -18,8 +19,10 @@ from services.discount import DiscountService
 from services.dashboard import DashboardService
 from services.rider import RiderService
 from services.image_storage import ImageStorageService
+from services.return_request import _return_request_to_dict, resolve_return_request
 from schemas.rider import RiderCreate
 from schemas.upload import ImageUploadResponse
+from schemas.return_request import ReturnRequestListResponse, ReturnRequestResolve, ReturnRequestResponse
 from utils.logger import get_logger, log_to_db
 from utils.cache import cache_get, cache_set, cache_clear_prefix, cache_delete
 from utils.ids import is_valid_id
@@ -813,6 +816,70 @@ async def add_order_note(
         await log_to_db("ERROR", __name__, f"Add note error: {e}", {"order_id": order_id})
         logger.error(f"Add note error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add note")
+
+# ════════════════════════════════════════════════════════════════════════════
+# RETURNS / REFUNDS QUEUE (pairs with the customer-facing POST /orders/{id}/return-request)
+# ════════════════════════════════════════════════════════════════════════════
+
+@router.get("/returns", response_model=ReturnRequestListResponse)
+@limiter.limit("30/minute")
+async def list_return_requests(
+    request: Request,
+    status: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0,
+    admin_data: dict = Depends(verify_admin_token),
+    db: AsyncSession = Depends(get_db),
+):
+    """List return requests — same "order:read" permission as the order list, since a return
+    request is order-adjacent (support can view; only admin/manager+ can resolve, see below)."""
+    if not await check_permission(admin_data, "order:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    query = select(ReturnRequest)
+    count_query = select(func.count()).select_from(ReturnRequest)
+    if status:
+        query = query.where(ReturnRequest.status == status)
+        count_query = count_query.where(ReturnRequest.status == status)
+    query = query.order_by(ReturnRequest.created_at.desc()).offset(skip).limit(limit)
+
+    result = await db.execute(query)
+    requests = result.scalars().all()
+    total = (await db.execute(count_query)).scalar_one()
+    return {
+        "data": [_return_request_to_dict(r) for r in requests],
+        "total": total, "page": (skip // limit) + 1 if limit else 1, "pages": -(-total // limit) if limit else 1,
+    }
+
+
+@router.patch("/returns/{return_id}", response_model=ReturnRequestResponse)
+@limiter.limit("20/minute")
+async def resolve_return_request_route(
+    request: Request, return_id: str, body: ReturnRequestResolve,
+    admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db),
+):
+    """Approve or reject a return request. Approving transitions the order delivered -> returned
+    (utils/order_transitions.py already allows this), restores the returned items' stock, and
+    emails the customer either way — see services/return_request.py::resolve_return_request."""
+    if not await check_permission(admin_data, "order:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if not is_valid_id(return_id):
+        raise HTTPException(status_code=400, detail="Invalid return request ID")
+
+    rr = await db.get(ReturnRequest, return_id)
+    if not rr:
+        raise HTTPException(status_code=404, detail="Return request not found")
+
+    result = await resolve_return_request(
+        db, rr, body.action.value, admin_data["admin_id"], body.admin_note, body.refund_amount,
+    )
+
+    await AdminAuditService.log_action(
+        admin_id=admin_data["admin_id"], admin_name=admin_data.get("name", "System"),
+        action=f"return_request_{body.action.value}", entity_type="return_request", entity_id=return_id,
+        changes={"status": {"old": "pending", "new": result["status"]}}, ip_address="0.0.0.0",
+    )
+    return result
 
 # ════════════════════════════════════════════════════════════════════════════
 # USER MANAGEMENT ROUTES

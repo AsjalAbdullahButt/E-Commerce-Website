@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.order import Order, OrderItem, OrderNote, OrderStatusHistory
+from db.return_request import ReturnRequest
 from db.user import User
 from services.email import EmailService
 from services.email_templates import order_status_update_email
@@ -57,6 +58,17 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
         for h in history_result.scalars().all()
     ]
 
+    latest_return = (await db.execute(
+        select(ReturnRequest).where(ReturnRequest.order_id == order.id).order_by(ReturnRequest.created_at.desc())
+    )).scalars().first()
+    return_request = None
+    if latest_return:
+        return_request = {
+            "id": latest_return.id, "status": latest_return.status, "reason": latest_return.reason,
+            "refund_amount": latest_return.refund_amount, "admin_note": latest_return.admin_note,
+            "created_at": latest_return.created_at,
+        }
+
     return {
         "id": order.id,
         "user_id": order.user_id,
@@ -78,6 +90,7 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
         "status": order.status,
         "rider_id": order.rider_id,
         "status_history": status_history,
+        "return_request": return_request,
         "created_at": order.created_at,
         "updated_at": order.updated_at,
     }

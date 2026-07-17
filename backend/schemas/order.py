@@ -44,6 +44,7 @@ class OrderResponse(BaseModel):
     status: str
     rider_id: Optional[str] = None
     status_history: List[dict[str, Any]] = []
+    return_request: Optional[dict[str, Any]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
