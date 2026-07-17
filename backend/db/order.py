@@ -26,6 +26,13 @@ class Order(Base, IDMixin, TimestampMixin):
 
     payment_method: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     payment_reference: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    # Denormalized snapshot of the latest Payment row's outcome (db/payment.py) — kept in sync by
+    # services/payment.py so order lists/admin dashboard never need to join to know payment state.
+    # "not_required" for COD (nothing to process), "unpaid" until an online gateway resolves.
+    payment_status: Mapped[str] = mapped_column(String(20), default="not_required", index=True)
+    # Client-supplied Idempotency-Key header (routes/orders.py::place_order) — a retried checkout
+    # submission with the same key returns the already-created order instead of a duplicate one.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, unique=True, index=True)
     promo_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Shipping address, flattened onto the order — always 1:1, never queried independently, no

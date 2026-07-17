@@ -39,7 +39,19 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     one request = one session = one transaction: database.py::get_db() commits on clean exit
     and rolls back on any exception, so a plain HTTPException raised partway through this
     function already undoes every write above it — no manual tracking/rollback list needed.
+
+    IDEMPOTENCY: an optional Idempotency-Key header lets a retried checkout submission (e.g. the
+    client times out waiting for a response and resubmits) return the order already created
+    instead of double-placing it and double-decrementing stock. See db/order.py::idempotency_key.
     """
+    idempotency_key = request.headers.get("Idempotency-Key")
+    if idempotency_key:
+        existing = (await db.execute(
+            select(Order).where(Order.idempotency_key == idempotency_key, Order.user_id == str(user["_id"]))
+        )).scalar_one_or_none()
+        if existing:
+            return await _order_to_dict(db, existing)
+
     resolved_items = []
     subtotal = 0.0
     discount = 0.0
@@ -124,6 +136,7 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     tax            = after_discount * TAX_RATE
     total          = after_discount + tax + DELIVERY_FEE
 
+    payment_method = (body.payment_method or "cod").lower()
     order = Order(
         user_id=str(user["_id"]),
         status="pending",
@@ -133,8 +146,12 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
         tax=round(tax, 2),
         delivery_fee=DELIVERY_FEE,
         total=round(total, 2),
-        payment_method=(body.payment_method or "cod").lower(),
+        payment_method=payment_method,
         payment_reference=body.payment_reference or None,
+        # COD has nothing to process; every other method starts "unpaid" until
+        # POST /payments/{order_id}/initiate + a verified gateway webhook resolve it.
+        payment_status="not_required" if payment_method == "cod" else "unpaid",
+        idempotency_key=idempotency_key,
         promo_code=body.promo_code or None,
         full_name=body.shipping_address.full_name,
         phone=body.shipping_address.phone,

@@ -39,6 +39,7 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
         },
         "payment_method": order.payment_method,
         "payment_reference": order.payment_reference,
+        "payment_status": order.payment_status,
         "promo_code": order.promo_code,
         "subtotal": order.subtotal,
         "discount": order.discount,

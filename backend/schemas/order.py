@@ -33,6 +33,7 @@ class OrderResponse(BaseModel):
     shipping_address: ShippingAddressResponse
     payment_method: str
     payment_reference: Optional[str] = None
+    payment_status: str = "not_required"
     promo_code: Optional[str] = None
     subtotal: float = 0.0
     discount: float = 0.0

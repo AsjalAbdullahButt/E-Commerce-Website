@@ -1,6 +1,6 @@
 """Centralized settings management with environment-based configuration"""
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pathlib import Path
 from typing import Optional
 from .environments import Environment
@@ -11,6 +11,18 @@ _PLACEHOLDER_JWT_SECRETS = {
     "replace_with_a_long_random_string_min_32_chars",
     "secret", "changeme", "change_me", "your-secret-key", "supersecret",
 }
+
+# Same idea as _PLACEHOLDER_JWT_SECRETS, generalized for payment gateway credentials — any
+# *_enabled flag below that's True must not be paired with one of these left over from
+# .env.example.
+_PLACEHOLDER_SECRET_MARKERS = ("changeme", "change_me", "replace_with", "your-", "placeholder")
+
+
+def _looks_like_placeholder(value: Optional[str]) -> bool:
+    if not value:
+        return True
+    lowered = value.strip().lower()
+    return any(marker in lowered for marker in _PLACEHOLDER_SECRET_MARKERS)
 
 class Settings(BaseSettings):
     """Application settings loaded from .env file"""
@@ -82,7 +94,56 @@ class Settings(BaseSettings):
     # ── Logging ────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_file: str = "logs/app.log"
-    
+
+    # ── Payments ───────────────────────────────────────────────────────────
+    # Every gateway defaults to disabled and the app runs fully on COD with zero real
+    # credentials. Flip a gateway's *_enabled flag once real credentials are set — the
+    # validator below fails fast on boot if enabled=True but a required field is still a
+    # placeholder, same precedent as jwt_secret above.
+    payment_currency: str = "PKR"
+
+    stripe_enabled: bool = False
+    stripe_secret_key: Optional[str] = None
+    stripe_publishable_key: Optional[str] = None
+    stripe_webhook_secret: Optional[str] = None
+
+    # JazzCash Hosted Checkout Page (HCP) — redirect-based, no special merchant tier required.
+    jazzcash_enabled: bool = False
+    jazzcash_merchant_id: Optional[str] = None
+    jazzcash_password: Optional[str] = None
+    jazzcash_integrity_salt: Optional[str] = None
+    jazzcash_sandbox: bool = True
+    jazzcash_return_url: Optional[str] = None
+
+    # EasyPaisa hosted checkout — same redirect-based tier as JazzCash HCP above.
+    easypaisa_enabled: bool = False
+    easypaisa_store_id: Optional[str] = None
+    easypaisa_hash_key: Optional[str] = None
+    easypaisa_sandbox: bool = True
+    easypaisa_return_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_payment_gateway_config(self) -> "Settings":
+        def require(enabled: bool, gateway: str, **fields: Optional[str]) -> None:
+            if not enabled:
+                return
+            for field_name, value in fields.items():
+                if _looks_like_placeholder(value):
+                    raise ValueError(
+                        f"{gateway.upper()}_ENABLED is true but {field_name.upper()} is missing "
+                        f"or still a placeholder — set a real value or leave "
+                        f"{gateway.upper()}_ENABLED=false to run without it"
+                    )
+
+        require(self.stripe_enabled, "stripe",
+                 stripe_secret_key=self.stripe_secret_key, stripe_webhook_secret=self.stripe_webhook_secret)
+        require(self.jazzcash_enabled, "jazzcash",
+                 jazzcash_merchant_id=self.jazzcash_merchant_id, jazzcash_password=self.jazzcash_password,
+                 jazzcash_integrity_salt=self.jazzcash_integrity_salt)
+        require(self.easypaisa_enabled, "easypaisa",
+                 easypaisa_store_id=self.easypaisa_store_id, easypaisa_hash_key=self.easypaisa_hash_key)
+        return self
+
     class Config:
         """Pydantic config"""
         env_file = str(Path(__file__).parent.parent.parent / ".env")
