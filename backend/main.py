@@ -48,7 +48,12 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    # X-CSRF-Token: sent by shared/js/api.js::refreshAccessToken() on every cross-origin
+    # POST /auth/refresh (frontend:5500 -> backend:8000 in dev) — without it allowlisted here,
+    # the browser's CORS preflight rejects the request before it's ever sent, silently breaking
+    # the whole "restore the in-memory access token after a full page load" flow.
+    # Idempotency-Key: sent by checkout.js on POST /orders (see db/order.py::idempotency_key).
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token", "Idempotency-Key"],
 )
 
 # ── Security Headers ───────────────────────────────────────────────────────────

@@ -143,6 +143,23 @@ def test_customer_cannot_cancel_another_users_order(client):
     assert resp.status_code == 403
 
 
+def test_cors_preflight_allows_idempotency_key_header(client):
+    """Regression test: checkout.js sends Idempotency-Key on every POST /orders (cross-origin,
+    frontend:5500 -> backend:8000). If it isn't in CORSMiddleware's allow_headers (main.py), the
+    browser's preflight silently rejects the real request before checkout ever runs."""
+    resp = client.options(
+        "/orders",
+        headers={
+            "Origin": "http://localhost:5500",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "idempotency-key",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    allowed = resp.headers.get("access-control-allow-headers", "")
+    assert "idempotency-key" in allowed.lower()
+
+
 def test_cannot_cancel_a_shipped_order(client):
     """VALID_TRANSITIONS (utils/order_transitions.py) allows cancelling from pending/confirmed/
     packed, but not once an order has shipped — matches the real-world constraint that a package

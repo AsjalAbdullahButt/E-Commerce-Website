@@ -198,19 +198,23 @@ function setupVariantSelectors(product) {
       return;
     }
     const qty = Math.min(parseInt(qtySpan.textContent, 10) || 1, variant.stock);
+    const item = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      images: product.images,
+      selectedSize: state.size,
+      selectedColor: state.color,
+    };
 
-    for (let i = 0; i < qty; i++) {
-      addToCart({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        images: product.images,
-        selectedSize: state.size,
-        selectedColor: state.color,
-      });
+    // addToCartWithAnimation() already calls addToCart() once (plus the fly-to-cart animation),
+    // so only the remaining qty-1 units are added directly here — calling it with `{}` on top of
+    // this loop (the previous code) pushed a second, field-less cart line on every click, which
+    // POST /orders then rejected outright since that line has no product_id/name/price/size/color.
+    for (let i = 0; i < qty - 1; i++) {
+      addToCart(item);
     }
-
-    addToCartWithAnimation(addBtn, {});
+    addToCartWithAnimation(addBtn, item);
   });
 
   refresh();

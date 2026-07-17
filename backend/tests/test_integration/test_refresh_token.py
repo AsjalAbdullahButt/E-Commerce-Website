@@ -77,6 +77,25 @@ def test_admin_refresh_with_wrong_csrf_header_is_rejected(client):
     assert resp.status_code == 403
 
 
+def test_cors_preflight_allows_csrf_token_header(client):
+    """Regression test: the frontend (localhost:5500) calls POST /auth/refresh cross-origin from
+    the backend (localhost:8000) and always sends X-CSRF-Token on that call (shared/js/api.js).
+    If X-CSRF-Token isn't in CORSMiddleware's allow_headers, the browser's preflight rejects the
+    real request before it's ever sent — silently breaking session restore on every full page
+    load, without ever producing a 401/403 to debug from. main.py must allowlist it."""
+    resp = client.options(
+        "/auth/refresh",
+        headers={
+            "Origin": "http://localhost:5500",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "x-csrf-token",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    allowed = resp.headers.get("access-control-allow-headers", "")
+    assert "x-csrf-token" in allowed.lower()
+
+
 def test_customer_refresh_requires_matching_csrf_header(client):
     client.post("/auth/register", json={
         "name": "Csrf Customer", "email": "csrfcustomer@test.com", "password": "CustPass123", "phone": "03001234567",

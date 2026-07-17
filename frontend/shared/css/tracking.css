@@ -23,6 +23,19 @@ main {
   font-size: 0.9rem;
 }
 
+.payment-status-banner {
+  margin: 1rem auto 0;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.payment-status-banner.pending { background: rgba(212, 175, 55, 0.15); color: var(--gold); }
+.payment-status-banner.success { background: rgba(22, 163, 74, 0.15); color: #16a34a; }
+.payment-status-banner.error   { background: rgba(230, 55, 55, 0.15); color: #e63737; }
+
 .status-timeline {
   background: var(--bg-card);
   padding: 2rem;
