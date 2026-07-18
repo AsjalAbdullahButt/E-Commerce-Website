@@ -56,38 +56,49 @@
       <button class="btn-primary" id="create-promo-btn" type="button">+ Create Promo</button>
     </div>
 
-    <div class="admin-grid" id="promo-summary"></div>
+    <div class="admin-grid reveal-stagger" id="promo-summary"></div>
 
     <section data-section="promos">
-      <div class="filters" style="margin-bottom: 1rem;">
-        <input class="search-box" id="promo-search" type="search" placeholder="Search code, description, or type">
-        <select class="filter-select" id="promo-status-filter">
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+      <div class="admin-form-section reveal">
+        <div class="section-title-row" style="margin-bottom: 1rem;">
+          <div>
+            <h2>Promo Filters</h2>
+            <p class="admin-section-desc">Search by code or description, or narrow by status.</p>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input class="search-box" id="promo-search" type="search" placeholder="Search code, description, or type">
+          <select class="filter-select" id="promo-status-filter">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
       </div>
 
-      <table class="table-wrapper data-table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Description</th>
-            <th>Type</th>
-            <th>Discount</th>
-            <th>Min Order</th>
-            <th>Valid Until</th>
-            <th>Usage</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="promo-table-body">
-          <tr id="promo-empty-row">
-            <td colspan="8" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-wrapper reveal">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Discount</th>
+              <th>Min Order</th>
+              <th>Valid Until</th>
+              <th>Usage</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="promo-table-body">
+            <tr id="promo-empty-row">
+              <td colspan="8" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </main>
 
@@ -101,6 +112,7 @@
   <script src="./js/admin-api.js"></script>
   <script src="./js/promos.js?v=20260716"></script>
   <script src="../shared/js/neural-bg.js"></script>
+  <script src="../shared/js/scroll-reveal.js"></script>
 
   <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"

@@ -9,127 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260719">
-  <style>
-    main {
-      max-width: 1280px;
-      margin: var(--nav-height) auto 0;
-      padding: 2rem;
-      min-height: calc(100vh - var(--nav-height) - 200px);
-    }
-
-    .dashboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 2rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .dashboard-header h1 {
-      font-family: var(--font-display);
-      font-size: 2rem;
-      color: var(--gold);
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1.5rem;
-      border-radius: var(--radius-pill);
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .status-badge.available {
-      background: rgba(34,197,94,0.1);
-      border-color: rgba(34,197,94,0.3);
-      color: #22c55e;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .stat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      transition: var(--transition);
-    }
-
-    .stat-card:hover {
-      border-color: var(--gold);
-      background: var(--bg-card-hover);
-    }
-
-    .stat-value {
-      font-family: var(--font-mono);
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--gold);
-      margin-bottom: 0.5rem;
-    }
-
-    .stat-label {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1rem;
-      color: var(--text-secondary);
-    }
-
-    .empty-state i {
-      font-size: 2.5rem;
-      opacity: 0.3;
-      margin-bottom: 1rem;
-    }
-
-    @media (max-width: 1024px) {
-      main { padding: 1.5rem; }
-    }
-
-    @media (max-width: 768px) {
-      .dashboard-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-      }
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 480px) {
-      main { padding: 1rem; }
-
-      .dashboard-header h1 { font-size: 1.5rem; }
-    }
-  </style>
+  <link rel="stylesheet" href="../shared/css/rider.css?v=20260719">
 </head>
 <body>
 
@@ -165,22 +45,31 @@
       </div>
     </div>
 
-    <div class="stats-grid">
+    <div class="stats-grid reveal-stagger">
       <div class="stat-card">
-        <div class="stat-value" id="stat-total">0</div>
-        <div class="stat-label">Total Orders</div>
+        <div class="stat-icon"><i class="fas fa-box"></i></div>
+        <div>
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">Total Orders</div>
+        </div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="stat-pending">0</div>
-        <div class="stat-label">Pending Delivery</div>
+        <div class="stat-icon"><i class="fas fa-truck"></i></div>
+        <div>
+          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-label">Pending Delivery</div>
+        </div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="stat-delivered">0</div>
-        <div class="stat-label">Delivered</div>
+        <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
+        <div>
+          <div class="stat-value" id="stat-delivered">0</div>
+          <div class="stat-label">Delivered</div>
+        </div>
       </div>
     </div>
 
-    <div class="empty-state">
+    <div class="empty-state reveal">
       <i class="fas fa-box"></i>
       <p>Navigate to "My Orders" to view your assigned deliveries</p>
     </div>
@@ -194,6 +83,7 @@
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
+  <script src="../shared/js/scroll-reveal.js?v=20260716"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
