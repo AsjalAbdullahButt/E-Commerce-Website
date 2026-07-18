@@ -13,7 +13,7 @@ from database import engine
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.cache import start_cache_sweeper, stop_cache_sweeper
-from routes import auth, products, orders, reviews, wishlist, promos, rider, admin, payments, addresses
+from routes import auth, products, orders, reviews, wishlist, promos, rider, admin, payments, addresses, seo
 from middleware.admin_auth import AdminAuthMiddleware
 import time
 
@@ -165,6 +165,7 @@ app.include_router(rider.router,    prefix="/rider",    tags=["Rider"])
 app.include_router(admin.router,    prefix="/admin",    tags=["Admin"])
 app.include_router(payments.router, prefix="/payments", tags=["Payments"])
 app.include_router(addresses.router, prefix="/addresses", tags=["Addresses"])
+app.include_router(seo.router,       prefix="",           tags=["SEO"])
 # Note: admin_new merged into admin.py — only the canonical admin router is mounted.
 # Note: routes/users.py (duplicate ban/unban/delete gated only by role membership, not the
 # granular permission matrix) was deleted — /admin/users/* is the single path for user

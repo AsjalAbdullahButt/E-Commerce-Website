@@ -5,6 +5,24 @@ function swatchColorMap(name) {
   return map[key] || key || '#888';
 }
 
+// The <meta> tags in product.html are static fallbacks (there's no server-side rendering in this
+// vanilla-JS frontend, so a crawler that doesn't execute JS still sees a reasonable generic
+// description) — this fills in the real product details once the API response lands, for
+// crawlers/social previews that do execute JS and for anyone copying the page's OG tags manually.
+function updateProductSeo(product) {
+  if (!product) return;
+  const title = `${product.name || 'Product'} | E-COM`;
+  const description = (product.description || `Shop ${product.name || 'this product'} at E-COM.`).slice(0, 160);
+  const image = product.images?.[0];
+
+  document.title = title;
+  const setMeta = (id, value) => { const el = document.getElementById(id); if (el && value) el.setAttribute('content', value); };
+  setMeta('seo-description', description);
+  setMeta('seo-og-title', title);
+  setMeta('seo-og-description', description);
+  if (image) setMeta('seo-og-image', image);
+}
+
 async function loadProduct() {
   const id = new URLSearchParams(window.location.search).get('id');
   
@@ -25,6 +43,7 @@ async function loadProduct() {
 
   try {
     const product = await api.get(`/products/${id}`);
+    updateProductSeo(product);
 
     // Update main image
     const mainImg = document.querySelector('.main-image img');

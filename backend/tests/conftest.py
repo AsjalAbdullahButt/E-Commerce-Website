@@ -22,6 +22,7 @@ from db.base import Base  # noqa: E402
 from db import address, admin, order, payment, product, promo, return_request, review, rider, user, wishlist  # noqa: E402,F401
 from main import app  # noqa: E402
 from utils.limiter import limiter  # noqa: E402
+from utils.cache import cache_clear_prefix  # noqa: E402
 
 
 async def _create_schema():
@@ -61,10 +62,14 @@ def client():
     Also resets slowapi's in-memory rate-limit storage — it's process-global state (the same
     limitation tracked in NOTES_schema_audit.md §7/task 6), so without a reset, tests that hit a
     tightly-limited endpoint (e.g. /auth/register at 3/minute) start failing once enough tests in
-    the same pytest run have exercised it, regardless of test order.
+    the same pytest run have exercised it, regardless of test order. Same reasoning for
+    utils/cache.py's in-memory cache — otherwise a cached response (e.g. GET /sitemap.xml,
+    GET /products/categories) from an earlier test can leak into a later one that expects to see
+    freshly-truncated data.
     """
     asyncio.run(_truncate_all_tables())
     limiter.reset()
+    asyncio.run(cache_clear_prefix(""))
     with TestClient(app) as c:
         yield c
 

@@ -198,6 +198,26 @@ WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:ap
 
 The frontend is static HTML/CSS/JS — serve `frontend/` with any static file host (nginx, S3+CloudFront, etc.), pointing `frontend/shared/js/config.js`'s `API_BASE` at your deployed API URL.
 
+### Docker
+
+A self-contained local/self-hosted stack (MySQL + backend + static frontend):
+
+```bash
+cp .env.example .env
+# edit .env: set MYSQL_PASSWORD and a real JWT_SECRET, at minimum
+
+docker compose up --build
+```
+
+This builds `backend/Dockerfile` (single-worker Gunicorn + Uvicorn worker, matching the
+single-process constraint above), waits for MySQL to become reachable, runs `alembic upgrade
+head` automatically on every start (`backend/docker-entrypoint.sh`), and serves the frontend on
+port 5500 via `python -m http.server` inside a plain `python:3.12-slim` container (no build step
+needed for vanilla JS). Same three URLs as the non-Docker setup above.
+
+Product images and other local-disk uploads (`services/image_storage.py`, active when
+`S3_ENABLED=false`) persist in the `backend_uploads` named volume across `docker compose down`/`up`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) if present, otherwise treat as MIT per this notice.

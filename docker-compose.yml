@@ -1,0 +1,56 @@
+# Local/self-hosted stack: MySQL + the FastAPI backend + the static frontend.
+# `docker compose up` reads .env from the repo root automatically for ${VAR} substitution below
+# (the same file backend/config/settings.py reads directly when NOT running in Docker) — copy
+# .env.example to .env and fill it in before running this.
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecommerce}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Overrides the .env value (which is "localhost", correct for running the app outside
+      # Docker) — inside the compose network, MySQL is reachable at its service name instead.
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      # Local-disk image storage (services/image_storage.py, default when S3_ENABLED=false)
+      # persists across container restarts instead of vanishing with the container filesystem.
+      - backend_uploads:/app/uploads
+
+  frontend:
+    image: python:3.12-slim
+    restart: unless-stopped
+    working_dir: /frontend
+    volumes:
+      - ./frontend:/frontend:ro
+    command: ["python", "-m", "http.server", "5500"]
+    ports:
+      - "5500:5500"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  backend_uploads:
