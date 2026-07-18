@@ -1,0 +1,4 @@
+/* Compiled by `npm run build:css` into tailwind.build.css — do not edit that output file
+   directly. Preflight is disabled (see tailwind.config.js) so this only ever adds utilities on
+   top of the existing hand-rolled design system in global.css, never resets it. */
+@tailwind utilities;
