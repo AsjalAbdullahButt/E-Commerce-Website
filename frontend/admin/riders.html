@@ -23,34 +23,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260719">
+  <link rel="stylesheet" href="../shared/css/tailwind.build.css?v=20260719">
   <link rel="stylesheet" href="../shared/css/admin.css?v=20260719">
+  <script src="../shared/js/components/site-header.js?v=20260719"></script>
+  <script src="../shared/js/components/site-footer.js?v=20260719"></script>
 </head>
 <body data-page="admin-riders">
 
   <canvas id="neural-bg"></canvas>
 
-  <nav class="navbar" id="navbar" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a class="nav-logo" href="../customer/index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
-      <ul class="nav-links" id="nav-links">
-        <li><a href="./dashboard.html">Dashboard</a></li>
-        <li><a href="./products.html">Products</a></li>
-        <li><a href="./orders.html">Orders</a></li>
-        <li><a href="./returns.html">Returns</a></li>
-        <li><a href="./riders.html" class="active">Riders</a></li>
-        <li><a href="./promos.html">Promos</a></li>
-        <li><a href="./logs.html">Logs</a></li>
-      </ul>
-      <div class="nav-actions">
-        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
-        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
-          <i class="fas fa-moon" id="theme-icon"></i>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <main>
+  <site-header variant="staff" logo-href="../customer/index.html" links='[{"href":"./dashboard.html","label":"Dashboard","active":false},{"href":"./products.html","label":"Products","active":false},{"href":"./orders.html","label":"Orders","active":false},{"href":"./returns.html","label":"Returns","active":false},{"href":"./riders.html","label":"Riders","active":true},{"href":"./promos.html","label":"Promos","active":false},{"href":"./logs.html","label":"Logs","active":false}]'></site-header>
+<main>
     <div class="admin-header">
       <div class="admin-header-copy">
         <h1 class="dashboard-title">Riders</h1>
@@ -142,11 +125,8 @@
     </div>
   </div>
 
-  <footer class="footer">
-    <div class="footer-bottom"><p>&copy; 2025 E-Commerce Admin Panel.</p></div>
-  </footer>
-
-  <script src="../shared/js/config.js"></script>
+  <site-footer variant="minimal" text="E-Commerce Admin Panel."></site-footer>
+<script src="../shared/js/config.js"></script>
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>

@@ -8,6 +8,12 @@ module.exports = {
   // (dark by default, [data-theme="light"] override) — Tailwind's preflight would fight that,
   // so utilities are additive only.
   corePlugins: { preflight: false },
+  // Existing pages already use plain class names that collide with real Tailwind utilities
+  // (container, flex, hidden, grid, ...) for their own hand-rolled CSS — e.g. admin/products.html
+  // toggles a modal via classList.add('hidden') against a custom .hidden rule in admin.css.
+  // Prefixing every generated utility avoids silently overriding those on pages that haven't
+  // adopted Tailwind yet.
+  prefix: 'tw-',
   theme: {
     extend: {
       // Same CSS custom properties global.css already swaps per-theme, so any of these

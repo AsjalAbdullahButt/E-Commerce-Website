@@ -10,31 +10,17 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260719">
+  <link rel="stylesheet" href="../shared/css/tailwind.build.css?v=20260719">
   <link rel="stylesheet" href="../shared/css/rider.css?v=20260719">
+  <script src="../shared/js/components/site-header.js?v=20260719"></script>
+  <script src="../shared/js/components/site-footer.js?v=20260719"></script>
 </head>
 <body>
 
   <canvas id="neural-bg"></canvas>
 
-  <nav class="navbar" id="navbar" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a class="nav-logo" href="./dashboard.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
-      <ul class="nav-links" id="nav-links">
-        <li><a href="./dashboard.html">Dashboard</a></li>
-        <li><a href="./assigned-orders.html" class="active">My Orders</a></li>
-      </ul>
-      <div class="nav-actions">
-        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
-          <i class="fas fa-moon" id="theme-icon"></i>
-        </button>
-        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer">
-          <i class="fas fa-sign-out-alt"></i>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <main>
+  <site-header variant="staff" logo-href="./dashboard.html" links='[{"href":"./dashboard.html","label":"Dashboard","active":false},{"href":"./assigned-orders.html","label":"My Orders","active":true}]'></site-header>
+<main>
     <div class="page-header">
       <div>
         <h1>My Deliveries</h1>
@@ -69,11 +55,8 @@
     </div>
   </main>
 
-  <footer class="footer">
-    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
-  </footer>
-
-  <div class="pod-modal-overlay" id="pod-modal-overlay">
+  <site-footer variant="minimal"></site-footer>
+<div class="pod-modal-overlay" id="pod-modal-overlay">
     <div class="pod-modal">
       <h3>Proof of Delivery</h3>
       <p>Take or upload a photo of the delivered package before marking this order as delivered.</p>

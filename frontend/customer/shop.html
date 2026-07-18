@@ -16,38 +16,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260719">
+  <link rel="stylesheet" href="../shared/css/tailwind.build.css?v=20260719">
   <link rel="stylesheet" href="../shared/css/shop.css?v=20260716">
+  <script src="../shared/js/components/site-header.js?v=20260719"></script>
+  <script src="../shared/js/components/site-footer.js?v=20260719"></script>
 </head>
 <body>
 
   <canvas id="neural-bg"></canvas>
 
-  <nav class="navbar" id="navbar" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a class="nav-logo" href="./index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
-      <ul class="nav-links" id="nav-links">
-        <li><a href="./index.html">Home</a></li>
-        <li><a href="./shop.html" class="active">Shop</a></li>
-        <li><a href="./about.html">About</a></li>
-        <li><a href="./contact.html">Contact</a></li>
-      </ul>
-      <div class="nav-actions">
-        <a href="./profile.html"  class="nav-icon" id="nav-profile-btn"  aria-label="Profile"><i class="fas fa-user"></i></a>
-        <a href="../auth/login.html"    class="nav-icon" id="nav-login-btn"    aria-label="Login"><i class="fas fa-sign-in-alt"></i></a>
-        <button                   class="nav-icon" id="nav-logout-btn"   aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
-        <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">
-          <i class="fas fa-shopping-bag"></i>
-          <span class="cart-badge" id="cart-badge">0</span>
-        </button>
-        <!-- Dark/Light Mode Toggle -->
-        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
-          <i class="fas fa-moon" id="theme-icon"></i>
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <div class="cart-overlay" id="cart-overlay"></div>
+  <site-header variant="shop" links='[{"href":"./index.html","label":"Home","active":false},{"href":"./shop.html","label":"Shop","active":true},{"href":"./about.html","label":"About","active":false},{"href":"./contact.html","label":"Contact","active":false}]'></site-header>
+<div class="cart-overlay" id="cart-overlay"></div>
   <aside class="cart-drawer" id="cart-drawer" role="dialog" aria-modal="true" aria-label="Shopping cart" aria-hidden="true"></aside>
 
   <main>
@@ -85,44 +64,8 @@
     </div>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <p class="footer-logo"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></p>
-        <p>Your one-stop shop for everything. Quality products, fast delivery.</p>
-      </div>
-      <div class="footer-col">
-        <h4>Shop</h4>
-        <a href="./shop.html">All Products</a>
-        <a href="./about.html">Our Story</a>
-        <a href="./contact.html">Contact Us</a>
-      </div>
-      <div class="footer-col">
-        <h4>Account</h4>
-        <a href="../auth/login.html">Login</a>
-        <a href="../auth/register.html">Register</a>
-        <a href="./profile.html">My Orders</a>
-        <a href="./tracking.html">Track Order</a>
-      </div>
-      <div class="footer-col">
-        <h4>Legal</h4>
-        <a href="./privacy-policy.html">Privacy Policy</a>
-        <a href="./terms.html">Terms of Service</a>
-        <a href="./refund-policy.html">Refund Policy</a>
-      </div>
-      <div class="footer-col">
-        <h4>Follow Us</h4>
-        <div class="footer-socials">
-          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
-          <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
-          <a href="#" aria-label="TikTok"><i class="fab fa-tiktok"></i></a>
-        </div>
-      </div>
-    </div>
-    <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
-  </footer>
-
-  <script src="../shared/js/config.js?v=20260716"></script>
+  <site-footer variant="full"></site-footer>
+<script src="../shared/js/config.js?v=20260716"></script>
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/cart.js?v=20260716"></script>
