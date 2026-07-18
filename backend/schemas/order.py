@@ -43,6 +43,7 @@ class OrderResponse(BaseModel):
     total: float = 0.0
     status: str
     rider_id: Optional[str] = None
+    proof_of_delivery_url: Optional[str] = None
     status_history: List[dict[str, Any]] = []
     return_request: Optional[dict[str, Any]] = None
     created_at: Optional[datetime] = None

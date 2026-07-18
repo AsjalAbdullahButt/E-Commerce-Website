@@ -199,6 +199,7 @@ async function loadTrackingData() {
       }
     }
 
+    renderProofOfDeliverySection(order);
     renderReturnRequestSection(order, orderId, guestEmail);
   } catch (err) {
     console.error('Failed to load tracking data', err);
@@ -306,6 +307,27 @@ function renderGuestAccountPrompt(guestEmail) {
   el.appendChild(text);
   el.appendChild(link);
   el.style.display = 'block';
+}
+
+// ════════════════════════════════════════════════════
+// PROOF OF DELIVERY
+// ════════════════════════════════════════════════════
+function renderProofOfDeliverySection(order) {
+  const section = document.getElementById('proof-of-delivery-section');
+  if (!section) return;
+  section.textContent = '';
+  if (order.status !== 'delivered' || !order.proof_of_delivery_url) return;
+
+  const title = document.createElement('h3');
+  title.className = 'info-title';
+  title.textContent = 'Proof of Delivery';
+  section.appendChild(title);
+
+  const img = document.createElement('img');
+  img.src = sanitizeUrl(order.proof_of_delivery_url);
+  img.alt = 'Proof of delivery photo';
+  img.className = 'proof-of-delivery-photo';
+  section.appendChild(img);
 }
 
 // ════════════════════════════════════════════════════

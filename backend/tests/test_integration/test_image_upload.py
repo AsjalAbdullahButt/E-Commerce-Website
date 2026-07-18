@@ -44,11 +44,11 @@ def test_upload_valid_image_stores_locally_and_returns_urls(client):
     assert data["url"] != data["thumbnail_url"]
 
     # The files actually landed on disk, not just a fabricated URL.
-    from services.image_storage import UPLOAD_ROOT, THUMB_ROOT
+    from services.image_storage import UPLOADS_BASE
     uploaded_name = data["url"].rsplit("/", 1)[-1]
     thumb_name = data["thumbnail_url"].rsplit("/", 1)[-1]
-    assert (UPLOAD_ROOT / uploaded_name).exists()
-    assert (THUMB_ROOT / thumb_name).exists()
+    assert (UPLOADS_BASE / "products" / uploaded_name).exists()
+    assert (UPLOADS_BASE / "products" / "thumbs" / thumb_name).exists()
 
 
 def test_upload_rejects_non_image_file(client):

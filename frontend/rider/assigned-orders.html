@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260716">
   <style>
     main {
@@ -49,6 +50,143 @@
       color: var(--text-primary);
       font-size: 0.9rem;
       cursor: pointer;
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+
+    .view-toggle button {
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .view-toggle button.active {
+      background: var(--gold);
+      color: #000;
+      border-color: var(--gold);
+    }
+
+    #map-view {
+      display: none;
+      height: 600px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    #map-view.visible { display: block; }
+    #orders-container.hidden { display: none; }
+
+    .map-geocoding-note {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    .map-geocoding-note.visible { display: flex; }
+
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .leaflet-popup-tip { background: var(--bg-card); }
+
+    .map-popup .order-id { display: block; margin-bottom: 0.35rem; }
+    .map-popup .status-badge { margin-bottom: 0.5rem; }
+    .map-popup .popup-addr { font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.5rem; }
+    .map-popup button.btn-status { width: 100%; margin-top: 0.25rem; }
+
+    .pod-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .pod-modal-overlay.visible { display: flex; }
+
+    .pod-modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      max-width: 420px;
+      width: 100%;
+    }
+
+    .pod-modal h3 {
+      font-family: var(--font-display);
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+    }
+
+    .pod-modal p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .pod-preview {
+      width: 100%;
+      max-height: 260px;
+      object-fit: contain;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      display: none;
+      background: var(--bg-input);
+    }
+
+    .pod-preview.visible { display: block; }
+
+    .pod-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .pod-actions button {
+      flex: 1;
+      padding: 0.7rem;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #pod-cancel-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    #pod-submit-btn {
+      background: var(--gold);
+      border: 1px solid var(--gold);
+      color: #000;
+    }
+
+    #pod-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .orders-list {
@@ -406,7 +544,17 @@
         <option value="shipped">Shipped</option>
         <option value="delivered">Delivered</option>
       </select>
+      <div class="view-toggle">
+        <button id="list-view-btn" class="active" onclick="setView('list')"><i class="fas fa-list"></i> List</button>
+        <button id="map-view-btn" onclick="setView('map')"><i class="fas fa-map-location-dot"></i> Map</button>
+      </div>
     </div>
+
+    <div id="map-geocoding-note" class="map-geocoding-note">
+      <i class="fas fa-spinner fa-spin"></i> <span id="map-geocoding-text">Locating addresses...</span>
+    </div>
+
+    <div id="map-view"></div>
 
     <div id="orders-container" class="orders-list">
       <div class="loading">
@@ -419,11 +567,25 @@
     <div class="footer-bottom"><p>&copy; 2025 E-Commerce. All rights reserved.</p></div>
   </footer>
 
+  <div class="pod-modal-overlay" id="pod-modal-overlay">
+    <div class="pod-modal">
+      <h3>Proof of Delivery</h3>
+      <p>Take or upload a photo of the delivered package before marking this order as delivered.</p>
+      <img class="pod-preview" id="pod-preview" alt="Proof of delivery preview">
+      <input type="file" id="pod-file-input" accept="image/jpeg,image/png,image/webp" capture="environment">
+      <div class="pod-actions">
+        <button id="pod-cancel-btn" type="button">Cancel</button>
+        <button id="pod-submit-btn" type="button" disabled>Confirm Delivered</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../shared/js/config.js?v=20260716"></script>
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/sanitize.js?v=20260716"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <script>
     let allOrders = [];
@@ -573,7 +735,7 @@
         delBtn.className = `btn-status ${order.status === 'delivered' ? 'active' : ''}`;
         delBtn.textContent = 'Mark Delivered';
         delBtn.disabled = order.status !== 'shipped';
-        delBtn.addEventListener('click', () => updateStatus(order.id, 'delivered'));
+        delBtn.addEventListener('click', () => openProofOfDeliveryModal(order.id));
 
         controls.appendChild(shipBtn); controls.appendChild(delBtn);
 
@@ -620,6 +782,218 @@
         card?.classList.remove('status-updating');
       }
     }
+
+    // === MAP VIEW ===
+    // No lat/lng is stored anywhere in this app (db/order.py only has address/city/postal_code
+    // text fields) and there's no route-optimization requirement, so geocoding happens client-side
+    // against OpenStreetMap's free Nominatim API, one address string at a time, with results cached
+    // in localStorage indefinitely (an address's coordinates don't change) to stay well under
+    // Nominatim's 1 req/sec public-usage-policy limit even on repeat visits.
+    const GEOCODE_CACHE_KEY = 'rider_geocode_cache_v1';
+    let leafletMap = null;
+    let mapMarkersLayer = null;
+    let currentView = 'list';
+
+    function loadGeocodeCache() {
+      try { return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY)) || {}; }
+      catch { return {}; }
+    }
+
+    function saveGeocodeCache(cache) {
+      try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache)); } catch { /* storage full/unavailable, skip */ }
+    }
+
+    function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+    async function geocodeAddress(addr) {
+      const query = `${addr.address}, ${addr.city}, ${addr.postal_code}, Pakistan`;
+      const cache = loadGeocodeCache();
+      if (cache[query]) return cache[query];
+
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+      const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!resp.ok) return null;
+      const results = await resp.json();
+      if (!results.length) return null;
+
+      const coords = { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) };
+      cache[query] = coords;
+      saveGeocodeCache(cache);
+      return coords;
+    }
+
+    function setView(view) {
+      currentView = view;
+      document.getElementById('list-view-btn').classList.toggle('active', view === 'list');
+      document.getElementById('map-view-btn').classList.toggle('active', view === 'map');
+      document.getElementById('orders-container').classList.toggle('hidden', view === 'map');
+      document.getElementById('map-view').classList.toggle('visible', view === 'map');
+
+      if (view === 'map') {
+        renderMapView(allOrders);
+      }
+    }
+
+    async function renderMapView(orders) {
+      if (!leafletMap) {
+        leafletMap = L.map('map-view').setView([30.3753, 69.3451], 5); // Pakistan-centered default
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(leafletMap);
+        mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+      }
+      mapMarkersLayer.clearLayers();
+
+      const deliverable = (orders || []).filter(o => o.shipping_address);
+      if (!deliverable.length) return;
+
+      const note = document.getElementById('map-geocoding-note');
+      const noteText = document.getElementById('map-geocoding-text');
+      note.classList.add('visible');
+
+      const bounds = [];
+      let done = 0;
+      for (const order of deliverable) {
+        noteText.textContent = `Locating addresses... (${done + 1}/${deliverable.length})`;
+        let coords = null;
+        try { coords = await geocodeAddress(order.shipping_address); }
+        catch (err) { console.error('Geocoding failed for order', order.id, err); }
+        done += 1;
+
+        if (coords) {
+          const marker = L.marker([coords.lat, coords.lon]).addTo(mapMarkersLayer);
+          marker.bindPopup(buildMapPopupHtml(order));
+          marker.on('popupopen', () => bindPopupActions(order));
+          bounds.push([coords.lat, coords.lon]);
+        }
+
+        // Nominatim's usage policy caps public, unauthenticated use at ~1 request/second.
+        if (done < deliverable.length) await sleep(1000);
+      }
+
+      note.classList.remove('visible');
+      if (bounds.length) leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      setTimeout(() => leafletMap.invalidateSize(), 100);
+    }
+
+    function buildMapPopupHtml(order) {
+      const addr = order.shipping_address;
+      const shortId = (order.id && order.id.substring) ? order.id.substring(0, 8) : 'N/A';
+      const canShip = ['confirmed', 'packed'].includes(order.status);
+      const canDeliver = order.status === 'shipped';
+      const wrap = document.createElement('div'); wrap.className = 'map-popup';
+
+      const idEl = document.createElement('strong'); idEl.className = 'order-id'; idEl.textContent = `Order #${shortId}`;
+      const statusEl = document.createElement('span'); statusEl.className = `status-badge ${order.status || 'confirmed'}`; statusEl.textContent = formatStatus(order.status);
+      const addrEl = document.createElement('span'); addrEl.className = 'popup-addr'; addrEl.textContent = `${addr.address}, ${addr.city} ${addr.postal_code}`;
+
+      wrap.appendChild(idEl); wrap.appendChild(document.createElement('br'));
+      wrap.appendChild(statusEl); wrap.appendChild(addrEl);
+
+      if (canShip) {
+        const btn = document.createElement('button'); btn.className = 'btn-status'; btn.textContent = 'Mark Shipped';
+        btn.dataset.action = 'ship'; btn.dataset.orderId = order.id;
+        wrap.appendChild(btn);
+      }
+      if (canDeliver) {
+        const btn = document.createElement('button'); btn.className = 'btn-status'; btn.textContent = 'Mark Delivered';
+        btn.dataset.action = 'deliver'; btn.dataset.orderId = order.id;
+        wrap.appendChild(btn);
+      }
+      return wrap;
+    }
+
+    function bindPopupActions() {
+      document.querySelectorAll('.map-popup button[data-action]').forEach((btn) => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.orderId;
+          if (btn.dataset.action === 'ship') updateStatus(orderId, 'shipped');
+          else openProofOfDeliveryModal(orderId);
+        });
+      });
+    }
+
+    // === PROOF OF DELIVERY ===
+    let podOrderId = null;
+    let podFile = null;
+
+    function openProofOfDeliveryModal(orderId) {
+      podOrderId = orderId;
+      podFile = null;
+      document.getElementById('pod-file-input').value = '';
+      const preview = document.getElementById('pod-preview');
+      preview.src = '';
+      preview.classList.remove('visible');
+      document.getElementById('pod-submit-btn').disabled = true;
+      document.getElementById('pod-modal-overlay').classList.add('visible');
+    }
+
+    function closeProofOfDeliveryModal() {
+      document.getElementById('pod-modal-overlay').classList.remove('visible');
+      podOrderId = null;
+      podFile = null;
+    }
+
+    async function submitProofOfDelivery() {
+      if (!podOrderId || !podFile) return;
+      const submitBtn = document.getElementById('pod-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const token = getAccessToken();
+        const formData = new FormData();
+        formData.append('proof_photo', podFile);
+
+        const res = await fetch(`${API_BASE}/rider/orders/${podOrderId}/complete`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Request failed with status ${res.status}`);
+        }
+
+        showToast('Delivery confirmed', 'success');
+        closeProofOfDeliveryModal();
+        loadOrders();
+        if (currentView === 'map' && leafletMap) leafletMap.closePopup();
+      } catch (err) {
+        console.error('Failed to submit proof of delivery:', err);
+        showToast(err.message || 'Failed to confirm delivery', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm Delivered';
+      }
+    }
+
+    document.getElementById('pod-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const preview = document.getElementById('pod-preview');
+      const submitBtn = document.getElementById('pod-submit-btn');
+      if (!file) {
+        podFile = null;
+        preview.classList.remove('visible');
+        submitBtn.disabled = true;
+        return;
+      }
+      podFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.classList.add('visible');
+      submitBtn.disabled = false;
+    });
+
+    document.getElementById('pod-cancel-btn').addEventListener('click', closeProofOfDeliveryModal);
+    document.getElementById('pod-submit-btn').addEventListener('click', submitProofOfDelivery);
+    document.getElementById('pod-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'pod-modal-overlay') closeProofOfDeliveryModal();
+    });
   </script>
 </body>
 </html>

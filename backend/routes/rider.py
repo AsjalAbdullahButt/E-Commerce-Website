@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, File, HTTPException, Depends, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.order_transitions import assert_valid_transition
 from utils.ids import is_valid_id
+from services.image_storage import ImageStorageService
 from services.order_user import _order_to_dict, notify_order_status_change
 
 logger = get_logger(__name__)
@@ -147,9 +149,11 @@ async def get_earnings(request: Request, user=Depends(require_rider), db: AsyncS
 
 @router.post("/orders/{order_id}/complete")
 @limiter.limit("20/minute")
-async def complete_delivery(request: Request, order_id: str, proof_image_url: str = None, user=Depends(require_rider), db: AsyncSession = Depends(get_db)):
-    """Mark delivery as completed by rider. `proof_image_url` is accepted for API compatibility
-    but never populated by any current frontend caller (confirmed via grep) — not persisted."""
+async def complete_delivery(request: Request, order_id: str, proof_photo: Optional[UploadFile] = File(None), user=Depends(require_rider), db: AsyncSession = Depends(get_db)):
+    """Mark delivery as completed by rider. `proof_photo` is an optional multipart image
+    (proof-of-delivery) — validated/stored via ImageStorageService and persisted to
+    Order.proof_of_delivery_url. Optional at the API level so this endpoint stays usable without
+    a photo (e.g. existing callers); the frontend rider UI requires one before calling this."""
     if not is_valid_id(order_id):
         await log_to_db("INVALID_ORDER_ID", __name__, f"rider {str(user['_id'])} tried invalid order ID {order_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
         raise HTTPException(status_code=400, detail="Invalid order ID")
@@ -167,17 +171,25 @@ async def complete_delivery(request: Request, order_id: str, proof_image_url: st
     assert_valid_transition(order.status, "delivered")
 
     try:
+        proof_url = None
+        if proof_photo is not None and proof_photo.filename:
+            proof_url, _ = await ImageStorageService.upload(proof_photo, str(request.base_url), category="delivery-proof")
+            order.proof_of_delivery_url = proof_url
+
         order.status = "delivered"
         order.updated_at = datetime.utcnow()
         db.add(OrderStatusHistory(order_id=order_id, status="delivered", timestamp=datetime.utcnow(), note="Delivered by rider"))
         await notify_order_status_change(db, order, "delivered")
 
-        await log_to_db("DELIVERY_COMPLETED", __name__, f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": order_id, "user_id": str(user["_id"])})
+        await log_to_db("DELIVERY_COMPLETED", __name__, f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": order_id, "user_id": str(user["_id"]), "proof_of_delivery": bool(proof_url)})
 
         return {
             "success": True,
-            "message": "Delivery marked as completed"
+            "message": "Delivery marked as completed",
+            "proof_of_delivery_url": proof_url,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         await log_to_db("DELIVERY_COMPLETE_ERROR", __name__, f"failed to complete delivery {order_id}", {"error": str(e), "order_id": order_id, "user_id": str(user["_id"])})
         logger.error(f"Delivery completion error: {e}")

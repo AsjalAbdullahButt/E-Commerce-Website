@@ -54,10 +54,24 @@ main {
   margin-left: 0.35rem;
 }
 
-.return-request-section {
+.return-request-section,
+.proof-of-delivery-section {
   background: var(--bg-card);
   padding: 1.5rem;
   border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.return-request-section:empty,
+.proof-of-delivery-section:empty {
+  display: none;
+}
+
+.proof-of-delivery-photo {
+  max-width: 100%;
+  max-height: 320px;
+  display: block;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
 }
 

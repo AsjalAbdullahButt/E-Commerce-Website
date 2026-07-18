@@ -95,6 +95,7 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
         "total": order.total,
         "status": order.status,
         "rider_id": order.rider_id,
+        "proof_of_delivery_url": order.proof_of_delivery_url,
         "status_history": status_history,
         "return_request": return_request,
         "created_at": order.created_at,

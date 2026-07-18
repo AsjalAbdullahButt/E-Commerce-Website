@@ -46,6 +46,10 @@ class Order(Base, IDMixin, TimestampMixin):
     city: Mapped[str] = mapped_column(String(100))
     postal_code: Mapped[str] = mapped_column(String(20))
 
+    # Set by routes/rider.py::complete_delivery when the rider attaches a photo — optional, since
+    # requiring one is enforced client-side only (see frontend/rider/assigned-orders.html), not here.
+    proof_of_delivery_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
 
 class OrderItem(Base, IDMixin):
     __tablename__ = "order_items"
