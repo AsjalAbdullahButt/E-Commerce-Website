@@ -1,75 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Audit Logs | E-COM Admin</title>
   <link rel="icon" type="image/png" href="../images/E_Commerce_Logo.png?v=20260511">
-  <link rel="stylesheet" href="./css/admin-style.css">
+
+  <!-- AUTH GUARD — Runs FIRST before page renders, to avoid a flash of protected content.
+       Checks the cached (non-sensitive) admin profile set by admin/login.html
+       (POST /admin/auth/login), not the customer-facing ecom_* keys. The access token itself
+       lives in memory only (see js/admin-api.js) and isn't available this early; real auth is
+       enforced server-side on every API call via the httpOnly admin_refresh_token cookie. -->
+  <script>
+    (function() {
+      const user = JSON.parse(localStorage.getItem('admin_data') || 'null');
+      if (!user) { window.location.replace('./login.html'); return; }
+      if (!['admin', 'super_admin', 'manager', 'support'].includes(user.role)) { window.location.replace('../customer/index.html'); return; }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../shared/css/global.css?v=20260719">
+  <link rel="stylesheet" href="../shared/css/admin.css?v=20260719">
 </head>
-<body>
-  <main class="admin-container audit-page">
-    <section class="audit-hero">
-      <div>
-        <p class="audit-kicker">Security • Traceability • Oversight</p>
-        <h1>Audit Logs</h1>
-        <p class="audit-subtitle">Review administrative activity with a clearer timeline, faster filters, and visual severity cues.</p>
-      </div>
-      <div class="audit-hero-actions">
-        <button id="refresh" class="audit-button audit-button-primary">Refresh</button>
-        <button id="export-btn" class="audit-button audit-button-secondary" type="button">Export View</button>
-      </div>
-    </section>
+<body data-page="admin-logs">
 
-    <section class="audit-summary-grid" aria-label="Audit summary">
-      <article class="audit-summary-card">
-        <span class="audit-summary-label">Total logs</span>
-        <strong id="total-count">0</strong>
-        <span class="audit-summary-note">Latest events in the current view</span>
-      </article>
-      <article class="audit-summary-card">
-        <span class="audit-summary-label">Admins involved</span>
-        <strong id="admin-count">0</strong>
-        <span class="audit-summary-note">Unique actors captured</span>
-      </article>
-      <article class="audit-summary-card">
-        <span class="audit-summary-label">Sensitive actions</span>
-        <strong id="high-count">0</strong>
-        <span class="audit-summary-note">Deletes, bans, and auth changes</span>
-      </article>
-      <article class="audit-summary-card audit-summary-card-accent">
-        <span class="audit-summary-label">Last refresh</span>
-        <strong id="last-updated">--</strong>
-        <span class="audit-summary-note">View updates on demand</span>
-      </article>
-    </section>
+  <canvas id="neural-bg"></canvas>
 
-    <section class="audit-panel">
-      <div class="audit-panel-header">
-        <div>
-          <h2>Activity Feed</h2>
-          <p>Filter by entity or search within the current set of logs.</p>
+  <nav class="navbar" id="navbar" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a class="nav-logo" href="../customer/index.html"><span class="logo-e">E</span><span class="logo-dash">-</span><span class="logo-com">COM</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="./dashboard.html">Dashboard</a></li>
+        <li><a href="./products.html">Products</a></li>
+        <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./returns.html">Returns</a></li>
+        <li><a href="./riders.html">Riders</a></li>
+        <li><a href="./promos.html">Promos</a></li>
+        <li><a href="./logs.html" class="active">Logs</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>
+        <!-- Dark/Light Mode Toggle -->
+        <button class="nav-icon theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Switch theme">
+          <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="admin-header">
+      <div class="admin-header-copy">
+        <h1 class="dashboard-title">Audit Logs</h1>
+        <p class="dashboard-subtitle">Review administrative activity with a clear timeline, fast filters, and severity cues.</p>
+      </div>
+      <div class="admin-toolbar">
+        <button id="refresh" class="builder-button" type="button"><i class="fas fa-rotate"></i> Refresh</button>
+        <button id="export-btn" class="builder-button" type="button"><i class="fas fa-file-export"></i> Export View</button>
+      </div>
+    </div>
+
+    <div class="stats-grid reveal-stagger" aria-label="Audit summary">
+      <div class="stat-card">
+        <div class="stat-content">
+          <p class="stat-label">Total logs</p>
+          <p class="stat-value" id="total-count">0</p>
+          <p class="summary-note">Latest events in the current view</p>
         </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-content">
+          <p class="stat-label">Admins involved</p>
+          <p class="stat-value" id="admin-count">0</p>
+          <p class="summary-note">Unique actors captured</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-content">
+          <p class="stat-label">Sensitive actions</p>
+          <p class="stat-value" id="high-count">0</p>
+          <p class="summary-note">Deletes, bans, and auth changes</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-content">
+          <p class="stat-label">Last refresh</p>
+          <p class="stat-value" id="last-updated">--</p>
+          <p class="summary-note">View updates on demand</p>
+        </div>
+      </div>
+    </div>
+
+    <section data-section="logs">
+      <div class="admin-form-section reveal">
+        <div class="section-title-row" style="margin-bottom: 1rem;">
+          <div>
+            <h2>Activity Feed</h2>
+            <p class="admin-section-desc">Filter by entity or search within the current set of logs.</p>
+          </div>
+        </div>
+
         <div class="audit-pill-row" id="filter-pills"></div>
-      </div>
 
-      <div class="audit-controls" id="controls">
-        <div class="audit-control-group">
-          <label for="filter-entity">Entity type</label>
-          <input id="filter-entity" placeholder="product, order, user, discount">
-        </div>
-        <div class="audit-control-group">
-          <label for="filter-search">Search</label>
-          <input id="filter-search" placeholder="Search admin, action, message, or IP">
-        </div>
-        <div class="audit-control-group audit-control-inline">
-          <label>&nbsp;</label>
-          <button id="clear-filters" class="audit-button audit-button-secondary" type="button">Clear</button>
+        <div class="filters" id="controls">
+          <input id="filter-entity" class="search-box" placeholder="Entity type: product, order, user, discount">
+          <input id="filter-search" class="search-box" placeholder="Search admin, action, message, or IP">
+          <button id="clear-filters" class="builder-button" type="button">Clear</button>
         </div>
       </div>
 
-      <div class="audit-table-wrap">
+      <div class="table-wrapper reveal">
         <table id="logs-table">
           <thead>
             <tr>
@@ -85,7 +128,7 @@
           <tbody></tbody>
         </table>
         <div id="empty-state" class="audit-empty-state" style="display:none;">
-          <div class="audit-empty-icon">↯</div>
+          <div class="audit-empty-icon"><i class="fas fa-magnifying-glass"></i></div>
           <h3>No logs match this view</h3>
           <p>Try clearing filters or refresh after more admin activity is recorded.</p>
         </div>
@@ -93,11 +136,43 @@
     </section>
   </main>
 
+  <footer class="footer">
+    <div class="footer-bottom"><p>&copy; 2025 E-Commerce Admin Panel.</p></div>
+  </footer>
+
+  <script src="../shared/js/config.js"></script>
+  <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
-  <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/sanitize.js"></script>
+  <script src="../shared/js/neural-bg.js"></script>
+  <script src="../shared/js/scroll-reveal.js"></script>
+
   <script>
+    (function () {
+      const saved = localStorage.getItem('ecom_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.addEventListener('DOMContentLoaded', () => {
+        const icon = document.getElementById('theme-icon');
+        if (icon) icon.className = saved === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        document.getElementById('theme-toggle')?.addEventListener('click', () => {
+          const html = document.documentElement;
+          const next = (html.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark';
+          html.setAttribute('data-theme', next);
+          localStorage.setItem('ecom_theme', next);
+          if (icon) icon.className = next === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        });
+      });
+    })();
+
+    document.getElementById('nav-logout-btn').addEventListener('click', async () => {
+      try { await adminAPI.logout(); } catch {}
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
+      window.location.href = './login.html';
+    });
+
     const AUDIT_STATE = {
       logs: [],
       filtered: [],
@@ -247,7 +322,7 @@
 
         const actionTd = document.createElement('td');
         const actionBadge = document.createElement('span');
-        actionBadge.className = `audit-action-badge audit-action-${getSeverity(l.action, l.entity_type)}`;
+        actionBadge.className = `badge audit-action-${getSeverity(l.action, l.entity_type)}`;
         actionBadge.textContent = getActionLabel(l.action || l.type);
         actionTd.appendChild(actionBadge);
 
@@ -300,5 +375,15 @@
     });
     document.addEventListener('DOMContentLoaded', fetchLogs);
   </script>
+
+  <!-- WhatsApp Support Button — TODO: replace number with real WhatsApp Business number -->
+  <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Chat with us on WhatsApp"
+     title="WhatsApp Support">
+    <i class="fab fa-whatsapp"></i>
+  </a>
 </body>
 </html>

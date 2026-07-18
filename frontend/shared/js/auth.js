@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loginPasswordInput.type = isPassword ? 'text' : 'password';
       const icon = loginToggleBtn.querySelector('i');
       if (icon) {
-        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+        icon.className = isPassword ? 'fas fa-eye' : 'fas fa-eye-slash';
       }
     });
   }
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
       registerPasswordInput.type = isPassword ? 'text' : 'password';
       const icon = registerToggleBtn.querySelector('i');
       if (icon) {
-        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+        icon.className = isPassword ? 'fas fa-eye' : 'fas fa-eye-slash';
       }
     });
   }
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
       registerConfirmInput.type = isPassword ? 'text' : 'password';
       const icon = registerToggleConfirmBtn.querySelector('i');
       if (icon) {
-        icon.className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+        icon.className = isPassword ? 'fas fa-eye' : 'fas fa-eye-slash';
       }
     });
   }
