@@ -76,7 +76,7 @@ function renderReturns(returns) {
 
     const orderTd = document.createElement('td');
     const orderBadge = document.createElement('span');
-    orderBadge.className = 'audit-admin-badge';
+    orderBadge.className = 'code-badge';
     orderBadge.textContent = `${rr.order_id.substring(0, 8)}...`;
     orderTd.appendChild(orderBadge);
 
@@ -89,8 +89,8 @@ function renderReturns(returns) {
 
     const statusTd = document.createElement('td');
     const statusBadge = document.createElement('span');
-    const statusClass = { pending: 'audit-action-neutral', approved: 'audit-action-neutral', rejected: 'audit-action-critical' }[rr.status] || 'audit-action-neutral';
-    statusBadge.className = `audit-action-badge ${statusClass}`;
+    const statusClass = { pending: 'neutral', approved: 'success', rejected: 'danger' }[rr.status] || 'neutral';
+    statusBadge.className = `status-badge status-badge--${statusClass}`;
     statusBadge.textContent = rr.status;
     statusTd.appendChild(statusBadge);
 

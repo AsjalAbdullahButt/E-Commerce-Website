@@ -316,13 +316,14 @@
 
         const adminTd = document.createElement('td');
         const adminBadge = document.createElement('span');
-        adminBadge.className = 'audit-admin-badge';
+        adminBadge.className = 'code-badge';
         adminBadge.textContent = l.admin_name || l.admin || l.admin_id || '-';
         adminTd.appendChild(adminBadge);
 
         const actionTd = document.createElement('td');
         const actionBadge = document.createElement('span');
-        actionBadge.className = `badge audit-action-${getSeverity(l.action, l.entity_type)}`;
+        const severityClass = { critical: 'danger', warning: 'warning', neutral: 'neutral' }[getSeverity(l.action, l.entity_type)];
+        actionBadge.className = `status-badge status-badge--${severityClass}`;
         actionBadge.textContent = getActionLabel(l.action || l.type);
         actionTd.appendChild(actionBadge);
 

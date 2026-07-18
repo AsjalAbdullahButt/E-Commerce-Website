@@ -276,7 +276,7 @@ function renderPromos(promos) {
 
     const code = document.createElement('td');
     const codeBadge = document.createElement('span');
-    codeBadge.className = 'audit-admin-badge';
+    codeBadge.className = 'code-badge';
     codeBadge.textContent = promo.code;
     code.appendChild(codeBadge);
 
@@ -300,7 +300,7 @@ function renderPromos(promos) {
 
     const status = document.createElement('td');
     const statusBadge = document.createElement('span');
-    statusBadge.className = `audit-action-badge ${promo.is_active ? 'audit-action-neutral' : 'audit-action-critical'}`;
+    statusBadge.className = `status-badge status-badge--${promo.is_active ? 'success' : 'danger'}`;
     statusBadge.textContent = promo.is_active ? 'Active' : 'Inactive';
     status.appendChild(statusBadge);
 

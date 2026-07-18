@@ -105,7 +105,7 @@ function renderRiders(riders) {
     const availabilityCell = document.createElement('td');
     const availBadge = document.createElement('span');
     const availability = rider.status || 'offline';
-    availBadge.className = `badge ${availability === 'available' ? 'active' : availability === 'busy' ? 'low-stock' : 'inactive'}`;
+    availBadge.className = `status-badge status-badge--${availability === 'available' ? 'success' : availability === 'busy' ? 'warning' : 'neutral'}`;
     availBadge.textContent = availability;
     availabilityCell.appendChild(availBadge);
 
@@ -115,7 +115,7 @@ function renderRiders(riders) {
 
     const statusCell = document.createElement('td');
     const statusBadge = document.createElement('span');
-    statusBadge.className = `badge ${rider.is_active ? 'active' : 'inactive'}`;
+    statusBadge.className = `status-badge status-badge--${rider.is_active ? 'success' : 'danger'}`;
     statusBadge.textContent = rider.is_active ? 'Active' : 'Deactivated';
     statusCell.appendChild(statusBadge);
 

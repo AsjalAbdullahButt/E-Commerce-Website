@@ -5,6 +5,8 @@ const orderState = {
 
 const TERMINAL_STATUSES = ['delivered', 'cancelled', 'returned'];
 
+const ORDER_STATUS_BADGE = { delivered: 'success', cancelled: 'danger', returned: 'warning' };
+
 // Mirrors backend/utils/order_transitions.py — kept in sync manually since the admin UI needs to
 // know which "advance status" actions to offer without a round trip.
 const VALID_TRANSITIONS = {
@@ -80,7 +82,7 @@ function renderOrders(orders) {
 
     const statusCell = document.createElement('td');
     const statusBadge = document.createElement('span');
-    statusBadge.className = `badge ${order.status === 'delivered' ? 'active' : order.status === 'cancelled' ? 'out-of-stock' : ''}`;
+    statusBadge.className = `status-badge status-badge--${ORDER_STATUS_BADGE[order.status] || 'neutral'}`;
     statusBadge.textContent = order.status;
     statusCell.appendChild(statusBadge);
 

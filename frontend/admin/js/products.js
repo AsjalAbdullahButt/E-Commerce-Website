@@ -550,7 +550,7 @@ function renderProducts(products) {
 
     const stockCell = document.createElement('td');
     const stockBadge = document.createElement('span');
-    stockBadge.className = `badge ${Number(product.total_stock || 0) === 0 ? 'out-of-stock' : isLowStock(product) ? 'low-stock' : 'healthy'}`;
+    stockBadge.className = `status-badge status-badge--${Number(product.total_stock || 0) === 0 ? 'danger' : isLowStock(product) ? 'warning' : 'success'}`;
     stockBadge.textContent = `${Number(product.total_stock || 0)} units`;
     stockCell.appendChild(stockBadge);
 
@@ -559,7 +559,7 @@ function renderProducts(products) {
 
     const statusCell = document.createElement('td');
     const statusBadge = document.createElement('span');
-    statusBadge.className = `badge ${product.is_active ? 'active' : 'inactive'}`;
+    statusBadge.className = `status-badge status-badge--${product.is_active ? 'success' : 'danger'}`;
     statusBadge.textContent = product.is_active ? 'Active' : 'Inactive';
     statusCell.appendChild(statusBadge);
 
