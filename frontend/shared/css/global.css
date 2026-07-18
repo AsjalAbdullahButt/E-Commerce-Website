@@ -10,6 +10,13 @@
 
 /* === ROOT VARIABLES (DARK MODE — DEFAULT) === */
 :root {
+  /* Tells the browser this page already implements its own dark/light theming (via the
+     variables below + [data-theme] overrides) so it doesn't try to auto-dark-mode or
+     auto-recolor the page itself — Chrome's "Auto Dark Theme"/forced-dark-mode and similar
+     browser features otherwise invert/recolor pages that don't declare this, which can turn a
+     gold-on-black theme into a blue-tinted mess despite the site's own CSS being correct. */
+  color-scheme: dark light;
+
   /* Backgrounds */
   --bg-base:         #0a0a0a;
   --bg-surface:      #111111;
@@ -103,6 +110,7 @@
 
 /* === LIGHT MODE THEME === */
 [data-theme="light"] {
+  color-scheme: light;
   --bg-base:        #F5F4F0;
   --bg-surface:     #FFFFFF;
   --bg-card:        #EEEDE8;

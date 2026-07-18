@@ -434,8 +434,14 @@ textarea:focus {
   margin-bottom: 1.5rem;
 }
 
-/* === PRODUCT MANAGEMENT === */
-.product-page .admin-header {
+/* === ADMIN TOOLBAR / PRODUCT MANAGEMENT ===
+   Shared across every admin page's header/toolbar (dashboard, orders, returns, riders,
+   products) — used to require a `.product-page` ancestor class that only products.html's
+   <body> actually had, so every other page's toolbar buttons/header rendered completely
+   unstyled. De-scoped so it applies globally; the builder-*/product-* rules further down are
+   still only referenced by products.html and riders.html's forms, but there's no risk in them
+   also being unscoped now. */
+.admin-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -444,17 +450,17 @@ textarea:focus {
   margin-bottom: 1.5rem;
 }
 
-.product-page .admin-header-copy {
+.admin-header-copy {
   max-width: 700px;
 }
 
-.product-page .dashboard-subtitle {
+.dashboard-subtitle {
   color: var(--text-secondary);
   margin-top: 0.35rem;
   line-height: 1.6;
 }
 
-.product-page .admin-toolbar {
+.admin-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -462,29 +468,29 @@ textarea:focus {
   align-items: center;
 }
 
-.product-page .filters {
+.filters {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(160px, 0.7fr));
   gap: 0.75rem;
   width: 100%;
 }
 
-.product-page .search-box,
-.product-page .filter-select {
+.search-box,
+.filter-select {
   width: 100%;
 }
 
-.product-page .summary-note {
+.summary-note {
   margin-top: 0.35rem;
   color: var(--text-muted);
   font-size: 0.85rem;
 }
 
-.product-page .summary-card .stat-value {
+.summary-card .stat-value {
   margin-bottom: 0.25rem;
 }
 
-.product-page .summary-pill {
+.summary-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -497,54 +503,54 @@ textarea:focus {
   font-weight: 600;
 }
 
-.product-page .product-table .badge.low-stock {
+.product-table .badge.low-stock {
   background: rgba(245,158,11,0.16);
   color: var(--warning);
 }
 
-.product-page .product-table .badge.out-of-stock {
+.product-table .badge.out-of-stock {
   background: rgba(239,68,68,0.2);
   color: var(--error);
 }
 
-.product-page .product-table .badge.healthy {
+.product-table .badge.healthy {
   background: rgba(34,197,94,0.18);
   color: var(--success);
 }
 
-.product-page .product-meta {
+.product-meta {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 }
 
-.product-page .product-meta small {
+.product-meta small {
   color: var(--text-muted);
 }
 
-.product-page .product-modal-content {
+.product-modal-content {
   max-width: 1100px;
 }
 
-.product-page .product-form-grid {
+.product-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
-.product-page .product-form-grid .full-span,
-.product-page .product-section-full {
+.product-form-grid .full-span,
+.product-section-full {
   grid-column: 1 / -1;
 }
 
-.product-page .builder-section {
+.builder-section {
   background: rgba(255,255,255,0.02);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1rem;
 }
 
-.product-page .builder-header {
+.builder-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -552,27 +558,27 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
-.product-page .builder-title {
+.builder-title {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.product-page .builder-title strong {
+.builder-title strong {
   font-size: 1rem;
 }
 
-.product-page .builder-title small {
+.builder-title small {
   color: var(--text-muted);
 }
 
-.product-page .builder-list {
+.builder-list {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
 }
 
-.product-page .builder-row {
+.builder-row {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(180px, 1.3fr) minmax(100px, 0.65fr) auto;
   gap: 0.75rem;
@@ -583,36 +589,36 @@ textarea:focus {
   background: rgba(0,0,0,0.18);
 }
 
-.product-page .builder-row.compact-row {
+.builder-row.compact-row {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
 
-.product-page .builder-row .builder-field {
+.builder-row .builder-field {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
 }
 
-.product-page .builder-row .builder-field small {
+.builder-row .builder-field small {
   color: var(--text-muted);
 }
 
-.product-page .builder-row input,
-.product-page .builder-row select,
-.product-page .builder-row textarea {
+.builder-row input,
+.builder-row select,
+.builder-row textarea {
   width: 100%;
 }
 
-.product-page .builder-actions {
+.builder-actions {
   display: flex;
   gap: 0.6rem;
   justify-content: flex-end;
   flex-wrap: wrap;
 }
 
-.product-page .builder-button,
-.product-page .builder-icon-button {
+.builder-button,
+.builder-icon-button {
   border: 1px solid var(--gold-border);
   background: rgba(212,175,55,0.08);
   color: var(--gold);
@@ -623,13 +629,13 @@ textarea:focus {
   transition: var(--transition);
 }
 
-.product-page .builder-button:hover,
-.product-page .builder-icon-button:hover {
+.builder-button:hover,
+.builder-icon-button:hover {
   background: rgba(212,175,55,0.18);
   border-color: var(--gold);
 }
 
-.product-page .builder-icon-button {
+.builder-icon-button {
   width: 42px;
   height: 42px;
   display: inline-flex;
@@ -638,14 +644,14 @@ textarea:focus {
   padding: 0;
 }
 
-.product-page .builder-chip-list {
+.builder-chip-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
 
-.product-page .builder-chip {
+.builder-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -656,7 +662,7 @@ textarea:focus {
   border: 1px solid rgba(212,175,55,0.22);
 }
 
-.product-page .builder-chip button {
+.builder-chip button {
   background: transparent;
   border: none;
   color: inherit;
@@ -665,25 +671,25 @@ textarea:focus {
   line-height: 1;
 }
 
-.product-page .product-form-footer {
+.product-form-footer {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
   margin-top: 1.25rem;
 }
 
-.product-page .product-form-footer .btn-secondary,
-.product-page .product-form-footer .btn-primary {
+.product-form-footer .btn-secondary,
+.product-form-footer .btn-primary {
   min-width: 140px;
 }
 
-.product-page .inline-help {
+.inline-help {
   color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.5;
 }
 
-.product-page .stock-pill {
+.stock-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -696,29 +702,29 @@ textarea:focus {
 
 /* Breakpoints match the site-wide standard (1024/768/480 — see global.css) rather than one-off values. */
 @media (max-width: 1024px) {
-  .product-page .filters,
-  .product-page .product-form-grid {
+  .filters,
+  .product-form-grid {
     grid-template-columns: 1fr;
   }
 
-  .product-page .builder-row {
+  .builder-row {
     grid-template-columns: 1fr 1fr;
   }
 
-  .product-page .builder-row .builder-actions,
-  .product-page .builder-row .builder-button,
-  .product-page .builder-row .builder-icon-button {
+  .builder-row .builder-actions,
+  .builder-row .builder-button,
+  .builder-row .builder-icon-button {
     grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 768px) {
-  .product-page .builder-row {
+  .builder-row {
     grid-template-columns: 1fr;
   }
 
-  .product-page .product-form-footer,
-  .product-page .builder-header {
+  .product-form-footer,
+  .builder-header {
     flex-direction: column;
     align-items: stretch;
   }
