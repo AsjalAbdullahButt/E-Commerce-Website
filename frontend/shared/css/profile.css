@@ -295,6 +295,65 @@ textarea:focus {
   background: var(--gold-glow);
 }
 
+.addresses-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.addresses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.address-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  transition: border-color var(--duration-base) var(--ease);
+}
+
+.address-card.is-default {
+  border-color: var(--gold-border);
+}
+
+.address-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.default-badge {
+  background: var(--gold-glow);
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+}
+
+.address-card-body {
+  color: var(--text-secondary);
+  white-space: pre-line;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.address-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.address-card-actions button {
+  flex: 1;
+  min-width: 90px;
+}
+
 @media (max-width: 1024px) {
   main {
     padding: 1.5rem;

@@ -154,6 +154,27 @@ def test_stranger_cannot_poll_payment_status_for_a_logged_in_customers_order(cli
     assert resp.status_code == 403
 
 
+def test_guest_can_cancel_own_pending_order(client):
+    admin_token = _admin_token(client, email="guestadmin12@test.com")
+    product_id = _create_product(client, admin_token, sku="guest-item-12")
+    order = client.post("/orders", json=_guest_order_payload(product_id, "guest12@test.com")).json()
+
+    resp = client.post(f"/orders/{order['id']}/cancel", params={"email": "guest12@test.com"})
+    assert resp.status_code == 200, resp.text
+
+    order_resp = client.get(f"/orders/{order['id']}", params={"email": "guest12@test.com"})
+    assert order_resp.json()["status"] == "cancelled"
+
+
+def test_guest_cannot_cancel_with_wrong_email(client):
+    admin_token = _admin_token(client, email="guestadmin13@test.com")
+    product_id = _create_product(client, admin_token, sku="guest-item-13")
+    order = client.post("/orders", json=_guest_order_payload(product_id, "guest13@test.com")).json()
+
+    resp = client.post(f"/orders/{order['id']}/cancel", params={"email": "wrong@test.com"})
+    assert resp.status_code == 403
+
+
 def test_admin_order_list_includes_guest_orders(client):
     admin_token = _admin_token(client, email="guestadmin8@test.com")
     product_id = _create_product(client, admin_token, sku="guest-item-8")

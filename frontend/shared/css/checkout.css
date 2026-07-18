@@ -283,6 +283,7 @@ label {
 input[type="text"],
 input[type="email"],
 input[type="tel"],
+select,
 textarea {
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -299,6 +300,7 @@ textarea::placeholder {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--gold);

@@ -111,7 +111,170 @@ document.addEventListener('DOMContentLoaded', async () => {
       const errP2 = document.createElement('p'); errP2.style.color = 'var(--error)'; errP2.textContent = 'Failed to load wishlist'; wishlistContent.appendChild(errP2);
     }
   }
+
+  loadAddresses();
 });
+
+// ════════════════════════════════════════════════════
+// SAVED ADDRESSES
+// ════════════════════════════════════════════════════
+async function loadAddresses() {
+  const content = document.querySelector('[data-tab="addresses"]');
+  if (!content) return;
+  content.textContent = '';
+
+  let addresses = [];
+  try {
+    addresses = await api.get('/addresses', true);
+  } catch (err) {
+    const errP = document.createElement('p'); errP.style.color = 'var(--error)'; errP.textContent = 'Failed to load addresses'; content.appendChild(errP);
+    return;
+  }
+
+  const wrap = document.createElement('div'); wrap.className = 'addresses-wrap';
+
+  if (addresses.length === 0) {
+    const p = document.createElement('p'); p.style.textAlign = 'center'; p.style.color = 'var(--text-secondary)'; p.textContent = 'No saved addresses yet';
+    wrap.appendChild(p);
+  } else {
+    const grid = document.createElement('div'); grid.className = 'addresses-grid';
+    addresses.forEach(addr => grid.appendChild(renderAddressCard(addr)));
+    wrap.appendChild(grid);
+  }
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'edit-profile-btn';
+  addBtn.textContent = '+ Add Address';
+  addBtn.addEventListener('click', () => showAddressForm(null));
+  wrap.appendChild(addBtn);
+
+  const formHost = document.createElement('div');
+  formHost.id = 'address-form-host';
+  wrap.appendChild(formHost);
+
+  content.appendChild(wrap);
+}
+
+function renderAddressCard(addr) {
+  const card = document.createElement('div'); card.className = 'address-card';
+  if (addr.is_default) card.classList.add('is-default');
+
+  const header = document.createElement('div'); header.className = 'address-card-header';
+  const labelSpan = document.createElement('strong'); labelSpan.textContent = addr.label || 'Address';
+  header.appendChild(labelSpan);
+  if (addr.is_default) {
+    const badge = document.createElement('span'); badge.className = 'default-badge'; badge.textContent = 'Default';
+    header.appendChild(badge);
+  }
+  card.appendChild(header);
+
+  const body = document.createElement('p'); body.className = 'address-card-body';
+  safeText(body, `${addr.full_name}\n${addr.phone}\n${addr.address}, ${addr.city} ${addr.postal_code}`);
+  card.appendChild(body);
+
+  const actions = document.createElement('div'); actions.className = 'address-card-actions';
+  if (!addr.is_default) {
+    const defaultBtn = document.createElement('button'); defaultBtn.className = 'save-btn'; defaultBtn.textContent = 'Set Default';
+    defaultBtn.addEventListener('click', async () => {
+      try {
+        await api.post(`/addresses/${addr.id}/default`, {}, true);
+        loadAddresses();
+      } catch (err) {
+        showToast('Failed to set default address', 'error');
+      }
+    });
+    actions.appendChild(defaultBtn);
+  }
+  const editBtn = document.createElement('button'); editBtn.className = 'save-btn'; editBtn.textContent = 'Edit';
+  editBtn.addEventListener('click', () => showAddressForm(addr));
+  actions.appendChild(editBtn);
+  const deleteBtn = document.createElement('button'); deleteBtn.className = 'cancel-btn'; deleteBtn.textContent = 'Delete';
+  deleteBtn.addEventListener('click', async () => {
+    if (!window.confirm('Delete this address?')) return;
+    try {
+      await api.delete(`/addresses/${addr.id}`, true);
+      loadAddresses();
+    } catch (err) {
+      showToast('Failed to delete address', 'error');
+    }
+  });
+  actions.appendChild(deleteBtn);
+  card.appendChild(actions);
+
+  return card;
+}
+
+function showAddressForm(addr) {
+  const host = document.getElementById('address-form-host');
+  if (!host) return;
+  host.textContent = '';
+
+  const form = document.createElement('div'); form.className = 'edit-form full';
+
+  const makeField = (labelText, id, value, type = 'text') => {
+    const group = document.createElement('div'); group.className = 'form-group';
+    const label = document.createElement('label'); label.textContent = labelText;
+    const input = document.createElement('input'); input.type = type; input.id = id; input.value = value || '';
+    group.appendChild(label); group.appendChild(input);
+    return group;
+  };
+
+  form.appendChild(makeField('Label (e.g. Home, Work)', 'addr-label', addr?.label));
+  form.appendChild(makeField('Full Name', 'addr-fullName', addr?.full_name));
+  form.appendChild(makeField('Phone', 'addr-phone', addr?.phone, 'tel'));
+  form.appendChild(makeField('Address', 'addr-address', addr?.address));
+  form.appendChild(makeField('City', 'addr-city', addr?.city));
+  form.appendChild(makeField('Postal Code', 'addr-postal', addr?.postal_code));
+
+  const defaultGroup = document.createElement('div'); defaultGroup.className = 'form-group';
+  const defaultLabel = document.createElement('label');
+  const defaultCheckbox = document.createElement('input'); defaultCheckbox.type = 'checkbox'; defaultCheckbox.id = 'addr-isDefault';
+  defaultCheckbox.checked = Boolean(addr?.is_default);
+  defaultCheckbox.style.width = 'auto'; defaultCheckbox.style.marginRight = '0.5rem';
+  defaultLabel.appendChild(defaultCheckbox);
+  defaultLabel.appendChild(document.createTextNode('Set as default address'));
+  defaultGroup.appendChild(defaultLabel);
+  form.appendChild(defaultGroup);
+
+  const actionsDiv = document.createElement('div'); actionsDiv.className = 'form-actions';
+  const saveBtn = document.createElement('button'); saveBtn.className = 'save-btn'; saveBtn.textContent = 'Save Address';
+  saveBtn.addEventListener('click', () => saveAddress(addr?.id));
+  const cancelBtn = document.createElement('button'); cancelBtn.className = 'cancel-btn'; cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => { host.textContent = ''; });
+  actionsDiv.appendChild(saveBtn); actionsDiv.appendChild(cancelBtn);
+  form.appendChild(actionsDiv);
+
+  host.appendChild(form);
+}
+
+async function saveAddress(existingId) {
+  const payload = {
+    label: document.getElementById('addr-label').value.trim() || null,
+    full_name: document.getElementById('addr-fullName').value.trim(),
+    phone: document.getElementById('addr-phone').value.trim(),
+    address: document.getElementById('addr-address').value.trim(),
+    city: document.getElementById('addr-city').value.trim(),
+    postal_code: document.getElementById('addr-postal').value.trim(),
+    is_default: document.getElementById('addr-isDefault').checked,
+  };
+
+  if (!payload.full_name || !payload.phone || !payload.address || !payload.city) {
+    showToast('Please fill all required address fields', 'warning');
+    return;
+  }
+
+  try {
+    if (existingId) {
+      await api.put(`/addresses/${existingId}`, payload, true);
+    } else {
+      await api.post('/addresses', payload, true);
+    }
+    showToast('Address saved');
+    loadAddresses();
+  } catch (err) {
+    showToast(err.message || 'Failed to save address', 'error');
+  }
+}
 
 function showEditForm() {
   document.getElementById('edit-form').style.display = 'block';

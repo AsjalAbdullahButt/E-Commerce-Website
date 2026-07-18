@@ -78,6 +78,10 @@
               <input type="email" id="checkout-guestEmail" name="guestEmail" autocomplete="email" placeholder="you@example.com">
             </div>
           </div>
+          <!-- Logged-in shoppers with saved addresses (frontend/customer/profile.html) get a
+               picker here instead of retyping — initPaymentMethods()'s sibling, initAddressPicker()
+               in js/checkout.js, fills it in and hides itself if there's nothing saved yet. -->
+          <div class="form-grid full" id="saved-address-picker" style="display:none;"></div>
           <div class="form-grid">
             <div class="form-group">
               <label for="checkout-fullName">Full Name</label>

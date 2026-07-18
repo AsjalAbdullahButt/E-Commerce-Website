@@ -24,6 +24,9 @@ async function loadTrackingData() {
       renderGuestAccountPrompt(guestEmail);
     }
 
+    initCancelOrderButton(order, orderId, guestEmail);
+    initDownloadInvoiceButton(orderId, guestEmail);
+
     // Safe: use textContent instead of innerHTML for user data
     const orderIdElement = document.querySelector('.order-id');
     if (orderIdElement) {
@@ -195,11 +198,95 @@ async function loadTrackingData() {
         shippingDiv.appendChild(addressDiv);
       }
     }
+
+    renderReturnRequestSection(order, orderId, guestEmail);
   } catch (err) {
     console.error('Failed to load tracking data', err);
     // Don't expose raw backend errors to users
     showToast('Failed to load order. Please try again later.', 'error');
   }
+}
+
+// ════════════════════════════════════════════════════
+// DOWNLOAD INVOICE (PDF) — a plain <a href> can't carry the Authorization header a logged-in
+// customer's request needs, so this fetches the PDF as a blob and triggers the download itself.
+// A guest order doesn't need that (GET /orders/{id}/invoice accepts ?email= instead).
+// ════════════════════════════════════════════════════
+function initDownloadInvoiceButton(orderId, guestEmail) {
+  const btn = document.getElementById('download-invoice-btn');
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const url = guestEmail
+        ? `${API_BASE}/orders/${orderId}/invoice?email=${encodeURIComponent(guestEmail)}`
+        : `${API_BASE}/orders/${orderId}/invoice`;
+      const headers = {};
+      if (!guestEmail) {
+        let token = getAccessToken();
+        if (!token) {
+          await refreshAccessToken();
+          token = getAccessToken();
+        }
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const resp = await fetch(url, { headers, credentials: 'include', cache: 'no-store' });
+      if (!resp.ok) throw new Error('Failed to download invoice');
+
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `invoice-${orderId.substring(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      showToast(err.message || 'Failed to download invoice', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════
+// CANCEL ORDER — only while still early in the fulfillment lifecycle (matches the backend's
+// utils/order_transitions.py: pending/confirmed/packed -> cancelled; shipped/delivered can't).
+// ════════════════════════════════════════════════════
+const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'packed'];
+
+function initCancelOrderButton(order, orderId, guestEmail) {
+  const btn = document.getElementById('cancel-order-btn');
+  if (!btn) return;
+
+  if (!CANCELLABLE_STATUSES.includes(order.status)) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = 'inline-block';
+
+  // Replace any previous handler from an earlier render (e.g. after a return-request refresh).
+  const freshBtn = btn.cloneNode(true);
+  btn.parentNode.replaceChild(freshBtn, btn);
+
+  freshBtn.addEventListener('click', async () => {
+    if (!window.confirm('Cancel this order? This cannot be undone.')) return;
+    freshBtn.disabled = true;
+    try {
+      const url = guestEmail
+        ? `/orders/${orderId}/cancel?email=${encodeURIComponent(guestEmail)}`
+        : `/orders/${orderId}/cancel`;
+      await api.post(url, {}, !guestEmail && isLoggedIn());
+      showToast('Order cancelled');
+      loadTrackingData();
+    } catch (err) {
+      showToast(err.message || 'Failed to cancel order', 'error');
+      freshBtn.disabled = false;
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════
@@ -219,6 +306,94 @@ function renderGuestAccountPrompt(guestEmail) {
   el.appendChild(text);
   el.appendChild(link);
   el.style.display = 'block';
+}
+
+// ════════════════════════════════════════════════════
+// RETURNS / REFUNDS
+// ════════════════════════════════════════════════════
+const RETURN_STATUS_COPY = {
+  pending: 'Return requested — awaiting review.',
+  approved: 'Return approved — your refund is being processed.',
+  rejected: 'Return request was not approved.',
+};
+
+function renderReturnRequestSection(order, orderId, guestEmail) {
+  const section = document.getElementById('return-request-section');
+  if (!section) return;
+  section.textContent = '';
+
+  const rr = order.return_request;
+  const canRequestNew = order.status === 'delivered' && (!rr || rr.status === 'rejected');
+  const isPending = rr && rr.status === 'pending';
+  const isApproved = rr && rr.status === 'approved';
+
+  if (!canRequestNew && !rr) return; // not delivered yet, nothing to show
+
+  const title = document.createElement('h3');
+  title.className = 'info-title';
+  title.textContent = 'Returns';
+  section.appendChild(title);
+
+  if (rr && (isPending || isApproved || rr.status === 'rejected')) {
+    const statusP = document.createElement('p');
+    statusP.className = 'return-request-status';
+    safeText(statusP, RETURN_STATUS_COPY[rr.status] || `Return ${rr.status}`);
+    section.appendChild(statusP);
+    if (isApproved && rr.refund_amount) {
+      const amountP = document.createElement('p');
+      amountP.className = 'return-request-status';
+      amountP.textContent = `Refund amount: Rs ${Number(rr.refund_amount).toLocaleString()}`;
+      section.appendChild(amountP);
+    }
+  }
+
+  if (!canRequestNew) return;
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'return-request-btn';
+  toggleBtn.textContent = rr?.status === 'rejected' ? 'Request Return Again' : 'Request a Return';
+  section.appendChild(toggleBtn);
+
+  const form = document.createElement('div');
+  form.className = 'return-request-form';
+  form.style.display = 'none';
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = 'Why are you returning this order?';
+  textarea.maxLength = 1000;
+  textarea.rows = 3;
+  const submitBtn = document.createElement('button');
+  submitBtn.type = 'button';
+  submitBtn.className = 'return-request-btn';
+  submitBtn.textContent = 'Submit Request';
+  form.appendChild(textarea);
+  form.appendChild(submitBtn);
+  section.appendChild(form);
+
+  toggleBtn.addEventListener('click', () => {
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+
+  submitBtn.addEventListener('click', async () => {
+    const reason = textarea.value.trim();
+    if (reason.length < 5) {
+      showToast('Please describe the issue in a bit more detail.', 'warning');
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const url = guestEmail
+        ? `/orders/${orderId}/return-request?email=${encodeURIComponent(guestEmail)}`
+        : `/orders/${orderId}/return-request`;
+      await api.post(url, { reason }, !guestEmail && isLoggedIn());
+      showToast('Return request submitted');
+      loadTrackingData();
+    } catch (err) {
+      showToast(err.message || 'Failed to submit return request', 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════

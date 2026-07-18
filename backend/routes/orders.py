@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +14,7 @@ from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, get_current_user_optional, require_admin
 from services.email import EmailService
 from services.email_templates import order_confirmation_email
+from services.invoice import generate_invoice_pdf
 from services.order_user import _order_to_dict, notify_order_status_change
 from services.product import InventoryService
 from services.return_request import submit_return_request
@@ -243,6 +245,39 @@ async def get_order(
         raise HTTPException(status_code=403, detail="Access denied")
     return await _order_to_dict(db, o)
 
+@router.get("/{order_id}/invoice")
+@limiter.limit("20/minute")
+async def get_order_invoice(
+    request: Request, order_id: str, email: Optional[str] = Query(None),
+    user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
+):
+    """Downloadable PDF invoice/receipt for an order — same access rule as GET /orders/{id}:
+    the logged-in owner, an admin, or a guest supplying the matching guest_email."""
+    if not is_valid_id(order_id):
+        raise HTTPException(status_code=400, detail="Invalid order ID")
+
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user:
+        if not order.guest_email or not email or email.lower() != order.guest_email.lower():
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif user["role"] == "customer" and order.user_id != str(user["_id"]):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    items_result = await db.execute(select(OrderItem).where(OrderItem.order_id == order.id))
+    items = [
+        {"name": i.name, "price": i.price, "quantity": i.quantity, "size": i.size, "color": i.color}
+        for i in items_result.scalars().all()
+    ]
+    pdf_bytes = generate_invoice_pdf(order, items)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="invoice-{order.id[:8]}.pdf"'},
+    )
+
 @router.patch("/{order_id}/status")
 @limiter.limit("20/minute")
 async def update_status(request: Request, order_id: str, body: OrderStatusUpdate, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -271,20 +306,28 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
 
 @router.post("/{order_id}/cancel")
 @limiter.limit("10/minute")
-async def cancel_order(request: Request, order_id: str, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Cancel a pending order. Customers can only cancel their own orders."""
+async def cancel_order(
+    request: Request, order_id: str, email: Optional[str] = Query(None),
+    user=Depends(get_current_user_optional), db: AsyncSession = Depends(get_db),
+):
+    """Cancel a pending order — logged-in owner, or a guest supplying the email the order was
+    placed with (same lookup convention as GET /orders/{id}?email=...)."""
+    requester_id = str(user["_id"]) if user else None
     if not is_valid_id(order_id):
-        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID on cancel {order_id}", {"error": "invalid id format", "user_id": str(user["_id"])})
+        await log_to_db("INVALID_ORDER_ID", __name__, f"invalid order ID on cancel {order_id}", {"error": "invalid id format", "user_id": requester_id})
         raise HTTPException(status_code=400, detail="Invalid order ID")
 
     order = await db.get(Order, order_id)
     if not order:
-        await log_to_db("ORDER_NOT_FOUND", __name__, f"order not found for cancellation {order_id}", {"user_id": str(user["_id"])})
+        await log_to_db("ORDER_NOT_FOUND", __name__, f"order not found for cancellation {order_id}", {"user_id": requester_id})
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Customers can only cancel their own orders
-    if user["role"] == "customer" and order.user_id != str(user["_id"]):
-        await log_to_db("UNAUTHORIZED_CANCEL", __name__, f"user {str(user['_id'])} tried to cancel another user's order {order_id}", {"order_id": order_id, "user_id": str(user["_id"])})
+    if not user:
+        if not order.guest_email or not email or email.lower() != order.guest_email.lower():
+            await log_to_db("UNAUTHORIZED_CANCEL", __name__, f"unauthenticated cancel attempt on order {order_id} with mismatched/missing email", {"order_id": order_id})
+            raise HTTPException(status_code=403, detail="Cannot cancel another user's order")
+    elif user["role"] == "customer" and order.user_id != requester_id:
+        await log_to_db("UNAUTHORIZED_CANCEL", __name__, f"user {requester_id} tried to cancel another user's order {order_id}", {"order_id": order_id, "user_id": requester_id})
         raise HTTPException(status_code=403, detail="Cannot cancel another user's order")
 
     assert_valid_transition(order.status, "cancelled")
@@ -305,13 +348,13 @@ async def cancel_order(request: Request, order_id: str, user=Depends(get_current
             except Exception:
                 # Ignore stock restore failures but log
                 await log_to_db("STOCK_RESTORE_FAILED", __name__, "failed to restore stock on cancel", {"order_id": order_id, "item": it.product_id})
-        await log_to_db("ORDER_CANCELLED", __name__, f"order {order_id} cancelled by user {str(user['_id'])}", {"order_id": order_id, "user_id": str(user["_id"])})
+        await log_to_db("ORDER_CANCELLED", __name__, f"order {order_id} cancelled by user {requester_id}", {"order_id": order_id, "user_id": requester_id})
         return {
             "success": True,
             "message": "Order cancelled successfully"
         }
     except Exception as e:
-        await log_to_db("ORDER_CANCEL_ERROR", __name__, f"failed to cancel order {order_id}", {"error": str(e), "order_id": order_id, "user_id": str(user["_id"])})
+        await log_to_db("ORDER_CANCEL_ERROR", __name__, f"failed to cancel order {order_id}", {"error": str(e), "order_id": order_id, "user_id": requester_id})
         logger.error(f"Order cancellation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to cancel order")
 

@@ -19,7 +19,7 @@ from sqlalchemy import text  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 import database  # noqa: E402
 from db.base import Base  # noqa: E402
-from db import admin, order, payment, product, promo, return_request, review, rider, user, wishlist  # noqa: E402,F401
+from db import address, admin, order, payment, product, promo, return_request, review, rider, user, wishlist  # noqa: E402,F401
 from main import app  # noqa: E402
 from utils.limiter import limiter  # noqa: E402
 

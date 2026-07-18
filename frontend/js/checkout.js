@@ -62,12 +62,80 @@ async function initializeCheckout() {
     } catch (e) {
       // ignore profile prefill error
     }
+
+    await initAddressPicker();
   }
 
   setupPromoCode();
   initPaymentToggle();
   initCheckoutProgress();
   initFieldValidation();
+}
+
+// Lets a logged-in shopper with saved addresses (frontend/customer/profile.html) pick one
+// instead of retyping — fills the same fullName/phone/address/city/postal fields the guest/plain
+// flow already uses, so placeOrder() doesn't need to know addresses were involved at all.
+async function initAddressPicker() {
+  const picker = document.getElementById('saved-address-picker');
+  if (!picker) return;
+
+  let addresses = [];
+  try {
+    addresses = await api.get('/addresses', true);
+  } catch (e) {
+    return; // leave the picker hidden — plain manual entry still works
+  }
+  if (!addresses.length) return;
+
+  const group = document.createElement('div');
+  group.className = 'form-group';
+  const label = document.createElement('label');
+  label.setAttribute('for', 'checkout-savedAddress');
+  label.textContent = 'Use a saved address';
+  const select = document.createElement('select');
+  select.id = 'checkout-savedAddress';
+
+  const newOption = document.createElement('option');
+  newOption.value = '';
+  newOption.textContent = '+ Enter a new address';
+  select.appendChild(newOption);
+
+  addresses.forEach(addr => {
+    const opt = document.createElement('option');
+    opt.value = addr.id;
+    opt.textContent = `${addr.label || 'Address'} — ${addr.city}${addr.is_default ? ' (Default)' : ''}`;
+    select.appendChild(opt);
+  });
+
+  const fillFromAddress = (addr) => {
+    const nameInput = document.querySelector('[name="fullName"]');
+    const phoneInput = document.querySelector('[name="phone"]');
+    const addressInput = document.querySelector('[name="address"]');
+    const cityInput = document.querySelector('[name="city"]');
+    const postalInput = document.querySelector('[name="postal"]');
+    if (nameInput) nameInput.value = addr.full_name;
+    if (phoneInput) phoneInput.value = addr.phone;
+    if (addressInput) addressInput.value = addr.address;
+    if (cityInput) cityInput.value = addr.city;
+    if (postalInput) postalInput.value = addr.postal_code;
+  };
+
+  select.addEventListener('change', () => {
+    const chosen = addresses.find(a => a.id === select.value);
+    if (chosen) fillFromAddress(chosen);
+  });
+
+  group.appendChild(label);
+  group.appendChild(select);
+  picker.textContent = '';
+  picker.appendChild(group);
+  picker.style.display = '';
+
+  const defaultAddress = addresses.find(a => a.is_default) || addresses[0];
+  if (defaultAddress) {
+    select.value = defaultAddress.id;
+    fillFromAddress(defaultAddress);
+  }
 }
 
 // Purely visual scrollspy — highlights the current step as the shopper scrolls
