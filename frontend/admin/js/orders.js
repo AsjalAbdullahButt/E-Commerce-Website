@@ -200,6 +200,34 @@ async function loadOrders() {
 function bindEvents() {
   document.getElementById('refresh-orders-btn')?.addEventListener('click', loadOrders);
   document.getElementById('order-status-filter')?.addEventListener('change', loadOrders);
+
+  document.getElementById('export-orders-btn')?.addEventListener('click', async () => {
+    try {
+      await adminAPI.exportOrders();
+    } catch (err) {
+      showToast(err.message || 'Failed to export orders', 'error');
+    }
+  });
+
+  document.getElementById('bulk-status-btn')?.addEventListener('click', () => {
+    document.getElementById('bulk-status-file')?.click();
+  });
+  document.getElementById('bulk-status-file')?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await adminAPI.bulkUpdateOrderStatus(file);
+      const { updated, errors } = result.data;
+      const summary = `Bulk update: ${updated} order(s) updated${errors.length ? `, ${errors.length} row error(s)` : ''}`;
+      showToast(summary, errors.length ? 'warning' : 'success');
+      if (errors.length) console.warn('Bulk status update row errors:', errors);
+      await loadOrders();
+    } catch (err) {
+      showToast(err.message || 'Failed to bulk-update order status', 'error');
+    } finally {
+      event.target.value = '';
+    }
+  });
 }
 
 function initPage() {

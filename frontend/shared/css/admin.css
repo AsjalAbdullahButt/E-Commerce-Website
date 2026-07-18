@@ -23,6 +23,41 @@ main {
   margin-bottom: 1.5rem;
 }
 
+.admin-notifications {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-notification-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-lg, 10px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--duration-base, 0.2s) var(--ease, ease);
+}
+
+.admin-notification-pill:hover {
+  transform: translateY(-2px);
+}
+
+.admin-notification-warning {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--gold);
+  border: 1px solid var(--gold-border, rgba(212, 175, 55, 0.4));
+}
+
+.admin-notification-info {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
 .analytics-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 1.5rem 0;

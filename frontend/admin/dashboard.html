@@ -36,6 +36,7 @@
         <li><a href="./dashboard.html" class="active">Dashboard</a></li>
         <li><a href="./products.html">Products</a></li>
         <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./returns.html">Returns</a></li>
         <li><a href="./riders.html">Riders</a></li>
         <li><a href="./promos.html">Promos</a></li>
         <li><a href="./logs.html">Logs</a></li>
@@ -51,7 +52,20 @@
   </nav>
 
   <main>
-    <h1 class="dashboard-title">Admin Dashboard</h1>
+    <div class="admin-header">
+      <div class="admin-header-copy">
+        <h1 class="dashboard-title">Admin Dashboard</h1>
+      </div>
+      <div class="admin-toolbar">
+        <button class="builder-button" id="download-report-btn" type="button"><i class="fas fa-file-excel"></i> Download Sales Report</button>
+      </div>
+    </div>
+
+    <!-- Surfaces what used to only be logged/queryable — low stock and pending returns are
+         real "someone should act on this" items, not just numbers on a chart. Populated by
+         js/analytics.js::loadNotifications() from the existing low-stock endpoint plus the
+         Phase 2 returns queue; hidden entirely when there's nothing to flag. -->
+    <div id="admin-notifications" class="admin-notifications" style="display:none;"></div>
 
     <div class="stats-grid">
       <div class="stat-card">

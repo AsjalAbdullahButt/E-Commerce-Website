@@ -38,7 +38,7 @@ class AdminAPI {
                 credentials: 'include', // send/receive the httpOnly admin_refresh_token cookie
             };
 
-            if (data && (method === 'POST' || method === 'PUT')) {
+            if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
                 options.body = JSON.stringify(data);
             }
 
@@ -52,7 +52,13 @@ class AdminAPI {
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || `HTTP ${response.status}`);
+                // FastAPI validation errors put `detail` as an array of {loc, msg, ...} objects
+                // rather than a plain string — new Error(array) would otherwise stringify to a
+                // useless "[object Object]".
+                const message = Array.isArray(error.detail)
+                    ? error.detail.map((d) => d.msg || JSON.stringify(d)).join('; ')
+                    : (error.detail || `HTTP ${response.status}`);
+                throw new Error(message);
             }
 
             return await response.json();
@@ -123,6 +129,79 @@ class AdminAPI {
         return response.json();
     }
 
+    /**
+     * Uploads any file (CSV import etc.) to `endpoint` as multipart — same reasoning as
+     * uploadImage() above, generalized so it isn't product-image-specific.
+     */
+    async uploadFile(endpoint, file) {
+        if (!this.accessToken) {
+            await this.refreshAccessToken();
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${this.accessToken}` },
+            credentials: 'include',
+            body: formData,
+        });
+
+        if (response.status === 401) {
+            await this.refreshAccessToken();
+            return this.uploadFile(endpoint, file);
+        }
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || `HTTP ${response.status}`);
+        }
+
+        return response.json();
+    }
+
+    /**
+     * Downloads `endpoint` (a CSV/XLSX export) and triggers a browser save-as — a plain
+     * <a href> can't carry the Authorization header these routes need, so this fetches the file
+     * as a blob and hands it to the browser itself, same pattern as the customer-facing invoice
+     * download in frontend/js/tracking.js.
+     */
+    async downloadFile(endpoint, filename) {
+        if (!this.accessToken) {
+            await this.refreshAccessToken();
+        }
+
+        let response = await fetch(`${this.baseURL}${endpoint}`, {
+            headers: { 'Authorization': `Bearer ${this.accessToken}` },
+            credentials: 'include',
+            cache: 'no-store',
+        });
+
+        if (response.status === 401) {
+            await this.refreshAccessToken();
+            response = await fetch(`${this.baseURL}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` },
+                credentials: 'include',
+                cache: 'no-store',
+            });
+        }
+
+        if (!response.ok) {
+            throw new Error(`Download failed (HTTP ${response.status})`);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // AUTHENTICATION
     // ════════════════════════════════════════════════════════════════════════
@@ -164,6 +243,14 @@ class AdminAPI {
 
     async getLowStockItems() {
         return this.request(ADMIN_CONFIG.ENDPOINTS.PRODUCTS.LOW_STOCK);
+    }
+
+    async exportProducts() {
+        return this.downloadFile(ADMIN_CONFIG.ENDPOINTS.PRODUCTS.EXPORT, 'products.csv');
+    }
+
+    async importProducts(file) {
+        return this.uploadFile(ADMIN_CONFIG.ENDPOINTS.PRODUCTS.IMPORT, file);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -211,6 +298,38 @@ class AdminAPI {
     async assignRider(orderId, riderId) {
         const url = ADMIN_CONFIG.ENDPOINTS.ORDERS.ASSIGN_RIDER(orderId) + `?rider_id=${encodeURIComponent(riderId)}`;
         return this.request(url, 'PATCH');
+    }
+
+    async exportOrders() {
+        return this.downloadFile(ADMIN_CONFIG.ENDPOINTS.ORDERS.EXPORT, 'orders.csv');
+    }
+
+    async bulkUpdateOrderStatus(file) {
+        return this.uploadFile(ADMIN_CONFIG.ENDPOINTS.ORDERS.BULK_STATUS_UPDATE, file);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RETURNS
+    // ════════════════════════════════════════════════════════════════════════
+
+    async getReturns(status = null, limit = 50, skip = 0) {
+        let url = ADMIN_CONFIG.ENDPOINTS.RETURNS.LIST + `?limit=${limit}&skip=${skip}`;
+        if (status) url += `&status=${status}`;
+        return this.request(url);
+    }
+
+    async resolveReturn(returnId, action, adminNote = null, refundAmount = null) {
+        return this.request(ADMIN_CONFIG.ENDPOINTS.RETURNS.RESOLVE(returnId), 'PATCH', {
+            action, admin_note: adminNote, refund_amount: refundAmount,
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // REPORTS
+    // ════════════════════════════════════════════════════════════════════════
+
+    async downloadSalesInventoryReport() {
+        return this.downloadFile(ADMIN_CONFIG.ENDPOINTS.REPORTS.SALES_INVENTORY, 'sales-inventory-report.xlsx');
     }
 
     // ════════════════════════════════════════════════════════════════════════

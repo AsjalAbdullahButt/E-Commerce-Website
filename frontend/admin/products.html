@@ -35,6 +35,7 @@
         <li><a href="./dashboard.html">Dashboard</a></li>
         <li><a href="./products.html" class="active">Products</a></li>
         <li><a href="./orders.html">Orders</a></li>
+        <li><a href="./returns.html">Returns</a></li>
         <li><a href="./riders.html">Riders</a></li>
         <li><a href="./promos.html">Promos</a></li>
         <li><a href="./logs.html">Logs</a></li>
@@ -58,6 +59,9 @@
       <div class="admin-toolbar">
         <button class="btn-primary" id="open-product-modal-btn" type="button">+ Add Product</button>
         <button class="builder-button" id="refresh-products-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
+        <button class="builder-button" id="export-products-btn" type="button"><i class="fas fa-file-export"></i> Export CSV</button>
+        <button class="builder-button" id="import-products-btn" type="button"><i class="fas fa-file-import"></i> Import CSV</button>
+        <input type="file" id="import-products-file" accept=".csv" style="display:none;">
       </div>
     </div>
 

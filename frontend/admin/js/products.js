@@ -651,6 +651,32 @@ function bindEvents() {
   document.getElementById('cancel-product-btn')?.addEventListener('click', closeProductModal);
   document.getElementById('product-form')?.addEventListener('submit', saveProduct);
   document.getElementById('refresh-products-btn')?.addEventListener('click', loadProducts);
+  document.getElementById('export-products-btn')?.addEventListener('click', async () => {
+    try {
+      await adminAPI.exportProducts();
+    } catch (err) {
+      showToast(err.message || 'Failed to export products', 'error');
+    }
+  });
+  document.getElementById('import-products-btn')?.addEventListener('click', () => {
+    document.getElementById('import-products-file')?.click();
+  });
+  document.getElementById('import-products-file')?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await adminAPI.importProducts(file);
+      const { created, updated, errors } = result.data;
+      const summary = `Imported: ${created} created, ${updated} updated${errors.length ? `, ${errors.length} row error(s)` : ''}`;
+      showToast(summary, errors.length ? 'warning' : 'success');
+      if (errors.length) console.warn('Product import row errors:', errors);
+      await loadProducts();
+    } catch (err) {
+      showToast(err.message || 'Failed to import products', 'error');
+    } finally {
+      event.target.value = ''; // allow re-selecting the same file
+    }
+  });
   document.getElementById('product-search')?.addEventListener('input', applyFilters);
   document.getElementById('product-category-filter')?.addEventListener('change', loadProducts);
   document.getElementById('product-status-filter')?.addEventListener('change', loadProducts);

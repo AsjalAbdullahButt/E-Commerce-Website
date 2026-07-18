@@ -19,6 +19,8 @@ const ADMIN_CONFIG = {
             DELETE: (id) => `/admin/products/${id}`,
             LOW_STOCK: '/admin/products/low-stock/items',
             UPLOAD_IMAGE: '/admin/products/upload-image',
+            EXPORT: '/admin/products/export',
+            IMPORT: '/admin/products/import',
         },
         ORDERS: {
             LIST: '/admin/orders',
@@ -26,6 +28,15 @@ const ADMIN_CONFIG = {
             UPDATE_STATUS: (id) => `/admin/orders/${id}/status`,
             ADD_NOTE: (id) => `/admin/orders/${id}/note`,
             ASSIGN_RIDER: (id) => `/admin/orders/${id}/assign-rider`,
+            EXPORT: '/admin/orders/export',
+            BULK_STATUS_UPDATE: '/admin/orders/bulk-status-update',
+        },
+        RETURNS: {
+            LIST: '/admin/returns',
+            RESOLVE: (id) => `/admin/returns/${id}`,
+        },
+        REPORTS: {
+            SALES_INVENTORY: '/admin/reports/sales-inventory',
         },
         RIDERS: {
             LIST: '/admin/riders',

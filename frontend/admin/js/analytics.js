@@ -16,10 +16,72 @@ class AdminAnalyticsDashboard {
 
         document.addEventListener('DOMContentLoaded', () => {
             this.loadDashboard();
+            this.loadNotifications();
+            this.bindReportDownload();
         });
 
         if (document.readyState !== 'loading') {
             this.loadDashboard();
+            this.loadNotifications();
+            this.bindReportDownload();
+        }
+    }
+
+    bindReportDownload() {
+        document.getElementById('download-report-btn')?.addEventListener('click', async (event) => {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            try {
+                await adminAPI.downloadSalesInventoryReport();
+            } catch (error) {
+                showToast(error.message || 'Failed to download report', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    }
+
+    async loadNotifications() {
+        const container = document.getElementById('admin-notifications');
+        if (!container) return;
+
+        let lowStockCount = 0;
+        let pendingReturnsCount = 0;
+        try {
+            const lowStock = await adminAPI.getLowStockItems();
+            lowStockCount = (lowStock.data || lowStock || []).length;
+        } catch {
+            // Non-fatal — the rest of the dashboard still loads.
+        }
+        try {
+            const returns = await adminAPI.getReturns('pending', 1, 0);
+            pendingReturnsCount = returns.total || 0;
+        } catch {
+            // Non-fatal.
+        }
+
+        if (lowStockCount === 0 && pendingReturnsCount === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.textContent = '';
+        container.style.display = 'flex';
+
+        if (lowStockCount > 0) {
+            const link = document.createElement('a');
+            link.className = 'admin-notification-pill admin-notification-warning';
+            link.href = './products.html';
+            link.innerHTML = `<i class="fas fa-triangle-exclamation"></i> ${lowStockCount} product${lowStockCount === 1 ? '' : 's'} low on stock`;
+            container.appendChild(link);
+        }
+
+        if (pendingReturnsCount > 0) {
+            const link = document.createElement('a');
+            link.className = 'admin-notification-pill admin-notification-info';
+            link.href = './returns.html';
+            link.innerHTML = `<i class="fas fa-rotate-left"></i> ${pendingReturnsCount} return${pendingReturnsCount === 1 ? '' : 's'} awaiting review`;
+            container.appendChild(link);
         }
     }
 

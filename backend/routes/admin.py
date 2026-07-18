@@ -20,6 +20,8 @@ from services.dashboard import DashboardService
 from services.rider import RiderService
 from services.image_storage import ImageStorageService
 from services.return_request import _return_request_to_dict, resolve_return_request
+from services.csv_io import bulk_update_order_status_csv, export_orders_csv, export_products_csv, import_products_csv
+from services.reports import generate_sales_inventory_report
 from schemas.rider import RiderCreate
 from schemas.upload import ImageUploadResponse
 from schemas.return_request import ReturnRequestListResponse, ReturnRequestResolve, ReturnRequestResponse
@@ -451,6 +453,46 @@ async def upload_product_image(
     return {"success": True, "data": {"url": url, "thumbnail_url": thumbnail_url}}
 
 
+@router.get("/products/export")
+@limiter.limit("10/minute")
+async def export_products(request: Request, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
+    """CSV export of the full product catalog, one row per (product, variant) — the same shape
+    POST /admin/products/import expects back, so export -> edit in a spreadsheet -> re-import
+    is a supported round trip."""
+    if not await check_permission(admin_data, "product:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    csv_text = await export_products_csv(db)
+    return Response(
+        content=csv_text, media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="products.csv"'},
+    )
+
+
+@router.post("/products/import")
+@limiter.limit("5/minute")
+async def import_products(
+    request: Request, file: UploadFile = File(...),
+    admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db),
+):
+    """Bulk create/update products from a CSV in the same shape GET /admin/products/export
+    produces. Each product group gets its own SAVEPOINT (services/csv_io.py) so one bad row
+    doesn't roll back the rows that already succeeded earlier in the file — the response always
+    reports created/updated counts plus a per-row error list rather than all-or-nothing 500ing."""
+    if not await check_permission(admin_data, "product:create"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    file_bytes = await file.read()
+    result = await import_products_csv(db, file_bytes, admin_data.get("admin_id"))
+    await cache_clear_prefix("products:list:")
+    await cache_delete("products:categories")
+    await log_to_db(
+        "PRODUCTS_CSV_IMPORTED", __name__, f"product CSV imported by admin {admin_data.get('admin_id')}",
+        {"admin_id": admin_data.get("admin_id"), "created": result["created"], "updated": result["updated"], "error_count": len(result["errors"])},
+    )
+    return {"success": True, "data": result}
+
+
 @router.post("/products")
 async def create_product(
     product: ProductCreate,
@@ -694,6 +736,49 @@ async def get_inventory_history(
 # ORDER ROUTES
 # ════════════════════════════════════════════════════════════════════════════
 
+# NOTE: export/bulk-status-update must be declared before GET/POST /orders/{order_id} below —
+# FastAPI matches routes in declaration order, so a literal "/orders/export" would otherwise be
+# swallowed by the {order_id} path parameter (with order_id="export") and 404 as "not found".
+
+@router.get("/orders/export")
+@limiter.limit("10/minute")
+async def export_orders(request: Request, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
+    """CSV export of every order — reuses OrderService.list_orders() rather than a fresh query."""
+    if not await check_permission(admin_data, "order:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    csv_text = await export_orders_csv(db)
+    return Response(
+        content=csv_text, media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="orders.csv"'},
+    )
+
+
+@router.post("/orders/bulk-status-update")
+@limiter.limit("5/minute")
+async def bulk_update_order_status(
+    request: Request, file: UploadFile = File(...),
+    admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db),
+):
+    """Bulk order-status update via CSV (order_id,status,note columns) — e.g. importing a
+    fulfillment center's "these shipped today" export, instead of clicking through each order
+    individually. Every row still goes through OrderService.update_order_status() (same
+    transition validation + customer email as a single manual update) — see services/csv_io.py.
+    Deliberately does NOT support bulk-*creating* orders from CSV: an admin fabricating orders
+    wholesale isn't a real workflow and would bypass every checkout invariant (real stock
+    decrement, real pricing, real payment)."""
+    if not await check_permission(admin_data, "order:update"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    file_bytes = await file.read()
+    result = await bulk_update_order_status_csv(db, file_bytes, admin_data.get("admin_id"))
+    await log_to_db(
+        "ORDERS_BULK_STATUS_UPDATED", __name__, f"bulk order status update by admin {admin_data.get('admin_id')}",
+        {"admin_id": admin_data.get("admin_id"), "updated": result["updated"], "error_count": len(result["errors"])},
+    )
+    return {"success": True, "data": result}
+
+
 @router.get("/orders/{order_id}")
 async def get_order(
     order_id: str,
@@ -781,6 +866,7 @@ async def list_orders(
         await log_to_db("ERROR", __name__, f"List orders error: {e}")
         logger.error(f"List orders error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
 
 @router.post("/orders/{order_id}/note")
 async def add_order_note(
@@ -1347,6 +1433,23 @@ async def get_recent_orders_dashboard(
     except Exception as e:
         logger.error(f"Get recent orders error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch recent orders")
+
+
+@router.get("/reports/sales-inventory")
+@limiter.limit("10/minute")
+async def download_sales_inventory_report(request: Request, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
+    """Downloadable Excel workbook (Summary / Revenue Trend / Top Products / Low Stock sheets)
+    built entirely from services/dashboard.py's existing aggregation methods (services/reports.py)
+    — the same numbers already shown on the dashboard, just exportable."""
+    if not await check_permission(admin_data, "dashboard:read"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    xlsx_bytes = await generate_sales_inventory_report(db)
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="sales-inventory-report.xlsx"'},
+    )
 
 # ════════════════════════════════════════════════════════════════════════════
 # AUDIT LOG ROUTES

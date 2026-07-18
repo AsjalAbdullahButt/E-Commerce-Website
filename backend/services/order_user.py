@@ -25,6 +25,12 @@ async def notify_order_status_change(db: AsyncSession, order: Order, new_status:
     changes (routes/orders.py, routes/rider.py, services/order_user.py, services/payment.py's
     webhook-driven confirmation) — never raises, EmailService.send() already swallows its own
     failures the same way utils/logger.py::log_to_db does."""
+    # A couple of call sites (routes/orders.py::update_status, routes/rider.py's status update)
+    # pass models.order.OrderStatus enum members straight through from the request body rather
+    # than a plain str — equality/DB storage both already work fine since it's a str subclass,
+    # but f-string interpolation into the email template below would otherwise render the ugly
+    # "OrderStatus.confirmed" instead of "confirmed".
+    new_status = new_status.value if hasattr(new_status, "value") else new_status
     if new_status not in _CUSTOMER_NOTIFIED_STATUSES:
         return
 
