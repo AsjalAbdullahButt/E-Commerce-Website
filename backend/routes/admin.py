@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, Request, Response, UploadFile
@@ -107,6 +107,42 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token), db:
             sum(float(row.revenue or 0) for row in status_agg if row.status != "cancelled"), 2
         )
 
+        # Trend indicators: current vs previous 30-day window. Cancelled orders excluded from
+        # both revenue and the order count, same exclusion total_revenue already applies, so the
+        # two numbers stay comparable. None (not 0%) when the previous window has no orders at
+        # all — a percentage change from zero is undefined, not honestly representable as a number.
+        now = datetime.utcnow()
+        period_start = now - timedelta(days=30)
+        prev_period_start = now - timedelta(days=60)
+
+        current_period = (await db.execute(
+            select(
+                func.coalesce(func.sum(Order.total), 0).label("revenue"),
+                func.count().label("orders"),
+            ).where(Order.created_at >= period_start, Order.status != "cancelled")
+        )).one()
+
+        previous_period = (await db.execute(
+            select(
+                func.coalesce(func.sum(Order.total), 0).label("revenue"),
+                func.count().label("orders"),
+            ).where(
+                Order.created_at >= prev_period_start,
+                Order.created_at < period_start,
+                Order.status != "cancelled",
+            )
+        )).one()
+
+        def _pct_change(current, previous):
+            current = float(current or 0)
+            previous = float(previous or 0)
+            if previous == 0:
+                return None
+            return round((current - previous) / previous * 100, 1)
+
+        revenue_trend_pct = _pct_change(current_period.revenue, previous_period.revenue)
+        orders_trend_pct = _pct_change(current_period.orders, previous_period.orders)
+
         product_result = await db.execute(
             select(
                 OrderItem.product_id,
@@ -138,6 +174,8 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token), db:
                 "total_users": total_users,
                 "active_users": active_users,
                 "banned_users": banned_users,
+                "revenue_trend_pct": revenue_trend_pct,
+                "orders_trend_pct": orders_trend_pct,
             },
             "orders_by_status": [
                 {"status": row.status, "count": row.count}

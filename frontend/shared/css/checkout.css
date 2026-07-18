@@ -120,6 +120,10 @@ main {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   height: fit-content;
+  position: sticky;
+  top: calc(var(--nav-height) + 1.5rem);
+  max-height: calc(100vh - var(--nav-height) - 3rem);
+  overflow-y: auto;
 }
 
 .summary-title {
@@ -554,6 +558,9 @@ textarea {
 
   .order-summary {
     order: -1;
+    position: static;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
