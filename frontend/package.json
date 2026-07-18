@@ -5,9 +5,11 @@
   "description": "Build tooling for the vanilla HTML/CSS/JS frontend. No runtime bundler — Tailwind CLI compiles a single purged utility stylesheet; the site ships as plain static files exactly as before.",
   "scripts": {
     "build:css": "tailwindcss -i ./shared/css/tailwind.css -o ./shared/css/tailwind.build.css --minify",
-    "watch:css": "tailwindcss -i ./shared/css/tailwind.css -o ./shared/css/tailwind.build.css --watch"
+    "watch:css": "tailwindcss -i ./shared/css/tailwind.css -o ./shared/css/tailwind.build.css --watch",
+    "build": "npm run build:css && node scripts/build-dist.js"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "tailwindcss": "^3.4.13"
   }
 }

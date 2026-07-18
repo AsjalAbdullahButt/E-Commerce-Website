@@ -73,6 +73,71 @@ main {
   border-color: var(--success);
 }
 
+.form-group.field-invalid input {
+  border-color: var(--error);
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--error);
+  min-height: 1.1em;
+  line-height: 1.1;
+}
+
+.field-hint:empty {
+  display: none;
+}
+
+/* === FLOATING LABELS ===
+   Label sits inside the input at rest (like a placeholder) and floats to the existing
+   small-caps caption style (already used for static labels site-wide) once the field is
+   focused or has a value. Uses :has() rather than reordering the DOM so it works whether the
+   input is a direct child of .form-group or nested one level down inside
+   .password-input-wrapper. */
+.form-group--floating {
+  position: relative;
+  display: block;
+}
+
+.form-group--floating input {
+  width: 100%;
+  padding: 1.4rem 0.85rem 0.5rem;
+}
+
+.form-group--floating .password-input-wrapper input {
+  padding-right: 3rem;
+}
+
+.form-group--floating label {
+  position: absolute;
+  left: 0.9rem;
+  top: 1.1rem;
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
+  pointer-events: none;
+  transition: var(--transition);
+  background: transparent;
+  z-index: 1;
+}
+
+.form-group--floating:has(input:focus) label,
+.form-group--floating:has(input:not(:placeholder-shown)) label {
+  top: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.form-group--floating .field-hint {
+  margin-top: 0.4rem;
+}
+
 label {
   font-size: 0.75rem;
   text-transform: uppercase;

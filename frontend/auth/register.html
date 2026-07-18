@@ -29,35 +29,35 @@
         <p class="auth-subtitle">Create your account to start shopping</p>
 
         <form id="register-form">
-          <div class="form-group">
+          <div class="form-group form-group--floating">
+            <input type="text" id="register-name" placeholder=" " required autocomplete="name">
             <label for="register-name">Full Name</label>
-            <input type="text" id="register-name" placeholder="Your Name" required autocomplete="name">
           </div>
-          <div class="form-group">
+          <div class="form-group form-group--floating">
+            <input type="email" id="register-email" placeholder=" " required autocomplete="email">
             <label for="register-email">Email</label>
-            <input type="email" id="register-email" placeholder="your@email.com" required autocomplete="email">
           </div>
-          <div class="form-group">
+          <div class="form-group form-group--floating">
+            <input type="tel" id="register-phone" placeholder=" " autocomplete="tel">
             <label for="register-phone">Phone</label>
-            <input type="tel" id="register-phone" placeholder="03001234567" autocomplete="tel">
           </div>
-          <div class="form-group">
-            <label for="register-password">Password</label>
+          <div class="form-group form-group--floating">
             <div class="password-input-wrapper">
-              <input type="password" id="register-password" placeholder="••••••••" required autocomplete="new-password">
+              <input type="password" id="register-password" placeholder=" " required autocomplete="new-password">
               <button type="button" class="password-toggle-btn" id="register-toggle-pwd" aria-label="Toggle password visibility">
                 <i class="fas fa-eye-slash"></i>
               </button>
             </div>
+            <label for="register-password">Password</label>
           </div>
-          <div class="form-group">
-            <label for="register-confirm">Confirm Password</label>
+          <div class="form-group form-group--floating">
             <div class="password-input-wrapper">
-              <input type="password" id="register-confirm" placeholder="••••••••" required autocomplete="new-password">
+              <input type="password" id="register-confirm" placeholder=" " required autocomplete="new-password">
               <button type="button" class="password-toggle-btn" id="register-toggle-confirm" aria-label="Toggle password visibility">
                 <i class="fas fa-eye-slash"></i>
               </button>
             </div>
+            <label for="register-confirm">Confirm Password</label>
           </div>
           <button type="button" class="auth-btn" onclick="handleRegister()">Create Account</button>
         </form>
@@ -74,9 +74,17 @@
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/cart.js?v=20260716"></script>
+  <script src="../shared/js/form-validation.js?v=20260719"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
 
   <script>
+    attachFieldValidation(document.getElementById('register-email'), Validators.email);
+    attachFieldValidation(document.getElementById('register-password'), Validators.minLength(6));
+    attachFieldValidation(
+      document.getElementById('register-confirm'),
+      Validators.matches(() => document.getElementById('register-password').value, 'Passwords do not match')
+    );
+
     async function handleRegister() {
       const name = document.getElementById('register-name').value;
       const email = document.getElementById('register-email').value;

@@ -212,8 +212,13 @@ docker compose up --build
 This builds `backend/Dockerfile` (single-worker Gunicorn + Uvicorn worker, matching the
 single-process constraint above), waits for MySQL to become reachable, runs `alembic upgrade
 head` automatically on every start (`backend/docker-entrypoint.sh`), and serves the frontend on
-port 5500 via `python -m http.server` inside a plain `python:3.12-slim` container (no build step
-needed for vanilla JS). Same three URLs as the non-Docker setup above.
+port 5500 via `python -m http.server`. Same three URLs as the non-Docker setup above.
+
+`frontend/Dockerfile` is a multi-stage build: a `node:20-slim` stage runs `npm run build`
+(Tailwind CLI + esbuild minifying every CSS/JS file into `frontend/dist/`, HTML untouched — see
+`frontend/scripts/build-dist.js`), then a `python:3.12-slim` stage serves that `dist/` output.
+Outside Docker, `python -m http.server 5500 --directory frontend` (above) keeps serving the raw,
+unminified source directly — no build step needed for day-to-day dev.
 
 Product images and other local-disk uploads (`services/image_storage.py`, active when
 `S3_ENABLED=false`) persist in the `backend_uploads` named volume across `docker compose down`/`up`.

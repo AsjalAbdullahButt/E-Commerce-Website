@@ -40,12 +40,8 @@ services:
       - backend_uploads:/app/uploads
 
   frontend:
-    image: python:3.12-slim
+    build: ./frontend
     restart: unless-stopped
-    working_dir: /frontend
-    volumes:
-      - ./frontend:/frontend:ro
-    command: ["python", "-m", "http.server", "5500"]
     ports:
       - "5500:5500"
     depends_on:
