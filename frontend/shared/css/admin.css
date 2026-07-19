@@ -235,12 +235,14 @@ tbody tr {
   transition: background var(--duration-fast) var(--ease);
 }
 
-/* Subtle zebra striping: odd rows sit on the wrapper's --bg-card, even rows one step up. */
-tbody tr:nth-child(even) {
+/* Subtle zebra striping: odd rows sit on the wrapper's --bg-card, even rows one step up.
+   Skeleton rows are exempt — their shimmer gradient peaks at --bg-card-hover, so a zebra
+   background the same color would swallow the bars entirely. */
+tbody tr:nth-child(even):not(.table-skeleton-row) {
   background: var(--bg-card-hover);
 }
 
-tbody tr:hover {
+tbody tr:hover:not(.table-skeleton-row) {
   background: var(--bg-surface);
 }
 

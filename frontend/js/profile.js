@@ -14,7 +14,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Load profile info
-  const profileContent = document.querySelector('[data-tab="profile"]');
+  // .tab-content prefix matters: the tab BUTTONS carry the same data-tab attribute and come
+  // first in the DOM, so an unscoped [data-tab=...] query grabs a button instead.
+  const profileContent = document.querySelector('.tab-content[data-tab="profile"]');
   if (profileContent) {
     profileContent.textContent = '';
     const infoWrap = document.createElement('div'); infoWrap.className = 'profile-info';
@@ -48,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Load orders
-  const ordersContent = document.querySelector('[data-tab="orders"]');
+  const ordersContent = document.querySelector('.tab-content[data-tab="orders"]');
   if (ordersContent) {
     try {
       const ordersResponse = await api.get('/orders/me', true);
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Load wishlist
-  const wishlistContent = document.querySelector('[data-tab="wishlist"]');
+  const wishlistContent = document.querySelector('.tab-content[data-tab="wishlist"]');
   if (wishlistContent) {
     try {
       const wishlist = await api.get('/wishlist', true);
@@ -131,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // SAVED ADDRESSES
 // ════════════════════════════════════════════════════
 async function loadAddresses() {
-  const content = document.querySelector('[data-tab="addresses"]');
+  const content = document.querySelector('.tab-content[data-tab="addresses"]');
   if (!content) return;
   content.textContent = '';
 

@@ -1016,6 +1016,28 @@ button {
 .table-skeleton-row:nth-last-child(2) { opacity: 0.7; }
 .table-skeleton-row:nth-last-child(1) { opacity: 0.45; }
 
+/* Generic card skeleton (rider order cards, profile tabs, tracking sections): a bordered
+   card of shimmer lines. Written statically in HTML; renderers clear it with their usual
+   container.textContent = '' before painting real content. */
+.card-skeleton {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+.card-skeleton .skel-bar {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.9rem;
+}
+
+.card-skeleton .skel-bar:nth-child(3n+1) { width: 40%; }
+.card-skeleton .skel-bar:nth-child(3n+2) { width: 75%; }
+.card-skeleton .skel-bar:nth-child(3n)   { width: 55%; }
+.card-skeleton .skel-bar:last-child      { margin-bottom: 0; }
+
 /* === EMPTY STATE (shared: admin tables, rider lists, customer profile/tracking) ===
    Markup: .empty-state > (.empty-state-icon > i) + h3 + p — built by renderEmptyStateInto()
    in shared/js/ui-states.js, or written statically. Replaces the former rider.css .empty-state

@@ -462,23 +462,7 @@ main {
   border-color: var(--gold);
 }
 
-/* Order-card skeleton (initial loading state) — card variant of the shared .skeleton shimmer */
-.order-card-skeleton {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-}
-
-.order-card-skeleton .skel-bar {
-  height: 14px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 0.9rem;
-}
-
-.order-card-skeleton .skel-bar:nth-child(1) { width: 40%; }
-.order-card-skeleton .skel-bar:nth-child(2) { width: 75%; }
-.order-card-skeleton .skel-bar:nth-child(3) { width: 55%; margin-bottom: 0; }
+/* Order-card loading state uses the shared .card-skeleton in shared/css/global.css. */
 
 /* === STATUS TIMELINE === */
 .status-timeline {

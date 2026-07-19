@@ -1,4 +1,17 @@
 // === TRACKING.JS ===
+// Clears the static loading skeletons and shows the shared empty state where the
+// timeline would have rendered — used by every failure path below.
+function showTrackingError(title, message) {
+  document.querySelectorAll('.tracking-container .card-skeleton').forEach((el) => el.remove());
+  // The item/shipping sections would render as empty shells without data — drop them entirely.
+  document.querySelectorAll('.order-items, .shipping-info').forEach((el) => { el.style.display = 'none'; });
+  renderEmptyStateInto(document.querySelector('.status-timeline'), {
+    icon: 'fa-triangle-exclamation',
+    title,
+    message,
+  });
+}
+
 async function loadTrackingData() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -6,6 +19,7 @@ async function loadTrackingData() {
     const guestEmail = params.get('guest_email');
     if (!orderId) {
       showToast('Order not found', 'error');
+      showTrackingError('Order not found', 'This link is missing an order number. Open tracking from your profile or order email.');
       return;
     }
 
@@ -17,6 +31,7 @@ async function loadTrackingData() {
     // Null check for order
     if (!order) {
       showToast('Order data is invalid', 'error');
+      showTrackingError('Order not available', 'We could not read this order. Please try again later.');
       return;
     }
 
@@ -205,6 +220,7 @@ async function loadTrackingData() {
     console.error('Failed to load tracking data', err);
     // Don't expose raw backend errors to users
     showToast('Failed to load order. Please try again later.', 'error');
+    showTrackingError('Failed to load order', 'Check your connection, then reload the page to try again.');
   }
 }
 
