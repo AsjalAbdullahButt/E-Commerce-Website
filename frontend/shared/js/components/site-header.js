@@ -38,7 +38,7 @@ class SiteHeader extends HTMLElement {
       </button>`;
 
     const logoutBtn = `
-      <button class="nav-icon" id="nav-logout-btn" aria-label="Logout" style="background:none;border:none;cursor:pointer"><i class="fas fa-sign-out-alt"></i></button>`;
+      <button class="nav-icon" id="nav-logout-btn" aria-label="Logout"><i class="fas fa-sign-out-alt"></i></button>`;
 
     const cartBtn = `
       <button class="nav-icon cart-icon-btn" id="cart-toggle" aria-label="Cart">

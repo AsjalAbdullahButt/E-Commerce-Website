@@ -54,8 +54,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const ordersResponse = await api.get('/orders/me', true);
       const orders = ordersResponse.data || [];
         if (orders.length === 0) {
-          ordersContent.textContent = '';
-          const p = document.createElement('p'); p.style.textAlign = 'center'; p.style.color = 'var(--text-secondary)'; p.textContent = 'No orders yet'; ordersContent.appendChild(p);
+          renderEmptyStateInto(ordersContent, {
+            icon: 'fa-receipt',
+            title: 'No orders yet',
+            message: 'Your orders will appear here after your first purchase.',
+          });
         } else {
           ordersContent.textContent = '';
           const table = document.createElement('table'); table.className = 'orders-table';
@@ -74,8 +77,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           table.appendChild(thead); table.appendChild(tbody); ordersContent.appendChild(table);
         }
     } catch (err) {
-      ordersContent.textContent = '';
-      const errP = document.createElement('p'); errP.style.color = 'var(--error)'; errP.textContent = 'Failed to load orders'; ordersContent.appendChild(errP);
+      renderEmptyStateInto(ordersContent, {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load orders',
+        message: 'Reload the page to try again.',
+      });
     }
   }
 
@@ -85,8 +91,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const wishlist = await api.get('/wishlist', true);
       if (wishlist.length === 0) {
-        wishlistContent.textContent = '';
-        const p = document.createElement('p'); p.style.textAlign = 'center'; p.style.color = 'var(--text-secondary)'; p.textContent = 'Wishlist is empty'; wishlistContent.appendChild(p);
+        renderEmptyStateInto(wishlistContent, {
+          icon: 'fa-heart',
+          title: 'Wishlist is empty',
+          message: 'Tap the heart on any product to save it here.',
+        });
       } else {
         wishlistContent.textContent = '';
         const grid = document.createElement('div'); grid.className = 'wishlist-grid';
@@ -107,8 +116,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         wishlistContent.appendChild(grid);
       }
     } catch (err) {
-      wishlistContent.textContent = '';
-      const errP2 = document.createElement('p'); errP2.style.color = 'var(--error)'; errP2.textContent = 'Failed to load wishlist'; wishlistContent.appendChild(errP2);
+      renderEmptyStateInto(wishlistContent, {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load wishlist',
+        message: 'Reload the page to try again.',
+      });
     }
   }
 
@@ -127,15 +139,22 @@ async function loadAddresses() {
   try {
     addresses = await api.get('/addresses', true);
   } catch (err) {
-    const errP = document.createElement('p'); errP.style.color = 'var(--error)'; errP.textContent = 'Failed to load addresses'; content.appendChild(errP);
+    renderEmptyStateInto(content, {
+      icon: 'fa-triangle-exclamation',
+      title: 'Failed to load addresses',
+      message: 'Reload the page to try again.',
+    });
     return;
   }
 
   const wrap = document.createElement('div'); wrap.className = 'addresses-wrap';
 
   if (addresses.length === 0) {
-    const p = document.createElement('p'); p.style.textAlign = 'center'; p.style.color = 'var(--text-secondary)'; p.textContent = 'No saved addresses yet';
-    wrap.appendChild(p);
+    renderEmptyStateInto(wrap, {
+      icon: 'fa-location-dot',
+      title: 'No saved addresses yet',
+      message: 'Addresses you save at checkout will appear here.',
+    });
   } else {
     const grid = document.createElement('div'); grid.className = 'addresses-grid';
     addresses.forEach(addr => grid.appendChild(renderAddressCard(addr)));

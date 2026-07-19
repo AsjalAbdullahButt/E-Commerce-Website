@@ -405,6 +405,12 @@ textarea {
   text-align: center;
 }
 
+/* Payment-method brand hues — third-party brand colors, deliberately NOT design tokens
+   (moved here from inline styles in checkout.html). */
+.pay-icon--jazzcash { color: #e63737; }
+.pay-icon--easypaisa { color: #4caf50; }
+.pay-icon--card { color: #635bff; }
+
 .pay-info {
   display: flex;
   flex-direction: column;

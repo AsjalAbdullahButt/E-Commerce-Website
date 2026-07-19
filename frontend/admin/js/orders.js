@@ -59,11 +59,15 @@ function renderOrders(orders) {
   document.getElementById('orders-visible-count').textContent = `${orders.length} visible`;
 
   if (orders.length === 0) {
-    emptyRow.style.display = '';
-    emptyRow.querySelector('td').textContent = 'No orders match the current filter.';
+    emptyRow.hidden = false;
+    renderEmptyStateInto(emptyRow.querySelector('td'), {
+      icon: 'fa-box-open',
+      title: 'No orders found',
+      message: 'No orders match the current filter.',
+    });
     return;
   }
-  emptyRow.style.display = 'none';
+  emptyRow.hidden = true;
 
   orders.forEach((order) => {
     const row = document.createElement('tr');
@@ -179,7 +183,8 @@ async function loadAvailableRiders() {
 async function loadOrders() {
   const tbody = document.getElementById('order-table-body');
   if (tbody && orderState.orders.length === 0) {
-    tbody.querySelector('#order-empty-row td').textContent = 'Loading orders...';
+    document.getElementById('order-empty-row').hidden = true;
+    showTableSkeleton(tbody, 8);
   }
   try {
     const status = document.getElementById('order-status-filter')?.value || null;
@@ -192,9 +197,14 @@ async function loadOrders() {
   } catch (error) {
     showToast(error.message || 'Failed to load orders', 'error');
     if (tbody) {
+      clearTableSkeleton(tbody);
       const emptyRow = document.getElementById('order-empty-row');
-      emptyRow.style.display = '';
-      emptyRow.querySelector('td').textContent = 'Failed to load orders.';
+      emptyRow.hidden = false;
+      renderEmptyStateInto(emptyRow.querySelector('td'), {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load orders',
+        message: 'Check your connection, then hit Refresh to try again.',
+      });
     }
   }
 }

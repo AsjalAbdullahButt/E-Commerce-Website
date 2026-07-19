@@ -43,13 +43,13 @@
         <button class="builder-button" id="refresh-orders-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
         <button class="builder-button" id="export-orders-btn" type="button"><i class="fas fa-file-export"></i> Export CSV</button>
         <button class="builder-button" id="bulk-status-btn" type="button" title="Upload a CSV with order_id,status,note columns"><i class="fas fa-file-import"></i> Bulk Status Update</button>
-        <input type="file" id="bulk-status-file" accept=".csv" style="display:none;">
+        <input type="file" id="bulk-status-file" accept=".csv" hidden>
       </div>
     </div>
 
     <section data-section="orders">
       <div class="admin-form-section reveal">
-        <div class="section-title-row" style="margin-bottom: 1rem;">
+        <div class="section-title-row">
           <div>
             <h2>Order Filters</h2>
             <p class="admin-section-desc">Narrow the list by fulfillment status.</p>
@@ -86,8 +86,8 @@
             </tr>
           </thead>
           <tbody id="order-table-body">
-            <tr id="order-empty-row">
-              <td colspan="8" style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading orders...</td>
+            <tr id="order-empty-row" hidden>
+              <td colspan="8"></td>
             </tr>
           </tbody>
         </table>
@@ -100,6 +100,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
+  <script src="../shared/js/ui-states.js"></script>
   <script src="./js/orders.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
   <script src="../shared/js/scroll-reveal.js"></script>

@@ -146,6 +146,29 @@ main {
   font-size: 0.9rem;
 }
 
+/* 30-day metric trend chip under a stat value — populated by js/analytics.js::_renderTrend() */
+.stat-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stat-trend--up {
+  color: var(--success);
+}
+
+.stat-trend--down {
+  color: var(--error);
+}
+
+.stat-trend .stat-trend-note {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .section-title {
   font-weight: 700;
   font-size: 1.3rem;
@@ -173,7 +196,10 @@ main {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  overflow-x: auto;
+  /* Long lists scroll inside the wrapper so the sticky thead below has a scroll
+     container to pin against; short tables are unaffected. */
+  overflow: auto;
+  max-height: 75vh;
 }
 
 table {
@@ -190,6 +216,10 @@ th {
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
   text-transform: uppercase;
+  /* Stays visible while the wrapper scrolls; --bg-input is opaque so rows never bleed through. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 td {
@@ -201,42 +231,21 @@ tr:last-child td {
   border-bottom: none;
 }
 
-tr {
+tbody tr {
   transition: background var(--duration-fast) var(--ease);
 }
 
-tr:hover {
+/* Subtle zebra striping: odd rows sit on the wrapper's --bg-card, even rows one step up. */
+tbody tr:nth-child(even) {
+  background: var(--bg-card-hover);
+}
+
+tbody tr:hover {
   background: var(--bg-surface);
 }
 
-.status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
-.status-badge--success {
-  background: rgba(34,197,94,0.2);
-  color: var(--success);
-}
-
-.status-badge--danger {
-  background: rgba(239,68,68,0.2);
-  color: var(--error);
-}
-
-.status-badge--warning {
-  background: rgba(245,158,11,0.2);
-  color: var(--warning);
-}
-
-.status-badge--neutral {
-  background: rgba(255,255,255,0.06);
-  color: var(--text-secondary);
-}
+/* .status-badge + its four modifiers (--success/--danger/--warning/--neutral) now live in
+   shared/css/global.css so rider pages share the exact same scheme. */
 
 .btn-group {
   display: flex;
@@ -621,6 +630,11 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+/* Breathing room when actions follow a builder list (e.g. the variants editor) */
+.builder-list + .builder-actions {
+  margin-top: 0.85rem;
+}
+
 .builder-button,
 .builder-icon-button {
   border: 1px solid var(--gold-border);
@@ -743,6 +757,15 @@ textarea:focus {
 .url-input-row {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Stacked label-over-field variant (returns resolve modal) */
+.url-input-row--stacked {
+  flex-direction: column;
+}
+
+.url-input-row--stacked + .url-input-row--stacked {
+  margin-top: 1rem;
 }
 
 .url-input-row input {
@@ -947,25 +970,7 @@ textarea:focus {
   color: var(--text-muted);
 }
 
-.audit-empty-state {
-  display: grid;
-  place-items: center;
-  gap: 0.6rem;
-  padding: 3rem 1.5rem;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.audit-empty-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--gold-glow), rgba(184,150,12,0.12));
-  display: grid;
-  place-items: center;
-  color: var(--gold);
-  font-size: 1.5rem;
-}
+/* Audit empty state now uses the shared .empty-state component in shared/css/global.css. */
 
 @media (max-width: 768px) {
   #logs-table {

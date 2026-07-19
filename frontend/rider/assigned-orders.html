@@ -24,7 +24,7 @@
     <div class="page-header">
       <div>
         <h1>My Deliveries</h1>
-        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Manage your assigned orders</p>
+        <p>Manage your assigned orders</p>
       </div>
     </div>
 
@@ -48,10 +48,12 @@
 
     <div id="map-view"></div>
 
+    <!-- Map bottom sheet — populated by openMapSheet() when a marker is tapped -->
+    <div class="map-bottom-sheet" id="map-bottom-sheet" hidden></div>
+
     <div id="orders-container" class="orders-list">
-      <div class="loading">
-        <i class="fas fa-spinner fa-spin"></i> Loading orders...
-      </div>
+      <div class="order-card-skeleton" aria-hidden="true"><div class="skeleton skel-bar"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-bar"></div></div>
+      <div class="order-card-skeleton" aria-hidden="true"><div class="skeleton skel-bar"></div><div class="skeleton skel-bar"></div><div class="skeleton skel-bar"></div></div>
     </div>
   </main>
 
@@ -73,6 +75,7 @@
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="../shared/js/auth.js?v=20260716"></script>
   <script src="../shared/js/sanitize.js?v=20260716"></script>
+  <script src="../shared/js/ui-states.js?v=20260719"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
   <script src="../shared/js/scroll-reveal.js?v=20260716"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -93,11 +96,15 @@
         const orders = await api.get('/rider/orders', true);
         allOrders = orders || [];
         renderOrders(allOrders);
+        if (currentView === 'map') renderMapView(allOrders);
       } catch (err) {
         console.error('Failed to load orders:', err);
         showToast('Failed to load orders', 'error');
-        const container = document.getElementById('orders-container'); container.textContent = '';
-        const empty = document.createElement('div'); empty.className = 'empty-state'; const icon = document.createElement('i'); icon.className = 'fas fa-exclamation-triangle'; const p = document.createElement('p'); p.textContent = 'Failed to load orders'; empty.appendChild(icon); empty.appendChild(p); container.appendChild(empty);
+        renderEmptyStateInto(document.getElementById('orders-container'), {
+          icon: 'fa-triangle-exclamation',
+          title: 'Failed to load orders',
+          message: 'Check your connection, then pull down or reload to try again.',
+        });
       }
     }
 
@@ -110,6 +117,12 @@
     // Pipeline the rider cares about. status_history (already returned by GET /rider/orders,
     // per backend/schemas/order.py) supplies the timestamp for each step that's been reached.
     const STATUS_PIPELINE = ['confirmed', 'packed', 'shipped', 'delivered'];
+
+    // Same four-modifier badge scheme as the admin pages (shared/css/global.css).
+    const STATUS_BADGE = { delivered: 'success', shipped: 'warning', cancelled: 'danger', returned: 'warning' };
+    function statusBadgeClass(status) {
+      return `status-badge status-badge--${STATUS_BADGE[status] || 'neutral'}`;
+    }
 
     function buildStatusTimeline(order) {
       const timeline = document.createElement('div'); timeline.className = 'status-timeline';
@@ -159,11 +172,11 @@
       container.textContent = '';
 
       if (!orders || orders.length === 0) {
-        const empty = document.createElement('div'); empty.className = 'empty-state';
-        const icon = document.createElement('i'); icon.className = 'fas fa-box';
-        const p = document.createElement('p'); p.textContent = 'No orders to display';
-        empty.appendChild(icon); empty.appendChild(p);
-        container.appendChild(empty);
+        renderEmptyStateInto(container, {
+          icon: 'fa-box',
+          title: 'No orders to display',
+          message: 'Deliveries assigned to you will appear here.',
+        });
         return;
       }
 
@@ -178,7 +191,7 @@
         const dateP = document.createElement('p'); dateP.style.color = 'var(--text-secondary)'; dateP.style.fontSize = '0.85rem'; dateP.style.marginTop = '0.25rem'; dateP.textContent = new Date(order.created_at).toLocaleDateString();
         left.appendChild(idDiv); left.appendChild(dateP);
 
-        const statusSpan = document.createElement('span'); statusSpan.className = `status-badge ${order.status || 'confirmed'}`;
+        const statusSpan = document.createElement('span'); statusSpan.className = statusBadgeClass(order.status);
         const statusIcon = document.createElement('i'); statusIcon.className = 'fas fa-circle-dot';
         const statusText = document.createTextNode(' ' + formatStatus(order.status));
         statusSpan.appendChild(statusIcon); statusSpan.appendChild(statusText);
@@ -265,6 +278,7 @@
       try {
         await api.patch(`/rider/orders/${orderId}/status`, { status: newStatus }, true);
         showToast('Status updated successfully', 'success');
+        closeMapSheet();
         loadOrders();
       } catch (err) {
         console.error('Failed to update status:', err);
@@ -318,10 +332,59 @@
       document.getElementById('map-view-btn').classList.toggle('active', view === 'map');
       document.getElementById('orders-container').classList.toggle('hidden', view === 'map');
       document.getElementById('map-view').classList.toggle('visible', view === 'map');
+      if (view !== 'map') closeMapSheet();
 
       if (view === 'map') {
         renderMapView(allOrders);
       }
+    }
+
+    // === MAP BOTTOM SHEET ===
+    // Top map / bottom sheet layout: marker tap opens a fixed, thumb-reachable panel with the
+    // delivery details and full-size action buttons ("Mark Delivered" still goes through the
+    // proof-of-delivery photo modal, so completion stays an unmistakable two-step action).
+    function openMapSheet(order) {
+      const sheet = document.getElementById('map-bottom-sheet');
+      sheet.textContent = '';
+
+      const handle = document.createElement('div'); handle.className = 'map-sheet-handle';
+
+      const header = document.createElement('div'); header.className = 'map-sheet-header';
+      const idEl = document.createElement('strong'); idEl.className = 'order-id';
+      idEl.textContent = `Order #${(order.id && order.id.substring) ? order.id.substring(0, 8) : 'N/A'}`;
+      const statusEl = document.createElement('span'); statusEl.className = statusBadgeClass(order.status);
+      statusEl.textContent = formatStatus(order.status);
+      header.appendChild(idEl); header.appendChild(statusEl);
+
+      const addr = order.shipping_address;
+      const addrEl = document.createElement('p'); addrEl.className = 'map-sheet-addr';
+      addrEl.textContent = addr ? `${addr.address}, ${addr.city} ${addr.postal_code}` : 'No address on record';
+
+      const itemsEl = document.createElement('p'); itemsEl.className = 'map-sheet-items';
+      itemsEl.textContent = `${order.items?.length || 0} item(s)`;
+
+      const actions = document.createElement('div'); actions.className = 'map-sheet-actions';
+      const shipBtn = document.createElement('button'); shipBtn.className = 'btn-status'; shipBtn.type = 'button';
+      shipBtn.textContent = 'Mark Shipped';
+      shipBtn.disabled = !['confirmed', 'packed'].includes(order.status);
+      shipBtn.addEventListener('click', () => updateStatus(order.id, 'shipped'));
+      const delBtn = document.createElement('button'); delBtn.className = 'btn-status'; delBtn.type = 'button';
+      delBtn.textContent = 'Mark Delivered';
+      delBtn.disabled = order.status !== 'shipped';
+      delBtn.addEventListener('click', () => openProofOfDeliveryModal(order.id));
+      actions.appendChild(shipBtn); actions.appendChild(delBtn);
+
+      sheet.appendChild(handle); sheet.appendChild(header); sheet.appendChild(addrEl);
+      sheet.appendChild(itemsEl); sheet.appendChild(actions);
+      sheet.hidden = false;
+
+      handle.addEventListener('click', closeMapSheet);
+    }
+
+    function closeMapSheet() {
+      const sheet = document.getElementById('map-bottom-sheet');
+      sheet.hidden = true;
+      sheet.textContent = '';
     }
 
     async function renderMapView(orders) {
@@ -354,7 +417,7 @@
         if (coords) {
           const marker = L.marker([coords.lat, coords.lon]).addTo(mapMarkersLayer);
           marker.bindPopup(buildMapPopupHtml(order));
-          marker.on('popupopen', () => bindPopupActions(order));
+          marker.on('click', () => openMapSheet(order));
           bounds.push([coords.lat, coords.lon]);
         }
 
@@ -367,43 +430,20 @@
       setTimeout(() => leafletMap.invalidateSize(), 100);
     }
 
+    // Popup is informational only — actions live in the bottom sheet (openMapSheet), which
+    // opens on the same marker tap.
     function buildMapPopupHtml(order) {
       const addr = order.shipping_address;
       const shortId = (order.id && order.id.substring) ? order.id.substring(0, 8) : 'N/A';
-      const canShip = ['confirmed', 'packed'].includes(order.status);
-      const canDeliver = order.status === 'shipped';
       const wrap = document.createElement('div'); wrap.className = 'map-popup';
 
       const idEl = document.createElement('strong'); idEl.className = 'order-id'; idEl.textContent = `Order #${shortId}`;
-      const statusEl = document.createElement('span'); statusEl.className = `status-badge ${order.status || 'confirmed'}`; statusEl.textContent = formatStatus(order.status);
+      const statusEl = document.createElement('span'); statusEl.className = statusBadgeClass(order.status); statusEl.textContent = formatStatus(order.status);
       const addrEl = document.createElement('span'); addrEl.className = 'popup-addr'; addrEl.textContent = `${addr.address}, ${addr.city} ${addr.postal_code}`;
 
       wrap.appendChild(idEl); wrap.appendChild(document.createElement('br'));
       wrap.appendChild(statusEl); wrap.appendChild(addrEl);
-
-      if (canShip) {
-        const btn = document.createElement('button'); btn.className = 'btn-status'; btn.textContent = 'Mark Shipped';
-        btn.dataset.action = 'ship'; btn.dataset.orderId = order.id;
-        wrap.appendChild(btn);
-      }
-      if (canDeliver) {
-        const btn = document.createElement('button'); btn.className = 'btn-status'; btn.textContent = 'Mark Delivered';
-        btn.dataset.action = 'deliver'; btn.dataset.orderId = order.id;
-        wrap.appendChild(btn);
-      }
       return wrap;
-    }
-
-    function bindPopupActions() {
-      document.querySelectorAll('.map-popup button[data-action]').forEach((btn) => {
-        if (btn.dataset.bound) return;
-        btn.dataset.bound = '1';
-        btn.addEventListener('click', () => {
-          const orderId = btn.dataset.orderId;
-          if (btn.dataset.action === 'ship') updateStatus(orderId, 'shipped');
-          else openProofOfDeliveryModal(orderId);
-        });
-      });
     }
 
     // === PROOF OF DELIVERY ===
@@ -452,6 +492,7 @@
 
         showToast('Delivery confirmed', 'success');
         closeProofOfDeliveryModal();
+        closeMapSheet();
         loadOrders();
         if (currentView === 'map' && leafletMap) leafletMap.closePopup();
       } catch (err) {

@@ -146,6 +146,43 @@ class AdminAnalyticsDashboard {
         requestAnimationFrame(step);
     }
 
+    // Trailing-30-days vs previous-30-days change, computed server-side
+    // (backend/routes/admin.py::dashboard_summary). null means the previous window had no
+    // orders, so no meaningful percentage exists — the chip stays hidden.
+    _renderTrend(key, pct) {
+        const node = document.querySelector(`[data-stat-trend="${key}"]`);
+        if (!node) return;
+        if (pct === null || pct === undefined || Number.isNaN(Number(pct))) {
+            node.hidden = true;
+            return;
+        }
+        const up = Number(pct) >= 0;
+        node.hidden = false;
+        node.className = `stat-trend ${up ? 'stat-trend--up' : 'stat-trend--down'}`;
+        node.textContent = '';
+        const icon = document.createElement('i');
+        icon.className = `fas ${up ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const value = document.createElement('span');
+        value.textContent = `${up ? '+' : ''}${pct}%`;
+        const note = document.createElement('span');
+        note.className = 'stat-trend-note';
+        note.textContent = 'vs prev 30d';
+        node.append(icon, value, note);
+    }
+
+    _renderTableEmpty(bodyId, columnCount, emptyOpts) {
+        const body = document.getElementById(bodyId);
+        if (!body) return;
+        body.textContent = '';
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = columnCount;
+        renderEmptyStateInto(cell, emptyOpts);
+        row.appendChild(cell);
+        body.appendChild(row);
+    }
+
     _renderTableBody(bodyId, rows) {
         const body = document.getElementById(bodyId);
         if (!body) return;
@@ -177,12 +214,16 @@ class AdminAnalyticsDashboard {
     }
 
     async loadDashboard() {
+        showTableSkeleton(document.getElementById('top-products-body'), 3, 4);
+        showTableSkeleton(document.getElementById('recent-orders-body'), 4, 4);
         try {
             const summary = await adminAPI.getDashboardSummary();
             const stats = summary.stats || {};
 
             this._animateStat('[data-stat="revenue"]', Number(stats.total_revenue || 0), (v) => this._formatCurrency(v));
             this._animateStat('[data-stat="orders"]', Number(stats.total_orders || 0), (v) => String(Math.round(v)));
+            this._renderTrend('revenue', stats.revenue_trend_pct);
+            this._renderTrend('orders', stats.orders_trend_pct);
             this._animateStat('[data-stat="pending"]', Number(stats.pending_orders || 0), (v) => String(Math.round(v)));
             this._animateStat('[data-stat="products"]', Number(stats.total_products || 0), (v) => String(Math.round(v)));
 
@@ -194,6 +235,13 @@ class AdminAnalyticsDashboard {
             this.renderRecentOrders(summary.recent_orders || []);
         } catch (error) {
             console.error('Dashboard analytics error:', error);
+            const failed = {
+                icon: 'fa-triangle-exclamation',
+                title: 'Failed to load data',
+                message: 'Reload the page to try again.',
+            };
+            this._renderTableEmpty('top-products-body', 3, failed);
+            this._renderTableEmpty('recent-orders-body', 4, failed);
         }
     }
 
@@ -323,7 +371,12 @@ class AdminAnalyticsDashboard {
         ]);
 
         if (!rows.length) {
-            rows.push(['No product data yet', '-', '-']);
+            this._renderTableEmpty('top-products-body', 3, {
+                icon: 'fa-box-open',
+                title: 'No product data yet',
+                message: 'Top sellers appear here once orders come in.',
+            });
+            return;
         }
 
         this._renderTableBody('top-products-body', rows);
@@ -338,7 +391,12 @@ class AdminAnalyticsDashboard {
         ]);
 
         if (!rows.length) {
-            rows.push(['No recent orders', '-', '-', '-']);
+            this._renderTableEmpty('recent-orders-body', 4, {
+                icon: 'fa-receipt',
+                title: 'No recent orders',
+                message: 'New orders will show up here as they arrive.',
+            });
+            return;
         }
 
         this._renderTableBody('recent-orders-body', rows);

@@ -78,7 +78,7 @@
 
     <section data-section="logs">
       <div class="admin-form-section reveal">
-        <div class="section-title-row" style="margin-bottom: 1rem;">
+        <div class="section-title-row">
           <div>
             <h2>Activity Feed</h2>
             <p class="admin-section-desc">Filter by entity or search within the current set of logs.</p>
@@ -109,8 +109,8 @@
           </thead>
           <tbody></tbody>
         </table>
-        <div id="empty-state" class="audit-empty-state" style="display:none;">
-          <div class="audit-empty-icon"><i class="fas fa-magnifying-glass"></i></div>
+        <div id="empty-state" class="empty-state" hidden>
+          <div class="empty-state-icon"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></div>
           <h3>No logs match this view</h3>
           <p>Try clearing filters or refresh after more admin activity is recorded.</p>
         </div>
@@ -123,6 +123,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
+  <script src="../shared/js/ui-states.js"></script>
   <script src="../shared/js/sanitize.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
   <script src="../shared/js/scroll-reveal.js"></script>
@@ -196,6 +197,12 @@
 
       const entity = document.getElementById('filter-entity').value || '';
 
+      const logsBody = document.querySelector('#logs-table tbody');
+      if (AUDIT_STATE.logs.length === 0) {
+        document.getElementById('empty-state').hidden = true;
+        showTableSkeleton(logsBody, 7);
+      }
+
       try {
         const body = await adminAPI.getAuditLogs(entity || null, null, 200);
         if (!body.success) throw new Error(body.detail || 'Failed');
@@ -206,9 +213,8 @@
         document.getElementById('last-updated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } catch (err) {
         console.error('Fetch logs failed', err);
-        const tbody = document.querySelector('#logs-table tbody');
-        tbody.textContent = '';
-        document.getElementById('empty-state').style.display = 'block';
+        logsBody.textContent = '';
+        document.getElementById('empty-state').hidden = false;
       }
     }
 
@@ -282,11 +288,11 @@
       const emptyState = document.getElementById('empty-state');
 
       if (!logs.length) {
-        emptyState.style.display = 'grid';
+        emptyState.hidden = false;
         return;
       }
 
-      emptyState.style.display = 'none';
+      emptyState.hidden = true;
       logs.forEach(l => {
         const tr = document.createElement('tr');
 

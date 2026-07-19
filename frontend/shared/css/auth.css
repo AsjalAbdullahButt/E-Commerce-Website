@@ -52,6 +52,19 @@ main {
   line-height: 1.5;
 }
 
+/* Role selector — present in login.html markup but not wired to any JS yet, so it stays
+   hidden by default. */
+.role-selector {
+  display: none;
+  margin-bottom: 1.5rem;
+}
+
+.role-selector p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;

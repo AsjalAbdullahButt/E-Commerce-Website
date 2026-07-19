@@ -65,11 +65,15 @@ function renderReturns(returns) {
   tbody.querySelectorAll('tr:not(#returns-empty-row)').forEach((row) => row.remove());
 
   if (returns.length === 0) {
-    emptyRow.style.display = '';
-    emptyRow.querySelector('td').textContent = 'No return requests for this filter';
+    emptyRow.hidden = false;
+    renderEmptyStateInto(emptyRow.querySelector('td'), {
+      icon: 'fa-rotate-left',
+      title: 'No return requests',
+      message: 'No return requests match this filter.',
+    });
     return;
   }
-  emptyRow.style.display = 'none';
+  emptyRow.hidden = true;
 
   returns.forEach((rr) => {
     const row = document.createElement('tr');
@@ -134,6 +138,11 @@ function renderReturns(returns) {
 
 async function loadReturns() {
   const status = document.getElementById('returns-status-filter')?.value || 'pending';
+  const tbody = document.getElementById('returns-table-body');
+  if (tbody && returnsState.returns.length === 0) {
+    document.getElementById('returns-empty-row').hidden = true;
+    showTableSkeleton(tbody, 6);
+  }
   try {
     const response = await adminAPI.getReturns(status === 'all' ? null : status, 100, 0);
     returnsState.returns = response.data || [];
@@ -141,6 +150,16 @@ async function loadReturns() {
     renderReturns(returnsState.returns);
   } catch (error) {
     showToast(error.message || 'Failed to load return requests', 'error');
+    if (tbody) {
+      clearTableSkeleton(tbody);
+      const emptyRow = document.getElementById('returns-empty-row');
+      emptyRow.hidden = false;
+      renderEmptyStateInto(emptyRow.querySelector('td'), {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load return requests',
+        message: 'Check your connection, then hit Refresh to try again.',
+      });
+    }
   }
 }
 

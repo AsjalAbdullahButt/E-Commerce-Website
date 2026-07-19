@@ -84,7 +84,8 @@ main {
   border-color: var(--gold-border);
   background: var(--bg-card-hover);
   transform: translateY(-8px);
-  box-shadow: 0 12px 30px rgba(255, 215, 0, 0.2);
+  /* Lift + gold glow, composed purely from the global elevation tokens */
+  box-shadow: var(--shadow-md), var(--shadow-gold);
 }
 
 .product-image-wrapper {

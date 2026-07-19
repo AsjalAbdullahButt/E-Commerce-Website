@@ -263,13 +263,16 @@ function renderPromos(promos) {
   tbody.querySelectorAll('tr:not(#promo-empty-row)').forEach((row) => row.remove());
 
   if (promos.length === 0) {
-    emptyRow.style.display = '';
-    emptyRow.querySelector('td').colSpan = 9;
-    emptyRow.querySelector('td').textContent = 'No promos yet';
+    emptyRow.hidden = false;
+    renderEmptyStateInto(emptyRow.querySelector('td'), {
+      icon: 'fa-ticket',
+      title: 'No promos yet',
+      message: 'Create a promo code to see it listed here.',
+    });
     return;
   }
 
-  emptyRow.style.display = 'none';
+  emptyRow.hidden = true;
 
   promos.forEach((promo) => {
     const row = document.createElement('tr');
@@ -381,6 +384,11 @@ function applyFilters() {
 }
 
 async function loadPromos() {
+  const tbody = document.getElementById('promo-table-body');
+  if (tbody && promoState.promos.length === 0) {
+    document.getElementById('promo-empty-row').hidden = true;
+    showTableSkeleton(tbody, 9);
+  }
   try {
     const response = await adminAPI.getDiscounts(null, 100, 0);
     promoState.promos = response.data || [];
@@ -388,6 +396,16 @@ async function loadPromos() {
     applyFilters();
   } catch (error) {
     showToast(error.message || 'Failed to load promos', 'error');
+    if (tbody) {
+      clearTableSkeleton(tbody);
+      const emptyRow = document.getElementById('promo-empty-row');
+      emptyRow.hidden = false;
+      renderEmptyStateInto(emptyRow.querySelector('td'), {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load promos',
+        message: 'Check your connection, then reload the page to try again.',
+      });
+    }
   }
 }
 

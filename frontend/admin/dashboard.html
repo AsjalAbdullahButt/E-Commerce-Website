@@ -38,6 +38,7 @@
     <div class="admin-header">
       <div class="admin-header-copy">
         <h1 class="dashboard-title">Admin Dashboard</h1>
+        <p class="dashboard-subtitle">Revenue, order flow, and catalog health at a glance.</p>
       </div>
       <div class="admin-toolbar">
         <button class="builder-button" id="download-report-btn" type="button"><i class="fas fa-file-excel"></i> Download Sales Report</button>
@@ -56,6 +57,7 @@
         <div class="stat-content">
           <p class="stat-label">Total Revenue</p>
           <p class="stat-value" data-stat="revenue">Rs 0</p>
+          <p class="stat-trend" data-stat-trend="revenue" hidden></p>
         </div>
       </div>
       <div class="stat-card">
@@ -63,6 +65,7 @@
         <div class="stat-content">
           <p class="stat-label">Total Orders</p>
           <p class="stat-value" data-stat="orders">0</p>
+          <p class="stat-trend" data-stat-trend="orders" hidden></p>
         </div>
       </div>
       <div class="stat-card">
@@ -143,6 +146,7 @@
   <script src="../shared/js/api.js?v=20260716"></script>
   <script src="./js/admin-config.js?v=20260716"></script>
   <script src="./js/admin-api.js?v=20260716"></script>
+  <script src="../shared/js/ui-states.js?v=20260719"></script>
   <script src="./js/analytics.js?v=20260716"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
   <script src="../shared/js/scroll-reveal.js?v=20260716"></script>

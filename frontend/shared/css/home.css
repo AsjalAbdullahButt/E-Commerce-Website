@@ -64,6 +64,11 @@ main {
   z-index: 1;
 }
 
+/* Brand accent inside the hero heading ("E-COM") */
+.hero-brand-accent {
+  color: var(--gold);
+}
+
 .hero p {
   font-size: 1.1rem;
   color: var(--text-secondary);
@@ -703,6 +708,11 @@ main {
   font-size: 1.1rem;
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.sidebar-header h3 i {
+  margin-right: 0.5rem;
+  font-size: 0.85rem;
 }
 
 .sidebar-close {

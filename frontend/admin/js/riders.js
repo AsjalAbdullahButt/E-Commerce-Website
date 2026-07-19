@@ -82,11 +82,15 @@ function renderRiders(riders) {
   document.getElementById('riders-visible-count').textContent = `${riders.length} riders`;
 
   if (riders.length === 0) {
-    emptyRow.style.display = '';
-    emptyRow.querySelector('td').textContent = 'No riders match the current filter.';
+    emptyRow.hidden = false;
+    renderEmptyStateInto(emptyRow.querySelector('td'), {
+      icon: 'fa-motorcycle',
+      title: 'No riders found',
+      message: 'No riders match the current filter.',
+    });
     return;
   }
-  emptyRow.style.display = 'none';
+  emptyRow.hidden = true;
 
   riders.forEach((rider) => {
     const row = document.createElement('tr');
@@ -167,6 +171,11 @@ async function toggleRiderActive(rider) {
 }
 
 async function loadRiders() {
+  const tbody = document.getElementById('rider-table-body');
+  if (tbody && riderState.riders.length === 0) {
+    document.getElementById('rider-empty-row').hidden = true;
+    showTableSkeleton(tbody, 6);
+  }
   try {
     const isActive = getSelectedStatus();
     const response = await adminAPI.getRiders(isActive);
@@ -174,6 +183,16 @@ async function loadRiders() {
     renderRiders(riderState.riders);
   } catch (error) {
     showToast(error.message || 'Failed to load riders', 'error');
+    if (tbody) {
+      clearTableSkeleton(tbody);
+      const emptyRow = document.getElementById('rider-empty-row');
+      emptyRow.hidden = false;
+      renderEmptyStateInto(emptyRow.querySelector('td'), {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load riders',
+        message: 'Check your connection, then hit Refresh to try again.',
+      });
+    }
   }
 }
 

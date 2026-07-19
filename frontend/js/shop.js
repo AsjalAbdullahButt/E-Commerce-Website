@@ -102,6 +102,13 @@ async function loadProducts() {
 
     if (isFreshQuery) {
       container.textContent = '';
+      if (!data.products || data.products.length === 0) {
+        renderEmptyStateInto(container, {
+          icon: 'fa-box-open',
+          title: 'No products found',
+          message: 'Try different filters, or clear them to browse the full catalog.',
+        });
+      }
       const frag = document.createDocumentFragment();
       data.products.forEach(p => frag.appendChild(buildProductCard(p)));
       container.appendChild(frag);

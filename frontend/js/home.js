@@ -61,10 +61,11 @@ async function loadFeaturedProducts(category = '') {
 
     container.textContent = '';
     if (!data.products || data.products.length === 0) {
-      const emptyState = document.createElement('div');
-      emptyState.className = 'empty-state';
-      emptyState.textContent = category ? `No products found for ${category}.` : 'No featured products available.';
-      container.appendChild(emptyState);
+      renderEmptyStateInto(container, {
+        icon: 'fa-box-open',
+        title: 'No products found',
+        message: category ? `No products found for ${category}.` : 'No featured products available.',
+      });
       return;
     }
 

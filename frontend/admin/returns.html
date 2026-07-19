@@ -47,7 +47,7 @@
 
     <section data-section="returns">
       <div class="admin-form-section reveal">
-        <div class="section-title-row" style="margin-bottom: 1rem;">
+        <div class="section-title-row">
           <div>
             <h2>Return Filters</h2>
             <p class="admin-section-desc">Narrow the queue by resolution status.</p>
@@ -77,8 +77,8 @@
             </tr>
           </thead>
           <tbody id="returns-table-body">
-            <tr id="returns-empty-row">
-              <td colspan="6" style="text-align:center;color:var(--text-secondary);">Loading return requests...</td>
+            <tr id="returns-empty-row" hidden>
+              <td colspan="6"></td>
             </tr>
           </tbody>
         </table>
@@ -94,11 +94,11 @@
         <button type="button" class="modal-close" id="resolve-modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="admin-form-section">
-        <div class="url-input-row" style="flex-direction: column; gap: 0.5rem;">
+        <div class="url-input-row url-input-row--stacked">
           <label for="resolve-refund-amount" id="resolve-refund-label">Refund Amount (Rs)</label>
           <input type="number" id="resolve-refund-amount" min="0" step="0.01" placeholder="Defaults to order total">
         </div>
-        <div class="url-input-row" style="flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
+        <div class="url-input-row url-input-row--stacked">
           <label for="resolve-admin-note">Note to customer (optional)</label>
           <textarea id="resolve-admin-note" rows="3" placeholder="Visible to the customer in their notification email"></textarea>
         </div>
@@ -115,6 +115,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
+  <script src="../shared/js/ui-states.js"></script>
   <script src="./js/returns.js?v=20260718"></script>
   <script src="../shared/js/neural-bg.js"></script>
   <script src="../shared/js/scroll-reveal.js"></script>

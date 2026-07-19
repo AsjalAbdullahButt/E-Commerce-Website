@@ -510,13 +510,16 @@ function renderProducts(products) {
   document.getElementById('products-visible-count').textContent = `${products.length} visible`;
 
   if (products.length === 0) {
-    emptyRow.style.display = '';
-    emptyRow.querySelector('td').textContent = 'No products match the current filters.';
-    emptyRow.querySelector('td').colSpan = 7;
+    emptyRow.hidden = false;
+    renderEmptyStateInto(emptyRow.querySelector('td'), {
+      icon: 'fa-box-open',
+      title: 'No products found',
+      message: 'No products match the current filters.',
+    });
     return;
   }
 
-  emptyRow.style.display = 'none';
+  emptyRow.hidden = true;
 
   products.forEach((product) => {
     const row = document.createElement('tr');
@@ -613,7 +616,8 @@ function applyFilters() {
 async function loadProducts() {
   const tbody = document.getElementById('product-table-body');
   if (tbody && productState.products.length === 0) {
-    tbody.querySelector('#product-empty-row td').textContent = 'Loading products...';
+    document.getElementById('product-empty-row').hidden = true;
+    showTableSkeleton(tbody, 7);
   }
 
   try {
@@ -625,10 +629,14 @@ async function loadProducts() {
   } catch (error) {
     showToast(error.message || 'Failed to load products', 'error');
     if (tbody) {
+      clearTableSkeleton(tbody);
       const emptyRow = document.getElementById('product-empty-row');
-      emptyRow.style.display = '';
-      emptyRow.querySelector('td').textContent = 'Failed to load products.';
-      emptyRow.querySelector('td').colSpan = 7;
+      emptyRow.hidden = false;
+      renderEmptyStateInto(emptyRow.querySelector('td'), {
+        icon: 'fa-triangle-exclamation',
+        title: 'Failed to load products',
+        message: 'Check your connection, then hit Refresh to try again.',
+      });
     }
   }
 }

@@ -34,15 +34,20 @@
   <site-header variant="staff" logo-href="../customer/index.html" links='[{"href":"./dashboard.html","label":"Dashboard","active":false},{"href":"./products.html","label":"Products","active":false},{"href":"./orders.html","label":"Orders","active":false},{"href":"./returns.html","label":"Returns","active":false},{"href":"./riders.html","label":"Riders","active":false},{"href":"./promos.html","label":"Promos","active":true},{"href":"./logs.html","label":"Logs","active":false}]'></site-header>
 <main>
     <div class="admin-header">
-      <h1 class="dashboard-title">Promo Codes</h1>
-      <button class="btn-primary" id="create-promo-btn" type="button">+ Create Promo</button>
+      <div class="admin-header-copy">
+        <h1 class="dashboard-title">Promo Codes</h1>
+        <p class="dashboard-subtitle">Create discount codes, track usage, and retire codes that have run their course.</p>
+      </div>
+      <div class="admin-toolbar">
+        <button class="btn-primary" id="create-promo-btn" type="button">+ Create Promo</button>
+      </div>
     </div>
 
     <div class="admin-grid reveal-stagger" id="promo-summary"></div>
 
     <section data-section="promos">
       <div class="admin-form-section reveal">
-        <div class="section-title-row" style="margin-bottom: 1rem;">
+        <div class="section-title-row">
           <div>
             <h2>Promo Filters</h2>
             <p class="admin-section-desc">Search by code or description, or narrow by status.</p>
@@ -75,8 +80,8 @@
             </tr>
           </thead>
           <tbody id="promo-table-body">
-            <tr id="promo-empty-row">
-              <td colspan="8" style="text-align:center;color:var(--text-secondary);">No promos yet</td>
+            <tr id="promo-empty-row" hidden>
+              <td colspan="9"></td>
             </tr>
           </tbody>
         </table>
@@ -89,6 +94,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
+  <script src="../shared/js/ui-states.js"></script>
   <script src="./js/promos.js?v=20260716"></script>
   <script src="../shared/js/neural-bg.js"></script>
   <script src="../shared/js/scroll-reveal.js"></script>

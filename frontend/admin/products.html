@@ -44,7 +44,7 @@
         <button class="builder-button" id="refresh-products-btn" type="button"><i class="fas fa-rotate"></i> Refresh</button>
         <button class="builder-button" id="export-products-btn" type="button"><i class="fas fa-file-export"></i> Export CSV</button>
         <button class="builder-button" id="import-products-btn" type="button"><i class="fas fa-file-import"></i> Import CSV</button>
-        <input type="file" id="import-products-file" accept=".csv" style="display:none;">
+        <input type="file" id="import-products-file" accept=".csv" hidden>
       </div>
     </div>
 
@@ -52,7 +52,7 @@
 
     <section data-section="products">
       <div class="admin-form-section reveal">
-        <div class="section-title-row" style="margin-bottom: 1rem;">
+        <div class="section-title-row">
           <div>
             <h2>Catalog Filters</h2>
             <p class="admin-section-desc">Search by name, narrow by category, or inspect active inventory only.</p>
@@ -87,8 +87,8 @@
             </tr>
           </thead>
           <tbody id="product-table-body">
-            <tr id="product-empty-row">
-              <td colspan="7" style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading products...</td>
+            <tr id="product-empty-row" hidden>
+              <td colspan="7"></td>
             </tr>
           </tbody>
         </table>
@@ -160,7 +160,7 @@
               <div class="stock-pill"><i class="fas fa-cubes"></i> <span id="product-stock-total">0 units</span></div>
             </div>
             <div class="builder-list" id="product-variant-rows"></div>
-            <div class="builder-actions" style="margin-top: 0.85rem;">
+            <div class="builder-actions">
               <button class="builder-button" id="add-variant-row-btn" type="button"><i class="fas fa-plus"></i> Add variant</button>
             </div>
           </div>
@@ -179,6 +179,7 @@
   <script src="../shared/js/api.js"></script>
   <script src="./js/admin-config.js"></script>
   <script src="./js/admin-api.js"></script>
+  <script src="../shared/js/ui-states.js"></script>
   <script src="./js/products.js"></script>
   <script src="../shared/js/neural-bg.js"></script>
   <script src="../shared/js/scroll-reveal.js"></script>
