@@ -6,24 +6,8 @@ const productState = {
 
 const PRODUCT_CATEGORIES = ADMIN_CONFIG.CATEGORIES || [];
 
-function getAdminData() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function formatCurrency(value) {
-  return `Rs ${Number(value || 0).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+// getAdminData/requireAuth/formatCurrency/formatDate come from js/admin-common.js;
+// showToast from shared/js/api.js — both load before this file on every admin page.
 
 function slugify(value) {
   return String(value || '')
@@ -32,22 +16,8 @@ function slugify(value) {
     .replace(/(^-|-$)/g, '');
 }
 
-// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
-
-function requireAuth() {
-  // The access token lives in memory only (see js/admin-api.js) and is restored lazily on the
-  // first API call, so it isn't checked here — only the cached (non-sensitive) profile.
-  const adminData = getAdminData();
-  if (!adminData) {
-    window.location.replace('./login.html');
-    return false;
-  }
-  if (!['admin', 'super_admin', 'manager'].includes(adminData.role)) {
-    window.location.replace('../customer/index.html');
-    return false;
-  }
-  return true;
-}
+// Catalog writes are limited to these roles (matches the backend's product-route permissions).
+const PRODUCT_PAGE_ROLES = ['admin', 'super_admin', 'manager'];
 
 function getCategoryLabel(value) {
   return (PRODUCT_CATEGORIES.find((category) => category.value === value) || {}).label || value || '-';
@@ -701,21 +671,11 @@ function bindEvents() {
     }
   });
 
-  document.getElementById('nav-logout-btn')?.addEventListener('click', async () => {
-    try {
-      await adminAPI.logout();
-    } catch {
-      // Ignore logout network errors and clear local state anyway.
-    }
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
-    window.location.href = './login.html';
-  });
+  // Logout is wired centrally in js/admin-common.js.
 }
 
 function initPage() {
-  if (!requireAuth()) return;
+  if (!requireAuth(PRODUCT_PAGE_ROLES)) return;
   populateCategories();
   bindEvents();
   clearProductForm();

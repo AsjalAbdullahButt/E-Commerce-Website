@@ -1,9 +1,5 @@
 // === PRODUCT.JS ===
-function swatchColorMap(name) {
-  const map = { black: '#111111', white: '#f5f5f5', grey: '#888888', gray: '#888888', navy: '#1b2a4a', beige: '#d8c7a1', olive: '#5c5c33', maroon: '#5c1f2e' };
-  const key = String(name || '').trim().toLowerCase();
-  return map[key] || key || '#888';
-}
+// swatchColor comes from shared/js/ui-states.js, loaded before this file.
 
 // The <meta> tags in product.html are static fallbacks (there's no server-side rendering in this
 // vanilla-JS frontend, so a crawler that doesn't execute JS still sees a reasonable generic
@@ -178,7 +174,7 @@ function setupVariantSelectors(product) {
       btn.setAttribute('data-color', color);
       const dot = document.createElement('span');
       dot.className = 'color-btn-dot';
-      dot.style.background = swatchColorMap(color);
+      dot.style.background = swatchColor(color);
       btn.appendChild(dot);
       btn.appendChild(document.createTextNode(color));
       const hasStock = variants.some(v => v.color === color && v.stock > 0);

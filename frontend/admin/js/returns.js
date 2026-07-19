@@ -4,24 +4,7 @@ const returnsState = {
   resolvingAction: null,
 };
 
-function getAdminData() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function formatCurrency(value) {
-  return `Rs ${Number(value || 0).toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+// getAdminData/formatCurrency/formatDate come from js/admin-common.js, loaded before this file.
 
 function updateSummary(returns) {
   const summary = document.getElementById('returns-summary');
@@ -217,17 +200,7 @@ function bindEvents() {
     if (event.target.id === 'resolve-modal') closeResolveModal();
   });
 
-  document.getElementById('nav-logout-btn')?.addEventListener('click', async () => {
-    try {
-      await adminAPI.logout();
-    } catch {
-      // fall through
-    }
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
-    window.location.href = './login.html';
-  });
+  // Logout is wired centrally in js/admin-common.js.
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeResolveModal();

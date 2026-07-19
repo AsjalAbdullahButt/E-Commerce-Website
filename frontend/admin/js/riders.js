@@ -3,26 +3,8 @@ const riderState = {
   activeCounts: {},
 };
 
-function getAdminData() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function requireAuth() {
-  // The access token lives in memory only (see js/admin-api.js) and is restored lazily on the
-  // first API call, so it isn't checked here — only the cached (non-sensitive) profile.
-  const adminData = getAdminData();
-  if (!adminData) {
-    window.location.replace('./login.html');
-    return false;
-  }
-  return true;
-}
-
-// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
+// getAdminData/requireAuth come from js/admin-common.js; showToast from shared/js/api.js —
+// both load before this file on every admin page.
 
 function _onRiderModalKeydown(e) {
   if (e.key === 'Escape') closeRiderModal();
@@ -207,13 +189,7 @@ function bindEvents() {
     if (event.target.id === 'rider-modal') closeRiderModal();
   });
 
-  document.getElementById('nav-logout-btn')?.addEventListener('click', async () => {
-    try { await adminAPI.logout(); } catch {}
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
-    window.location.href = './login.html';
-  });
+  // Logout is wired centrally in js/admin-common.js.
 }
 
 function initPage() {

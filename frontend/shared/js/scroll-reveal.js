@@ -20,7 +20,11 @@
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+    // threshold 0 (any overlap), not a ratio: a ratio can never be reached by containers that
+    // are empty when observed (their content arrives async — e.g. the shop grid's skeletons),
+    // and elements much taller than the viewport would never hit it either, staying invisible.
+    // The -60px rootMargin is what keeps reveals from firing prematurely.
+    }, { threshold: 0, rootMargin: '0px 0px -60px 0px' });
 
     targets.forEach(el => observer.observe(el));
   }

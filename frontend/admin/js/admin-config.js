@@ -107,8 +107,3 @@ const STORAGE_KEYS = {
     REFRESH_TOKEN: 'admin_refresh_token',
     ADMIN_DATA: 'admin_data',
 };
-
-// Export for use in other scripts
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ADMIN_CONFIG, STORAGE_KEYS };
-}

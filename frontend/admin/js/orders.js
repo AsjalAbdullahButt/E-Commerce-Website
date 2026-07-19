@@ -19,37 +19,8 @@ const VALID_TRANSITIONS = {
   returned: [],
 };
 
-function getAdminData() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function requireAuth() {
-  // The access token lives in memory only (see js/admin-api.js) and is restored lazily on the
-  // first API call, so it isn't checked here — only the cached (non-sensitive) profile.
-  const adminData = getAdminData();
-  if (!adminData) {
-    window.location.replace('./login.html');
-    return false;
-  }
-  return true;
-}
-
-function formatCurrency(value) {
-  return `Rs ${Number(value || 0).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-PK', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-// showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
+// getAdminData/requireAuth/formatCurrency/formatDate come from js/admin-common.js;
+// showToast from shared/js/api.js — both load before this file on every admin page.
 
 function renderOrders(orders) {
   const tbody = document.getElementById('order-table-body');

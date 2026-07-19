@@ -1,0 +1,131 @@
+/* === PRODUCT CARD COMPONENT (customer home + shop grids) ===
+   One card style for every product grid — markup built by shared/js/product-card.js.
+   Link this after global.css on any page with a .product-grid; the page's own stylesheet
+   keeps only the grid layout itself. Interaction layers (3D tilt, image crossfade, swatch
+   reveal, magnetic buttons) live in global.css. */
+
+.product-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card:hover {
+  border-color: var(--gold-border);
+  background: var(--bg-card-hover);
+  transform: translateY(-8px);
+  /* Lift + gold glow, composed purely from the global elevation tokens */
+  box-shadow: var(--shadow-md), var(--shadow-gold);
+}
+
+.product-image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, var(--bg-surface), var(--bg-card));
+  overflow: hidden;
+}
+
+.product-image-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 215, 0, 0.1));
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease);
+}
+
+.product-card:hover .product-image-wrapper::after {
+  opacity: 1;
+}
+
+.product-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-base) var(--ease);
+}
+
+.product-card:hover .product-image-wrapper img {
+  transform: scale(1.05);
+}
+
+.wishlist-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid var(--gold-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.wishlist-btn:hover {
+  background: var(--gold);
+  color: #000;
+}
+
+.wishlist-btn.active {
+  background: var(--gold);
+  color: #000;
+}
+
+.product-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.product-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.product-price {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--gold);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  flex-grow: 1;
+  display: flex;
+  align-items: flex-end;
+}
+
+.product-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.product-actions a,
+.product-actions button {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--gold-border);
+  background: transparent;
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.product-actions a:hover,
+.product-actions button:hover {
+  background: var(--gold-glow);
+}

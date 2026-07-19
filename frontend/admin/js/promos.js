@@ -10,17 +10,7 @@ const promoState = {
 
 // showToast is defined once in shared/js/api.js and loaded before this file on every admin page.
 
-function getAdminData() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMIN_DATA) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function formatCurrency(value) {
-  return `Rs ${Number(value || 0).toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
-}
+// getAdminData/formatCurrency come from js/admin-common.js, loaded before this file.
 
 function formatDiscount(promo) {
   if (promo.discount_type === 'percentage') {
@@ -478,20 +468,7 @@ function bindEvents() {
     createBtn.addEventListener('click', openModal);
   }
 
-  const logoutBtn = document.getElementById('nav-logout-btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-      try {
-        await adminAPI.logout();
-      } catch {
-        // fall through
-      }
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
-      window.location.href = './login.html';
-    });
-  }
+  // Logout is wired centrally in js/admin-common.js.
 
   const search = document.getElementById('promo-search');
   const status = document.getElementById('promo-status-filter');

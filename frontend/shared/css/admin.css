@@ -104,12 +104,6 @@ main {
   border-radius: 0;
 }
 
-.admin-title {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  color: var(--gold);
-  margin-bottom: 2rem;
-}
 
 .admin-grid {
   display: grid;
@@ -174,22 +168,6 @@ main {
   font-size: 1.3rem;
   margin-bottom: 1.5rem;
   margin-top: 2rem;
-}
-
-.action-btn {
-  padding: 0.75rem 1.5rem;
-  background: var(--gold);
-  color: #000;
-  border: none;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--transition);
-  margin-bottom: 1.5rem;
-}
-
-.action-btn:hover {
-  background: var(--gold-hover);
 }
 
 .table-wrapper {

@@ -85,21 +85,7 @@ class AdminAnalyticsDashboard {
         }
     }
 
-    _formatCurrency(value) {
-        const amount = Number(value || 0);
-        return `Rs ${amount.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
-    }
-
-    _formatDate(value) {
-        if (!value) return '-';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '-';
-        return date.toLocaleDateString('en-PK', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    }
+    // formatCurrency/formatDate come from js/admin-common.js, loaded before this file.
 
     _chartAnimation() {
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -220,7 +206,7 @@ class AdminAnalyticsDashboard {
             const summary = await adminAPI.getDashboardSummary();
             const stats = summary.stats || {};
 
-            this._animateStat('[data-stat="revenue"]', Number(stats.total_revenue || 0), (v) => this._formatCurrency(v));
+            this._animateStat('[data-stat="revenue"]', Number(stats.total_revenue || 0), (v) => formatCurrency(v));
             this._animateStat('[data-stat="orders"]', Number(stats.total_orders || 0), (v) => String(Math.round(v)));
             this._renderTrend('revenue', stats.revenue_trend_pct);
             this._renderTrend('orders', stats.orders_trend_pct);
@@ -367,7 +353,7 @@ class AdminAnalyticsDashboard {
         const rows = items.map((item) => [
             item.name || 'Unknown',
             String(item.quantity_sold ?? 0),
-            this._formatCurrency(item.revenue),
+            formatCurrency(item.revenue),
         ]);
 
         if (!rows.length) {
@@ -386,8 +372,8 @@ class AdminAnalyticsDashboard {
         const rows = items.map((item) => [
             item.order_number || item.order_id || '-',
             item.status || '-',
-            this._formatCurrency(item.total),
-            this._formatDate(item.created_at),
+            formatCurrency(item.total),
+            formatDate(item.created_at),
         ]);
 
         if (!rows.length) {
