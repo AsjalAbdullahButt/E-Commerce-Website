@@ -75,9 +75,32 @@ async function loadProduct() {
 
     // Load reviews
     await loadReviews(id);
+    await loadRecommendations(id);
   } catch (err) {
     console.error('Failed to load product', err);
     showToast('Failed to load product', 'error');
+  }
+}
+
+// "Frequently Bought Together" — GET /products/{id}/recommendations (order_items co-occurrence,
+// see backend/routes/products.py::get_recommendations). Section stays hidden entirely when
+// there's nothing to recommend, rather than showing an empty heading.
+async function loadRecommendations(productId) {
+  const section = document.getElementById('recommendations-section');
+  const grid = document.getElementById('recommendations-grid');
+  if (!section || !grid) return;
+
+  try {
+    const result = await api.get(`/products/${productId}/recommendations`);
+    const products = Array.isArray(result?.products) ? result.products : [];
+    if (!products.length) return;
+
+    grid.textContent = '';
+    products.forEach((p) => grid.appendChild(buildProductCard(p)));
+    section.style.display = 'block';
+  } catch (err) {
+    console.error('Failed to load recommendations', err);
+    // Non-critical — leave the section hidden rather than surfacing an error toast for it.
   }
 }
 
