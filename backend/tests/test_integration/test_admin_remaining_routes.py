@@ -8,6 +8,7 @@ GET /admin/inventory/history/{id}, GET /admin/orders/{id}, GET /admin/users/{id}
 import asyncio
 
 from services.admin_auth import AdminAuthService
+from utils.limiter import limiter
 
 
 def _admin_token(client, email="remainingadmin@test.com", password="AdminPass123", role="admin"):
@@ -180,6 +181,11 @@ def test_super_admin_can_unlock_locked_admin_account(client):
     for _ in range(5):
         client.post("/admin/auth/login", json={"email": email, "password": "WrongPassword1"})
 
+    # /admin/auth/login is now also rate limited per-IP (Phase 1 hardening: settings.rate_login,
+    # default 5/minute) -- the 5 failed attempts above already used up this test's quota for the
+    # endpoint, so reset it before the 6th call, which is checking account-lock behavior, not
+    # rate limiting.
+    limiter.reset()
     locked_login = client.post("/admin/auth/login", json={"email": email, "password": password})
     assert locked_login.status_code == 423  # Locked — AdminAuthService.authenticate's explicit signal
 

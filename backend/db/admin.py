@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base, IDMixin, TimestampMixin
@@ -17,10 +17,10 @@ class AdminUser(Base, IDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    last_locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_locked_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    last_login: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     # See db/user.py::tokens_invalidated_at — same reuse-detection kill switch, admin side.
-    tokens_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    tokens_invalidated_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
 
 class AuditLog(Base, IDMixin):
@@ -31,7 +31,7 @@ class AuditLog(Base, IDMixin):
     __tablename__ = "audit_logs"
 
     entry_type: Mapped[str] = mapped_column(String(20), index=True)  # system_log | admin_action
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
 
     # system_log fields (utils/logger.py::log_to_db)
     level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)

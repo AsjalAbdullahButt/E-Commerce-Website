@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -20,12 +21,67 @@ import time
 
 logger = get_logger(__name__)
 
+# ── Startup / shutdown ─────────────────────────────────────────────────────────
+def check_single_worker_deployment() -> None:
+    """utils/cache.py and utils/limiter.py are process-local in-memory stores (no Redis or other
+    shared backend). Running more than one worker process means each worker has its own
+    independent cache and rate-limit counters, so cache invalidation and rate limits silently
+    stop being consistent across requests. Fail fast in production rather than degrade silently;
+    warn loudly elsewhere so local perf testing with multiple workers isn't blocked outright."""
+    if settings.web_concurrency <= 1:
+        return
+    message = (
+        f"web_concurrency={settings.web_concurrency} but utils/cache.py and utils/limiter.py "
+        "are process-local (no Redis backend) — cache invalidation and rate limits will be "
+        "inconsistent across workers. Set WEB_CONCURRENCY=1 (single worker) or wire up a shared "
+        "Redis-backed cache/limiter before scaling horizontally."
+    )
+    if settings.is_production:
+        raise RuntimeError(message)
+    print(f"    ⚠️  {message}\n")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Replaces the deprecated @app.on_event("startup"/"shutdown") decorators with the current
+    asgi-native pattern: everything before `yield` runs once at startup, everything after runs
+    once at shutdown, in the same function so the two halves stay obviously paired."""
+    check_single_worker_deployment()
+    start_cache_sweeper()
+    start_revocation_sweeper()
+    print("\n    ╔════════════════════════════════════╗")
+    print("    ║   🛍️  E-COMMERCE API v2.0  🛍️      ║")
+    print("    ╠════════════════════════════════════╣")
+    print("    ║  📊 Connecting to Database...     ║")
+    print("    ╚════════════════════════════════════╝\n")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        print("    ✅  MySQL connected — server ready on :8000\n")
+        print("    ✅  Schema managed by Alembic (see backend/alembic/) — indexes/constraints")
+        print("        are declared on the SQLAlchemy models, not created at runtime.")
+    except Exception as e:
+        print(f"    ❌  MySQL FAILED: {e}\n")
+        raise RuntimeError(f"Cannot connect to MySQL: {e}")
+
+    yield
+
+    await stop_cache_sweeper()
+    await stop_revocation_sweeper()
+    try:
+        await engine.dispose()
+        print("MySQL connection pool closed.")
+    except Exception:
+        pass
+
+
 app = FastAPI(
     title="E-Commerce API",
     description="Full-Stack E-Commerce Platform",
     version="2.0.0",
     docs_url="/docs" if settings.docs_enabled else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────────
@@ -108,46 +164,6 @@ async def add_request_id(request: Request, call_next):
         pass
     return response
 
-# ── Startup ────────────────────────────────────────────────────────────────────
-def check_single_worker_deployment() -> None:
-    """utils/cache.py and utils/limiter.py are process-local in-memory stores (no Redis or other
-    shared backend). Running more than one worker process means each worker has its own
-    independent cache and rate-limit counters, so cache invalidation and rate limits silently
-    stop being consistent across requests. Fail fast in production rather than degrade silently;
-    warn loudly elsewhere so local perf testing with multiple workers isn't blocked outright."""
-    if settings.web_concurrency <= 1:
-        return
-    message = (
-        f"web_concurrency={settings.web_concurrency} but utils/cache.py and utils/limiter.py "
-        "are process-local (no Redis backend) — cache invalidation and rate limits will be "
-        "inconsistent across workers. Set WEB_CONCURRENCY=1 (single worker) or wire up a shared "
-        "Redis-backed cache/limiter before scaling horizontally."
-    )
-    if settings.is_production:
-        raise RuntimeError(message)
-    print(f"    ⚠️  {message}\n")
-
-
-@app.on_event("startup")
-async def startup_db_check():
-    check_single_worker_deployment()
-    start_cache_sweeper()
-    start_revocation_sweeper()
-    print("\n    ╔════════════════════════════════════╗")
-    print("    ║   🛍️  E-COMMERCE API v2.0  🛍️      ║")
-    print("    ╠════════════════════════════════════╣")
-    print("    ║  📊 Connecting to Database...     ║")
-    print("    ╚════════════════════════════════════╝\n")
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        print("    ✅  MySQL connected — server ready on :8000\n")
-        print("    ✅  Schema managed by Alembic (see backend/alembic/) — indexes/constraints")
-        print("        are declared on the SQLAlchemy models, not created at runtime.")
-    except Exception as e:
-        print(f"    ❌  MySQL FAILED: {e}\n")
-        raise RuntimeError(f"Cannot connect to MySQL: {e}")
-
 # ── Uploaded product images (local-disk storage fallback) ──────────────────────
 # Only ever serves files under backend/uploads/ — populated exclusively by
 # services/image_storage.py, never user-addressable for writes. Irrelevant once S3_ENABLED is
@@ -177,15 +193,19 @@ app.include_router(seo.router,       prefix="",           tags=["SEO"])
 async def root():
     return {"status": "ok", "version": "2.0.0"}
 
-@app.on_event("shutdown")
-async def shutdown_db():
-    await stop_cache_sweeper()
-    await stop_revocation_sweeper()
+
+@app.get("/health", tags=["Health"])
+async def health():
+    """Real liveness/readiness probe for a load balancer or container orchestrator -- unlike
+    `/`, this actually checks DB connectivity and reports 503 (not 200) on failure, so a
+    misconfigured or unreachable MySQL doesn't get silently routed traffic anyway."""
     try:
-        await engine.dispose()
-        print("MySQL connection pool closed.")
-    except Exception:
-        pass
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        logger.error(f"Health check DB probe failed: {e}")
+        return JSONResponse(status_code=503, content={"status": "error", "database": "unreachable"})
 
 
 if __name__ == "__main__":

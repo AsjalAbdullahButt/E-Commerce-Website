@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -96,7 +96,7 @@ class DiscountService:
 
         for key, value in updates.items():
             setattr(promo, key, value)
-        promo.updated_at = datetime.utcnow()
+        promo.updated_at = datetime.now(timezone.utc)
 
         # Log audit
         from services.admin_auth import AdminAuditService

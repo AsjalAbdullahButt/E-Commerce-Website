@@ -63,6 +63,9 @@
           <button type="button" class="auth-btn" onclick="handleRegister()">Create Account</button>
         </form>
 
+        <div class="auth-divider" id="google-divider">or</div>
+        <div class="google-signin-container" id="google-signin-container"></div>
+
         <p class="auth-footer">
           Already have an account? <a href="./login.html">Login here</a>
         </p>
@@ -85,6 +88,7 @@
       document.getElementById('register-confirm'),
       Validators.matches(() => document.getElementById('register-password').value, 'Passwords do not match')
     );
+    initGoogleSignIn('google-signin-container', 'google-divider');
 
     async function handleRegister() {
       const name = document.getElementById('register-name').value;

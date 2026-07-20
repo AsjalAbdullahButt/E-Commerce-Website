@@ -319,8 +319,11 @@ class DiscountCreate(BaseModel):
     @field_validator('expiry_date')
     @classmethod
     def expiry_must_be_future(cls, v):
-        expiry = v.astimezone(timezone.utc).replace(tzinfo=None) if v.tzinfo else v
-        if expiry <= datetime.utcnow():
+        # Normalize to an aware UTC datetime either way (naive input is assumed already-UTC,
+        # matching this codebase's convention) so the comparison below is never naive-vs-aware,
+        # which raises TypeError rather than comparing correctly.
+        expiry = v.astimezone(timezone.utc) if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        if expiry <= datetime.now(timezone.utc):
             raise ValueError('Expiry date must be in the future')
         return v
 

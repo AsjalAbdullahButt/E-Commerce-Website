@@ -6,7 +6,7 @@ Inserts: 20 products (12 clothing + 8 accessories), 3 users, 3 sample orders
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
@@ -202,7 +202,7 @@ async def seed():
                               price=white_tee.price, quantity=2, size="M", color="White", image=white_tee.images[0]))
             for s, note in [("pending", "Order placed"), ("confirmed", "Order confirmed"),
                              ("shipped", "Out for delivery"), ("delivered", "Delivered")]:
-                db.add(OrderStatusHistory(order_id=order1.id, status=s, timestamp=datetime.utcnow(), note=note))
+                db.add(OrderStatusHistory(order_id=order1.id, status=s, timestamp=datetime.now(timezone.utc), note=note))
             print("Order 1: customer1 - delivered")
 
         if customer1 and black_hoodie:
@@ -217,7 +217,7 @@ async def seed():
                               price=black_hoodie.price, quantity=1, size="L", color="Black", image=black_hoodie.images[0]))
             for s, note in [("pending", "Order placed"), ("confirmed", "Order confirmed"),
                              ("shipped", "Out for delivery")]:
-                db.add(OrderStatusHistory(order_id=order2.id, status=s, timestamp=datetime.utcnow(), note=note))
+                db.add(OrderStatusHistory(order_id=order2.id, status=s, timestamp=datetime.now(timezone.utc), note=note))
             print("Order 2: customer1 - shipped")
 
         if customer2 and backpack and cap:
@@ -234,7 +234,7 @@ async def seed():
                               price=backpack.price, quantity=1, size="", color="Black", image=backpack.images[0]))
             db.add(OrderItem(order_id=order3.id, product_id=cap.id, name=cap.name,
                               price=cap.price, quantity=1, size="", color="Black", image=cap.images[0]))
-            db.add(OrderStatusHistory(order_id=order3.id, status="pending", timestamp=datetime.utcnow(), note="Order placed"))
+            db.add(OrderStatusHistory(order_id=order3.id, status="pending", timestamp=datetime.now(timezone.utc), note="Order placed"))
             print("Order 3: customer2 - pending")
 
         await db.commit()

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from sqlalchemy import func, select
@@ -17,7 +17,7 @@ class DashboardService:
     @staticmethod
     async def get_dashboard_stats(db: AsyncSession) -> dict:
         """Get key dashboard statistics"""
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         total_sales = (await db.execute(
             select(func.coalesce(func.sum(Order.total), 0)).where(Order.status == "delivered")
@@ -57,7 +57,7 @@ class DashboardService:
     @staticmethod
     async def get_revenue_trend(db: AsyncSession, days: int = 30) -> dict:
         """Get revenue trend for last N days"""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         day_bucket = func.date_format(Order.created_at, "%Y-%m-%d")
         result = await db.execute(

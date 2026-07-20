@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, status, Request, Response, UploadFile
@@ -112,7 +112,7 @@ async def dashboard_summary(request: Request, _=Depends(verify_admin_token), db:
         # both revenue and the order count, same exclusion total_revenue already applies, so the
         # two numbers stay comparable. None (not 0%) when the previous window has no orders at
         # all — a percentage change from zero is undefined, not honestly representable as a number.
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         period_start = now - timedelta(days=30)
         prev_period_start = now - timedelta(days=60)
 
@@ -420,7 +420,7 @@ async def logout(request: Request, response: Response, admin_data: dict = Depend
             try:
                 payload = jwt.decode(refresh_token_str, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
                 if payload.get("type") == "refresh" and payload.get("jti") and payload.get("exp") is not None:
-                    await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.utcfromtimestamp(payload["exp"]))
+                    await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.fromtimestamp(payload["exp"], tz=timezone.utc))
             except JWTError:
                 pass  # already invalid/expired — nothing left to revoke
 
@@ -502,7 +502,9 @@ async def upload_product_image(
     if not await check_permission(admin_data, "product:create"):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
-    url, thumbnail_url = await ImageStorageService.upload(file, str(request.base_url))
+    url, thumbnail_url = await ImageStorageService.upload(
+        file, str(request.base_url), content_length_header=request.headers.get("content-length"),
+    )
     await log_to_db(
         "PRODUCT_IMAGE_UPLOADED", __name__, f"image uploaded by admin {admin_data.get('admin_id')}",
         {"admin_id": admin_data.get("admin_id"), "url": url},
@@ -1265,7 +1267,7 @@ async def assign_rider(order_id: str, rider_id: str, admin_data: dict = Depends(
         raise HTTPException(status_code=400, detail="Rider does not exist or is not active/available")
 
     order.rider_id = rider_id
-    order.updated_at = datetime.utcnow()
+    order.updated_at = datetime.now(timezone.utc)
     return {"success": True, "message": "Rider assigned"}
 
 # ════════════════════════════════════════════════════════════════════════════

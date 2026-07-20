@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import ID_TYPE, Base, IDMixin, TimestampMixin
@@ -69,7 +69,7 @@ class OrderStatusHistory(Base, IDMixin):
 
     order_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     status: Mapped[str] = mapped_column(String(20))
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
@@ -79,4 +79,4 @@ class OrderNote(Base, IDMixin):
     order_id: Mapped[str] = mapped_column(ID_TYPE, ForeignKey("orders.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
     added_by: Mapped[str] = mapped_column(String(24))
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

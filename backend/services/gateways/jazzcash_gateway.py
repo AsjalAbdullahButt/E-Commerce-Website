@@ -1,6 +1,6 @@
 import hashlib
 import hmac
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from config import settings
@@ -48,7 +48,7 @@ class JazzCashGateway(PaymentGateway):
         return digest.upper()
 
     async def initiate(self, *, order: Order, payment_id: str) -> dict:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # pp_TxnRefNo carries our own payment_id (prefixed "T" since JazzCash requires an
         # alphabetic lead character) so the callback can be matched straight back to this
         # attempt — see verify_webhook. Some JazzCash account versions cap this field at 20

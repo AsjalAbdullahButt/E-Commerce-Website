@@ -3,10 +3,20 @@ Phase 2 polish pass — input validation/sanitization on free-text fields beyond
 Pydantic `str` typing enforces (NOTES_schema_audit.md, "Polish-pass Phase 2" section).
 Covers: review comments, shipping addresses, order status notes, admin ban/adjust-stock
 reasons/notes, and product name/description/category.
+
+utils/helpers.py::sanitize_input's MongoDB-operator blacklist (Phase 3 hardening, 2026-07-20)
+was removed: this is a MySQL app where SQLAlchemy's parameter binding already prevents SQL
+injection regardless of string contents, so rejecting "$where"/"$ne"/etc. provided zero real
+protection while blocking legitimate text that happened to contain one of those substrings.
+The tests that used to assert those strings were rejected now assert the opposite -- and cover
+the replacement checks (null byte rejection, Unicode NFKC normalization) instead.
 """
 import asyncio
 
+import pytest
+
 from services.admin_auth import AdminAuthService
+from utils.helpers import sanitize_input
 
 
 def _admin_token(client, email="validationadmin@test.com", password="AdminPass123", role="admin"):
@@ -60,7 +70,11 @@ def _place_and_deliver_order(client, admin_token, customer_token, product_id):
 
 # ── Review comment ──────────────────────────────────────────────────────────────
 
-def test_review_comment_rejects_nosql_operator(client):
+def test_review_comment_accepts_dollar_sign_text(client):
+    # "$where"-shaped substrings used to be rejected as a MongoDB-operator blacklist -- a
+    # leftover from this app's pre-migration Mongo backend with zero relevance to a MySQL app
+    # (SQLAlchemy's parameter binding is what actually prevents injection). Legitimate text like
+    # a price mention must not be rejected just because it contains "$where"/"$gt"/etc.
     admin_token = _admin_token(client)
     customer_token = _register_customer(client)
     product_id = _create_product(client, admin_token)
@@ -68,10 +82,10 @@ def test_review_comment_rejects_nosql_operator(client):
 
     resp = client.post(
         "/reviews",
-        json={"product_id": product_id, "rating": 5, "comment": "nice $where trick"},
+        json={"product_id": product_id, "rating": 5, "comment": "Worth every $, no $where trick needed"},
         headers={"Authorization": f"Bearer {customer_token}"},
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 200, resp.text
 
 
 def test_review_comment_rejects_oversized_input(client):
@@ -141,7 +155,7 @@ def test_order_rejects_oversized_shipping_address(client):
     assert resp.status_code == 422
 
 
-def test_order_rejects_nosql_operator_in_shipping_address(client):
+def test_order_accepts_dollar_sign_in_shipping_address(client):
     admin_token = _admin_token(client)
     customer_token = _register_customer(client)
     product_id = _create_product(client, admin_token)
@@ -154,14 +168,14 @@ def test_order_rejects_nosql_operator_in_shipping_address(client):
                 "quantity": 1, "size": "One Size", "color": "White", "image": "",
             }],
             "shipping_address": {
-                "full_name": "$ne", "phone": "03001234567",
+                "full_name": "$ne Trading Co", "phone": "03001234567",
                 "address": "1 Test Rd", "city": "Karachi", "postal_code": "75000",
             },
             "payment_method": "cod",
         },
         headers={"Authorization": f"Bearer {customer_token}"},
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 200, resp.text
 
 
 # ── Admin free-text: ban reason, order note, stock-adjust reason ───────────────
@@ -193,7 +207,7 @@ def test_ban_user_accepts_normal_reason(client):
     assert resp.status_code == 200, resp.text
 
 
-def test_add_order_note_rejects_nosql_operator(client):
+def test_add_order_note_accepts_dollar_sign_text(client):
     admin_token = _admin_token(client)
     customer_token = _register_customer(client, email="notecustomer@test.com")
     product_id = _create_product(client, admin_token)
@@ -216,10 +230,10 @@ def test_add_order_note_rejects_nosql_operator(client):
 
     resp = client.post(
         f"/admin/orders/{order_id}/note",
-        params={"note": "$where malicious"},
+        params={"note": "Customer asked about a $where clause in their custom integration"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 200, resp.text
 
 
 def test_adjust_stock_rejects_oversized_reason(client):
@@ -263,5 +277,41 @@ def test_create_product_rejects_empty_name(client):
             "variants": [{"size": "One Size", "color": "White", "sku": "empty-name-1", "stock": 10}],
         },
         headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 422
+
+
+# ── sanitize_input itself: the Phase 3 replacement checks ───────────────────────
+
+def test_sanitize_input_rejects_null_byte():
+    with pytest.raises(ValueError):
+        sanitize_input("hello\x00world")
+
+
+def test_sanitize_input_normalizes_unicode_nfkc():
+    # U+FF21/22/23 (fullwidth "A"/"B"/"C") NFKC-normalize to plain ASCII "A"/"B"/"C" -- two
+    # different code points that render identically, which would otherwise let visually
+    # indistinguishable strings evade exact-match/duplicate-detection logic downstream.
+    assert sanitize_input("ＡＢＣ") == "ABC"
+
+
+def test_sanitize_input_strips_control_characters_but_keeps_newlines_and_tabs():
+    assert sanitize_input("line one\nline\ttwo\x07") == "line one\nline\ttwo"
+
+
+def test_sanitize_input_no_longer_rejects_dollar_operator_shaped_text():
+    assert sanitize_input("cost $gt 100 and $lte 500") == "cost $gt 100 and $lte 500"
+
+
+def test_review_comment_rejects_null_byte(client):
+    admin_token = _admin_token(client)
+    customer_token = _register_customer(client, email="nullbytecustomer@test.com")
+    product_id = _create_product(client, admin_token)
+    _place_and_deliver_order(client, admin_token, customer_token, product_id)
+
+    resp = client.post(
+        "/reviews",
+        json={"product_id": product_id, "rating": 5, "comment": "great\x00product"},
+        headers={"Authorization": f"Bearer {customer_token}"},
     )
     assert resp.status_code == 422

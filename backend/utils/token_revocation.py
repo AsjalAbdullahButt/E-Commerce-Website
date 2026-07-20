@@ -10,7 +10,7 @@
    refresh token for that account too (checked via each token's `iat`), not just the replayed one.
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -57,7 +57,7 @@ async def enforce_refresh_rotation(db: AsyncSession, user_obj, payload: dict) ->
         # rolls back the whole request's session on any exception — the mass-invalidation must
         # durably persist *because* a breach was detected, not in spite of it (same precedent as
         # services/admin_auth.py's failed-login counter).
-        user_obj.tokens_invalidated_at = datetime.utcnow()
+        user_obj.tokens_invalidated_at = datetime.now(timezone.utc)
         await db.commit()
         await log_to_db(
             "SECURITY_ALERT", "utils.token_revocation", "REFRESH_TOKEN_REUSE_DETECTED",
@@ -67,17 +67,20 @@ async def enforce_refresh_rotation(db: AsyncSession, user_obj, payload: dict) ->
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     invalidated_at = getattr(user_obj, "tokens_invalidated_at", None)
-    if invalidated_at is not None and datetime.utcfromtimestamp(iat) < invalidated_at:
+    # <=, not <: MySQL's DATETIME truncates to whole seconds, so a token issued in the same
+    # second a breach was detected would otherwise compare equal to tokens_invalidated_at and
+    # slip through. A security check should fail closed on a timestamp tie, not fail open.
+    if invalidated_at is not None and datetime.fromtimestamp(iat, tz=timezone.utc) <= invalidated_at:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    await revoke_jti(db, jti, user_id, role, datetime.utcfromtimestamp(exp))
+    await revoke_jti(db, jti, user_id, role, datetime.fromtimestamp(exp, tz=timezone.utc))
 
 
 async def purge_expired_revocations(db: AsyncSession) -> None:
     """Drop rows whose underlying JWT has already expired naturally — once a token's `exp` has
     passed it can never be redeemed anyway, revoked or not, so keeping the row serves no purpose
     and would otherwise grow this table forever."""
-    await db.execute(delete(RevokedToken).where(RevokedToken.expires_at <= datetime.utcnow()))
+    await db.execute(delete(RevokedToken).where(RevokedToken.expires_at <= datetime.now(timezone.utc)))
     await db.commit()
 
 

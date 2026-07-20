@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -63,7 +63,7 @@ class AdminAuthService:
         if admin.is_locked:
             lockout_expired = (
                 admin.last_locked_at is not None
-                and datetime.utcnow() >= admin.last_locked_at + timedelta(minutes=settings.admin_lockout_minutes)
+                and datetime.now(timezone.utc) >= admin.last_locked_at + timedelta(minutes=settings.admin_lockout_minutes)
             )
             if lockout_expired:
                 admin.is_locked = False
@@ -84,7 +84,7 @@ class AdminAuthService:
 
             admin.failed_login_attempts = failed_attempts
             admin.is_locked = is_locked
-            admin.last_locked_at = datetime.utcnow() if is_locked else None
+            admin.last_locked_at = datetime.now(timezone.utc) if is_locked else None
             # Commit explicitly here: this method is about to raise HTTPException, and
             # database.py::get_db() rolls back the whole request's session on any exception
             # (deliberately, so e.g. a failed checkout doesn't leave a partial stock decrement
@@ -108,7 +108,7 @@ class AdminAuthService:
 
         # Reset failed attempts on successful login
         admin.failed_login_attempts = 0
-        admin.last_login = datetime.utcnow()
+        admin.last_login = datetime.now(timezone.utc)
 
         # Create tokens
         access_token = create_access_token(admin.id, admin.role or "admin")
@@ -191,7 +191,7 @@ class AdminAuthService:
             )
 
         admin.password_hash = hash_password(new_password)
-        admin.updated_at = datetime.utcnow()
+        admin.updated_at = datetime.now(timezone.utc)
 
         logger.info(f"Password changed for admin {admin_id}")
         return True
@@ -205,7 +205,7 @@ class AdminAuthService:
 
         admin.is_locked = False
         admin.failed_login_attempts = 0
-        admin.updated_at = datetime.utcnow()
+        admin.updated_at = datetime.now(timezone.utc)
 
         # Log this action
         await AdminAuditService.log_action(
@@ -251,7 +251,7 @@ class AdminAuditService:
                 entity_id=entity_id,
                 changes=changes,
                 ip_address=ip_address,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
             db.add(entry)
             await db.flush()

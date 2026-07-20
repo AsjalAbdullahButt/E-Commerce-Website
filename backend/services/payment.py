@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -95,7 +95,7 @@ class PaymentService:
         except Exception as e:
             payment.status = "failed"
             payment.failure_reason = str(e)
-            payment.updated_at = datetime.utcnow()
+            payment.updated_at = datetime.now(timezone.utc)
             await log_to_db(
                 "PAYMENT_INITIATE_FAILED", __name__, f"gateway call failed for order {order.id}",
                 {"order_id": order.id, "payment_id": payment.id, "gateway": gateway_name, "error": str(e)},
@@ -103,9 +103,9 @@ class PaymentService:
             raise HTTPException(status_code=502, detail="Payment gateway request failed")
 
         payment.raw_response = result
-        payment.updated_at = datetime.utcnow()
+        payment.updated_at = datetime.now(timezone.utc)
         order.payment_status = "unpaid"
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         await log_to_db(
             "PAYMENT_INITIATED", __name__, f"payment initiated for order {order.id} via {gateway_name}",
@@ -184,17 +184,17 @@ class PaymentService:
         payment.gateway_event_id = result.event_id
         payment.gateway_transaction_id = result.transaction_id or payment.gateway_transaction_id
         payment.raw_response = result.raw
-        payment.updated_at = datetime.utcnow()
+        payment.updated_at = datetime.now(timezone.utc)
 
         order = await db.get(Order, payment.order_id)
         if order:
             order.payment_status = new_status
-            order.updated_at = datetime.utcnow()
+            order.updated_at = datetime.now(timezone.utc)
             if new_status == "paid" and order.status == "pending":
                 assert_valid_transition(order.status, "confirmed")
                 order.status = "confirmed"
                 db.add(OrderStatusHistory(
-                    order_id=order.id, status="confirmed", timestamp=datetime.utcnow(),
+                    order_id=order.id, status="confirmed", timestamp=datetime.now(timezone.utc),
                     note=f"Payment confirmed via {gateway_name}",
                 ))
                 await notify_order_status_change(db, order, "confirmed")

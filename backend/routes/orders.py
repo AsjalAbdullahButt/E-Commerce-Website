@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -134,7 +134,7 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
         if not promo:
             raise HTTPException(status_code=400, detail="Invalid or expired promo code")
 
-        if promo.expires_at and promo.expires_at < datetime.utcnow():
+        if promo.expires_at and promo.expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="Promo code has expired")
 
         if promo.max_uses and promo.uses >= promo.max_uses:
@@ -185,7 +185,7 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     for ri in resolved_items:
         db.add(OrderItem(order_id=order.id, **ri))
 
-    db.add(OrderStatusHistory(order_id=order.id, status="pending", timestamp=datetime.utcnow(), note="Order placed"))
+    db.add(OrderStatusHistory(order_id=order.id, status="pending", timestamp=datetime.now(timezone.utc), note="Order placed"))
     await db.flush()
 
     subject, html = order_confirmation_email(order, resolved_items)
@@ -293,8 +293,8 @@ async def update_status(request: Request, order_id: str, body: OrderStatusUpdate
     assert_valid_transition(order.status, body.status)
 
     order.status = body.status
-    order.updated_at = datetime.utcnow()
-    db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.utcnow(), note=body.note or ""))
+    order.updated_at = datetime.now(timezone.utc)
+    db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.now(timezone.utc), note=body.note or ""))
     await notify_order_status_change(db, order, body.status)
 
     return {"message": "Status updated"}
@@ -334,8 +334,8 @@ async def cancel_order(
 
     try:
         order.status = "cancelled"
-        order.updated_at = datetime.utcnow()
-        db.add(OrderStatusHistory(order_id=order_id, status="cancelled", timestamp=datetime.utcnow(), note="Cancelled by user"))
+        order.updated_at = datetime.now(timezone.utc)
+        db.add(OrderStatusHistory(order_id=order_id, status="cancelled", timestamp=datetime.now(timezone.utc), note="Cancelled by user"))
         await notify_order_status_change(db, order, "cancelled")
 
         # Restore variant stock for items in cancelled order

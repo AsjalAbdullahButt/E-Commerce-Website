@@ -10,7 +10,7 @@ Phase 1 (auth hardening master prompt, 2026-07-20):
     independent of the per-account failed-attempt counter.
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from config import settings
 from services.admin_auth import AdminAuthService
@@ -189,7 +189,7 @@ def test_admin_lockout_is_time_based_and_auto_clears(client):
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(AdminUser).where(AdminUser.email == "lockoutadmin@test.com"))
             admin = result.scalar_one()
-            admin.last_locked_at = datetime.utcnow() - timedelta(minutes=settings.admin_lockout_minutes + 1)
+            admin.last_locked_at = datetime.now(timezone.utc) - timedelta(minutes=settings.admin_lockout_minutes + 1)
             await db.commit()
 
     asyncio.run(_backdate_lock())

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import select
@@ -23,7 +23,7 @@ async def validate_promo(request: Request, body: PromoValidate, _=Depends(get_cu
     promo = result.scalar_one_or_none()
     if not promo:
         raise HTTPException(status_code=404, detail="Invalid or expired promo code")
-    if promo.expires_at and promo.expires_at < datetime.utcnow():
+    if promo.expires_at and promo.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Promo code has expired")
     if promo.max_uses and promo.uses >= promo.max_uses:
         raise HTTPException(status_code=400, detail="Promo code usage limit reached")

@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import ID_TYPE, Base, IDMixin, TimestampMixin
@@ -56,4 +56,4 @@ class InventoryHistoryEntry(Base, IDMixin):
     quantity_changed: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String(100))
     admin_id: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

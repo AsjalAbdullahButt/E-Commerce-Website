@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, Depends, Query, Request, UploadFile
@@ -53,8 +53,8 @@ async def update_delivery_status(request: Request, order_id: str, body: OrderSta
     assert_valid_transition(order.status, body.status)
 
     order.status = body.status
-    order.updated_at = datetime.utcnow()
-    db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.utcnow(), note=body.note or ""))
+    order.updated_at = datetime.now(timezone.utc)
+    db.add(OrderStatusHistory(order_id=order_id, status=body.status, timestamp=datetime.now(timezone.utc), note=body.note or ""))
     await notify_order_status_change(db, order, body.status)
     return {"message": "Status updated"}
 
@@ -85,7 +85,7 @@ async def update_profile(request: Request, body: RiderProfileUpdate, user=Depend
         updated = True
     if not updated:
         raise HTTPException(status_code=400, detail="No updates provided")
-    rider.updated_at = datetime.utcnow()
+    rider.updated_at = datetime.now(timezone.utc)
     return {"success": True, "message": "Profile updated"}
 
 
@@ -95,7 +95,7 @@ async def set_status(request: Request, status: str = Query(..., pattern="^(avail
     rider = await db.get(Rider, user["_id"])
     if rider:
         rider.status = status
-        rider.updated_at = datetime.utcnow()
+        rider.updated_at = datetime.now(timezone.utc)
     return {"success": True, "status": status}
 
 @router.get("/earnings")
@@ -116,7 +116,7 @@ async def get_earnings(request: Request, user=Depends(require_rider), db: AsyncS
         delivery_fee = RIDER_DELIVERY_FEE
         total_earnings = total_deliveries * delivery_fee
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         this_month = (await db.execute(
@@ -173,12 +173,15 @@ async def complete_delivery(request: Request, order_id: str, proof_photo: Option
     try:
         proof_url = None
         if proof_photo is not None and proof_photo.filename:
-            proof_url, _ = await ImageStorageService.upload(proof_photo, str(request.base_url), category="delivery-proof")
+            proof_url, _ = await ImageStorageService.upload(
+                proof_photo, str(request.base_url), category="delivery-proof",
+                content_length_header=request.headers.get("content-length"),
+            )
             order.proof_of_delivery_url = proof_url
 
         order.status = "delivered"
-        order.updated_at = datetime.utcnow()
-        db.add(OrderStatusHistory(order_id=order_id, status="delivered", timestamp=datetime.utcnow(), note="Delivered by rider"))
+        order.updated_at = datetime.now(timezone.utc)
+        db.add(OrderStatusHistory(order_id=order_id, status="delivered", timestamp=datetime.now(timezone.utc), note="Delivered by rider"))
         await notify_order_status_change(db, order, "delivered")
 
         await log_to_db("DELIVERY_COMPLETED", __name__, f"rider {str(user['_id'])} completed delivery {order_id}", {"order_id": order_id, "user_id": str(user["_id"]), "proof_of_delivery": bool(proof_url)})

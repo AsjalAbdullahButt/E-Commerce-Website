@@ -6,7 +6,7 @@ the admin-side CRUD (POST/GET/DELETE /promos) — a separate, parallel path from
 promos_col but are independently maintained code paths, by design, not a bug).
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from services.admin_auth import AdminAuthService
 
@@ -117,7 +117,7 @@ def test_validate_expired_promo_rejected(client):
     admin_token = _admin_token(client, email="promoadmin5@test.com")
     customer_token = _register_customer(client, email="promocustomer5@test.com")
 
-    expired = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    expired = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
     client.post(
         "/promos",
         json={"code": "EXPIRED1", "discount_type": "percentage", "discount_value": 20, "expires_at": expired},

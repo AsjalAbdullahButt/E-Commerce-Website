@@ -5,6 +5,7 @@ the local-disk storage path — the one actually usable without any third-party 
 import asyncio
 import io
 
+import pytest
 from PIL import Image
 
 from config import settings
@@ -85,6 +86,50 @@ def test_upload_rejects_oversized_file(client, monkeypatch):
     )
     assert resp.status_code == 400
     assert "exceeds" in resp.json()["detail"]
+
+
+def test_streaming_read_enforces_limit_independent_of_content_length(monkeypatch):
+    """Content-Length is a client-supplied hint (services/image_storage.py checks it as a fast
+    fail) -- the byte-counted streaming read is what actually enforces max_image_upload_mb, so
+    it must reject an oversized body even when no Content-Length is available at all (e.g.
+    chunked transfer encoding), not just when the header happens to be present and honest."""
+    monkeypatch.setattr(settings, "max_image_upload_mb", 0)
+    from services.image_storage import ImageStorageService
+
+    class _ChunkedFakeUploadFile:
+        """Stands in for an UploadFile with no known Content-Length up front."""
+        def __init__(self, data: bytes):
+            self._buf = io.BytesIO(data)
+
+        async def read(self, n=-1):
+            return self._buf.read(n)
+
+    fake_file = _ChunkedFakeUploadFile(_fake_jpeg_bytes())
+
+    async def _run():
+        with pytest.raises(Exception) as exc_info:
+            await ImageStorageService._read_with_limit(fake_file, max_bytes=0)
+        return exc_info.value
+
+    error = asyncio.run(_run())
+    assert getattr(error, "status_code", None) == 400
+    assert "exceeds" in error.detail
+
+
+def test_upload_rejects_decompression_bomb(client, monkeypatch):
+    """A small-on-disk image that decodes to a huge pixel grid must be rejected cleanly (400),
+    not crash the request -- Image.MAX_IMAGE_PIXELS is set in services/image_storage.py, and
+    Image.DecompressionBombError is not an OSError subclass, so it needs its own except branch."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1000)  # anything at all now counts as a bomb
+    admin_token = _admin_token(client, email="imageadmin7@test.com")
+
+    resp = client.post(
+        "/admin/products/upload-image",
+        files={"file": ("product.jpg", _fake_jpeg_bytes(size=(300, 300)), "image/jpeg")},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 400
+    assert "too large" in resp.json()["detail"]
 
 
 def test_upload_requires_admin_permission(client):

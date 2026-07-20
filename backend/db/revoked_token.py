@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -19,5 +19,5 @@ class RevokedToken(Base):
     jti: Mapped[str] = mapped_column(String(24), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(24), index=True)
     role: Mapped[str] = mapped_column(String(20))
-    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
-    revoked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    revoked_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

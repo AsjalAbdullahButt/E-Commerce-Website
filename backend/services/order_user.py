@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import HTTPException, status
@@ -141,9 +141,9 @@ class OrderService:
         assert_valid_transition(current_status, new_status)
 
         order.status = new_status
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
         db.add(OrderStatusHistory(
-            order_id=order_id, status=new_status, timestamp=datetime.utcnow(), note=note or "",
+            order_id=order_id, status=new_status, timestamp=datetime.now(timezone.utc), note=note or "",
         ))
         await notify_order_status_change(db, order, new_status)
 
@@ -197,8 +197,8 @@ class OrderService:
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-        db.add(OrderNote(order_id=order_id, text=note, added_by=admin_id, timestamp=datetime.utcnow()))
-        order.updated_at = datetime.utcnow()
+        db.add(OrderNote(order_id=order_id, text=note, added_by=admin_id, timestamp=datetime.now(timezone.utc)))
+        order.updated_at = datetime.now(timezone.utc)
 
         logger.info(f"Note added to order {order_id} by admin {admin_id}")
         return await OrderService.get_order(db, order_id)
@@ -260,8 +260,8 @@ class UserService:
         user.is_banned = True
         user.ban_reason = reason
         user.banned_by = admin_id
-        user.banned_at = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
+        user.banned_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
 
         # Log audit
         from services.admin_auth import AdminAuditService
@@ -289,7 +289,7 @@ class UserService:
         user.ban_reason = None
         user.banned_by = None
         user.banned_at = None
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
 
         # Log audit
         from services.admin_auth import AdminAuditService

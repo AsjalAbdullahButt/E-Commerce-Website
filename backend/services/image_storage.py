@@ -1,7 +1,7 @@
 import io
 import uuid
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
@@ -11,8 +11,17 @@ from config import settings
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 THUMBNAIL_SIZE = (400, 400)
+READ_CHUNK_BYTES = 1024 * 1024  # 1MB
 
 UPLOADS_BASE = Path(__file__).resolve().parent.parent / "uploads"
+
+# Guards against decompression bombs: a tiny, well-under-the-byte-limit file can still decode to
+# an enormous pixel grid (e.g. a crafted PNG a few KB on disk but tens of thousands of pixels per
+# side), which would otherwise exhaust memory in Image.open()/img.load() before any of our own
+# size checks below ever run. Pillow's own default (~89M pixels) is a general-purpose safety net;
+# this app only ever needs to accept normal product/delivery photos, so a tighter cap (roughly a
+# 6300x6300 image) costs nothing real while shrinking the attack surface further.
+Image.MAX_IMAGE_PIXELS = 40_000_000
 
 
 class ImageStorageService:
@@ -23,15 +32,30 @@ class ImageStorageService:
     so unrelated upload types don't collide or share one unbounded directory."""
 
     @staticmethod
+    async def _read_with_limit(file: UploadFile, max_bytes: int) -> bytes:
+        """Streams the upload in chunks with a running byte counter, aborting the instant the
+        configured limit is exceeded — reading the whole body into memory first (the previous
+        behavior) let a client force this process to buffer an arbitrarily large upload before
+        any size check ever ran, regardless of what Content-Length claimed."""
+        total = 0
+        chunks = []
+        while True:
+            chunk = await file.read(READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise HTTPException(status_code=400, detail=f"Image exceeds the {settings.max_image_upload_mb}MB limit")
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    @staticmethod
     def _validate(file_bytes: bytes, content_type: str) -> Image.Image:
         if content_type not in ALLOWED_CONTENT_TYPES:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported image type: {content_type}. Allowed: JPEG, PNG, WEBP",
             )
-        max_bytes = settings.max_image_upload_mb * 1024 * 1024
-        if len(file_bytes) > max_bytes:
-            raise HTTPException(status_code=400, detail=f"Image exceeds the {settings.max_image_upload_mb}MB limit")
 
         try:
             probe = Image.open(io.BytesIO(file_bytes))
@@ -40,6 +64,11 @@ class ImageStorageService:
             img.load()
         except (UnidentifiedImageError, OSError):
             raise HTTPException(status_code=400, detail="File is not a valid image")
+        except Image.DecompressionBombError:
+            # Not an OSError subclass, so it needs its own branch — raised by img.load() when the
+            # decoded pixel grid exceeds Image.MAX_IMAGE_PIXELS (set at module import above),
+            # i.e. a small file that decodes to a huge image (decompression bomb).
+            raise HTTPException(status_code=400, detail="Image dimensions are too large to process")
         return img
 
     @staticmethod
@@ -51,9 +80,24 @@ class ImageStorageService:
         return buf.getvalue()
 
     @staticmethod
-    async def upload(file: UploadFile, base_url: str, category: str = "products") -> Tuple[str, str]:
-        """Returns (url, thumbnail_url)."""
-        file_bytes = await file.read()
+    async def upload(
+        file: UploadFile, base_url: str, category: str = "products",
+        content_length_header: Optional[str] = None,
+    ) -> Tuple[str, str]:
+        """Returns (url, thumbnail_url). content_length_header, when the caller has it (the
+        request's own Content-Length), lets an obviously-oversized upload be rejected before
+        reading a single byte; the streaming read below is what actually enforces the limit
+        regardless, since Content-Length can be absent (chunked transfer) or simply wrong."""
+        max_bytes = settings.max_image_upload_mb * 1024 * 1024
+
+        if content_length_header is not None:
+            try:
+                if int(content_length_header) > max_bytes:
+                    raise HTTPException(status_code=400, detail=f"Image exceeds the {settings.max_image_upload_mb}MB limit")
+            except ValueError:
+                pass  # malformed header -- fall through to the real, byte-counted enforcement below
+
+        file_bytes = await ImageStorageService._read_with_limit(file, max_bytes)
         img = ImageStorageService._validate(file_bytes, file.content_type)
         ext = ALLOWED_CONTENT_TYPES[file.content_type]
         key = f"{uuid.uuid4().hex}.{ext}"

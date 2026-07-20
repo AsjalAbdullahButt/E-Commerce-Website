@@ -3,7 +3,7 @@ import logging.handlers
 from pathlib import Path
 from database import AsyncSessionLocal
 from db.admin import AuditLog
-from datetime import datetime
+from datetime import datetime, timezone
 
 LOG_DIR = Path(__file__).parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -49,7 +49,7 @@ async def log_to_db(level: str, module: str, message: str, meta: dict = None):
                 module=module,
                 message=message,
                 meta=meta or {},
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             ))
             await session.commit()
     except Exception:

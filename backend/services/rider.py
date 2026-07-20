@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -70,7 +70,7 @@ class RiderService:
         rider = await RiderService.get_rider(db, rider_id)
         old_active = rider.is_active
         rider.is_active = is_active
-        rider.updated_at = datetime.utcnow()
+        rider.updated_at = datetime.now(timezone.utc)
 
         from services.admin_auth import AdminAuditService
         await AdminAuditService.log_action(

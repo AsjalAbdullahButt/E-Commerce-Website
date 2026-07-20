@@ -18,7 +18,7 @@ from services.email import EmailService
 from services.email_templates import password_reset_email
 from services.google_auth import verify_id_token
 from config import settings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, EmailStr
 import hashlib
 import re
@@ -333,7 +333,7 @@ async def logout(request: Request, response: Response, user=Depends(get_current_
         try:
             payload = jwt.decode(refresh_token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
             if payload.get("type") == "refresh" and payload.get("jti") and payload.get("exp") is not None:
-                await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.utcfromtimestamp(payload["exp"]))
+                await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.fromtimestamp(payload["exp"], tz=timezone.utc))
         except JWTError:
             pass  # already invalid/expired — nothing left to revoke
 
@@ -426,7 +426,7 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
             current_user.password_hash = hashed
         else:
             current_user.password = hashed
-        current_user.updated_at = datetime.utcnow()
+        current_user.updated_at = datetime.now(timezone.utc)
 
         await log_to_db("PASSWORD_CHANGED", __name__, f"user {uid} changed password", {"user_id": uid})
         return {"success": True, "message": "Password changed successfully"}
@@ -462,7 +462,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest, db: Asy
     if user:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        expires_at = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
 
         user.reset_token_hash = token_hash
         user.reset_token_expires = expires_at
@@ -491,7 +491,7 @@ async def reset_password(request: Request, body: ResetPasswordRequest, db: Async
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     expires_at = user.reset_token_expires
-    if not expires_at or expires_at < datetime.utcnow():
+    if not expires_at or expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     if user.auth_provider == "google" and user.password is None:
@@ -505,7 +505,7 @@ async def reset_password(request: Request, body: ResetPasswordRequest, db: Async
         raise HTTPException(status_code=422, detail="New password must be at least 8 characters, include an uppercase letter and a digit")
 
     user.password = hash_password(new_pw)
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     user.reset_token_hash = None
     user.reset_token_expires = None
 
@@ -536,12 +536,12 @@ async def update_me(request: Request, body: UserUpdate, user=Depends(get_current
             for key, value in update_data.items():
                 if hasattr(updated, key):
                     setattr(updated, key, value)
-            updated.updated_at = datetime.utcnow()
+            updated.updated_at = datetime.now(timezone.utc)
         else:
             updated = await db.get(User, uid)
             for key, value in update_data.items():
                 setattr(updated, key, value)
-            updated.updated_at = datetime.utcnow()
+            updated.updated_at = datetime.now(timezone.utc)
         return serialize_user(updated)
     # Nothing to update: return current user
     return serialize_user(user)

@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base, IDMixin
@@ -14,4 +14,4 @@ class Review(Base, IDMixin):
     user_name: Mapped[str] = mapped_column(String(200))
     rating: Mapped[int] = mapped_column(Integer)
     comment: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import HTTPException, status
@@ -157,7 +157,7 @@ class ProductService:
 
         for key, value in updates.items():
             setattr(product, key, value)
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
         # Log audit
@@ -183,7 +183,7 @@ class ProductService:
         product = await db.get(Product, product_id)
 
         product.is_active = False
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(timezone.utc)
 
         # Log audit
         from services.admin_auth import AdminAuditService
@@ -346,7 +346,7 @@ class InventoryService:
         await db.execute(
             update(Product).where(Product.id == product_id).values(
                 total_stock=Product.total_stock + quantity_change,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
         )
 
@@ -356,7 +356,7 @@ class InventoryService:
             quantity_changed=quantity_change,
             reason=reason,
             admin_id=admin_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         ))
 
         logger.info(f"Stock adjusted for {variant_sku}: {quantity_change} ({reason})")

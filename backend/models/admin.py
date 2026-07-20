@@ -1,6 +1,6 @@
 # MongoDB database models (document schemas)
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from schemas.admin import AdminRole, OrderStatus, PaymentMethod, DiscountType, ProductVariant
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -32,8 +32,8 @@ def product_document(
         "images": images,
         "total_stock": total_stock,
         "is_active": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
         "created_by": None,  # admin_id
     }
 
@@ -55,7 +55,7 @@ def inventory_log_entry(
         "quantity_changed": quantity_changed,
         "reason": reason,  # "order", "adjustment", "return", etc.
         "admin_id": admin_id,
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
     }
 
 def inventory_history_document(product_id: str) -> dict:
@@ -63,8 +63,8 @@ def inventory_history_document(product_id: str) -> dict:
     return {
         "product_id": product_id,
         "logs": [],
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
 # NOTE: order documents are created exclusively by routes/orders.py::place_order (the real
@@ -91,8 +91,8 @@ def admin_user_document(
         "failed_login_attempts": 0,
         "last_locked_at": None,
         "last_login": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
     }
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -116,6 +116,6 @@ def audit_log_document(
         "entity_type": entity_type,  # "product", "order", "user", "discount", etc.
         "entity_id": entity_id,
         "changes": changes,  # {"field": {"old": value, "new": value}, ...}
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
         "ip_address": ip_address,
     }

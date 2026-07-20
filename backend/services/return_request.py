@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -78,15 +78,15 @@ async def resolve_return_request(
     rr.status = "approved" if approved else "rejected"
     rr.admin_note = admin_note
     rr.resolved_by = admin_id
-    rr.resolved_at = datetime.utcnow()
+    rr.resolved_at = datetime.now(timezone.utc)
     rr.refund_amount = (refund_amount if refund_amount is not None else order.total) if approved else None
 
     if approved:
         assert_valid_transition(order.status, "returned")
         order.status = "returned"
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
         db.add(OrderStatusHistory(
-            order_id=order.id, status="returned", timestamp=datetime.utcnow(),
+            order_id=order.id, status="returned", timestamp=datetime.now(timezone.utc),
             note=f"Return approved (return request {rr.id})",
         ))
         await notify_order_status_change(db, order, "returned")

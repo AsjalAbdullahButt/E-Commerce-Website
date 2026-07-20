@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select
@@ -47,7 +47,7 @@ async def add_to_wishlist(request: Request, product_id: str, user=Depends(get_cu
         select(WishlistItem).where(WishlistItem.user_id == str(user["_id"]), WishlistItem.product_id == product_id)
     )
     if not existing.scalar_one_or_none():
-        db.add(WishlistItem(user_id=str(user["_id"]), product_id=product_id, added_at=datetime.utcnow()))
+        db.add(WishlistItem(user_id=str(user["_id"]), product_id=product_id, added_at=datetime.now(timezone.utc)))
     return {"message": "Added to wishlist"}
 
 @router.delete("/{product_id}")

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String
+from sqlalchemy import Boolean, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base, IDMixin, TimestampMixin
@@ -21,6 +21,6 @@ class Promo(Base, IDMixin, TimestampMixin):
     min_order: Mapped[float] = mapped_column(Float, default=0.0)
     max_uses: Mapped[int] = mapped_column(Integer, default=100)
     uses: Mapped[int] = mapped_column(Integer, default=0)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_by: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)

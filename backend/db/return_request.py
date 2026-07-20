@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, Index, String, Text
+from sqlalchemy import Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import ID_TYPE, Base, IDMixin, TimestampMixin
@@ -24,4 +24,4 @@ class ReturnRequest(Base, IDMixin, TimestampMixin):
     refund_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     admin_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolved_by: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)

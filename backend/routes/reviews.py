@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from sqlalchemy import func, select
@@ -42,7 +42,7 @@ async def add_review(request: Request, body: ReviewCreate, user=Depends(get_curr
 
     db.add(Review(
         product_id=body.product_id, rating=body.rating, comment=body.comment,
-        user_id=str(user["_id"]), user_name=user["name"], created_at=datetime.utcnow(),
+        user_id=str(user["_id"]), user_name=user["name"], created_at=datetime.now(timezone.utc),
     ))
     await db.flush()
 

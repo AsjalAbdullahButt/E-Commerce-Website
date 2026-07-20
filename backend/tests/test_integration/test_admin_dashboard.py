@@ -9,7 +9,7 @@ round-trips correctly, (d) permission enforcement matches utils/permissions.py â
 dashboard:read but not promo:create, so it can read but not create a discount.
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from services.admin_auth import AdminAuthService
 
@@ -69,7 +69,7 @@ def test_audit_logs_reachable_and_shaped(client):
 def test_admin_create_get_update_list_discount(client):
     token = _admin_token(client, email="dashadmin5@test.com")
     headers = {"Authorization": f"Bearer {token}"}
-    expiry = (datetime.utcnow() + timedelta(days=30)).isoformat()
+    expiry = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
     create_resp = client.post(
         "/admin/discounts",
@@ -115,7 +115,7 @@ def test_manager_can_read_but_not_create_discount(client):
         json={
             "code": "MGRBLOCK", "description": "should be blocked",
             "discount_type": "fixed", "discount_value": 5,
-            "max_usage": 10, "expiry_date": (datetime.utcnow() + timedelta(days=10)).isoformat(),
+            "max_usage": 10, "expiry_date": (datetime.now(timezone.utc) + timedelta(days=10)).isoformat(),
         },
         headers=headers,
     )
