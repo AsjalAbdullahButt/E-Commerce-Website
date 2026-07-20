@@ -12,7 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from config import settings
 from database import engine
 from utils.limiter import limiter
-from utils.logger import get_logger, log_to_db
+from utils.logger import get_logger, log_to_db, request_id_var
 from utils.cache import start_cache_sweeper, stop_cache_sweeper
 from utils.token_revocation import start_revocation_sweeper, stop_revocation_sweeper
 from routes import auth, products, orders, reviews, wishlist, promos, rider, admin, payments, addresses, seo
@@ -23,18 +23,19 @@ logger = get_logger(__name__)
 
 # ── Startup / shutdown ─────────────────────────────────────────────────────────
 def check_single_worker_deployment() -> None:
-    """utils/cache.py and utils/limiter.py are process-local in-memory stores (no Redis or other
-    shared backend). Running more than one worker process means each worker has its own
-    independent cache and rate-limit counters, so cache invalidation and rate limits silently
-    stop being consistent across requests. Fail fast in production rather than degrade silently;
-    warn loudly elsewhere so local perf testing with multiple workers isn't blocked outright."""
-    if settings.web_concurrency <= 1:
+    """utils/cache.py and utils/limiter.py are process-local in-memory stores by default (no
+    Redis or other shared backend). Running more than one worker process means each worker has
+    its own independent cache and rate-limit counters, so cache invalidation and rate limits
+    silently stop being consistent across requests. Fail fast in production rather than degrade
+    silently; warn loudly elsewhere so local perf testing with multiple workers isn't blocked
+    outright. Moot once settings.redis_enabled — both then share state across every worker."""
+    if settings.web_concurrency <= 1 or settings.redis_enabled:
         return
     message = (
         f"web_concurrency={settings.web_concurrency} but utils/cache.py and utils/limiter.py "
         "are process-local (no Redis backend) — cache invalidation and rate limits will be "
-        "inconsistent across workers. Set WEB_CONCURRENCY=1 (single worker) or wire up a shared "
-        "Redis-backed cache/limiter before scaling horizontally."
+        "inconsistent across workers. Set WEB_CONCURRENCY=1 (single worker) or set "
+        "REDIS_ENABLED=true with a real REDIS_URL before scaling horizontally."
     )
     if settings.is_production:
         raise RuntimeError(message)
@@ -136,10 +137,16 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Cache-Control"]             = "no-store"
     # Content Security Policy — allow trusted CDNs used by frontend, plus Stripe.js/Elements
     # (js.stripe.com script + its iframe-hosted card input) for the Stripe card payment option.
+    # script-src has no 'unsafe-inline': every inline <script> and on*= handler in frontend/ was
+    # audited and moved to an external file (Phase 3 hardening, 2026-07-20) specifically so this
+    # could be dropped — the single biggest remaining XSS mitigation, since an attacker who gets
+    # a payload into the DOM (e.g. via a stored field the app forgot to escape) can no longer get
+    # it to execute as a script. style-src keeps 'unsafe-inline': far lower risk, and inline
+    # styles are used throughout for dynamic values (progress bars, computed positions, etc.).
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com https://accounts.google.com/gsi/client; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
+        "script-src 'self' https://cdnjs.cloudflare.com https://js.stripe.com https://accounts.google.com/gsi/client https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://unpkg.com; "
         "font-src https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
         "frame-src https://js.stripe.com https://hooks.stripe.com https://accounts.google.com; "
@@ -152,17 +159,25 @@ async def add_security_headers(request: Request, call_next):
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request.state.request_id = str(__import__('uuid').uuid4())[:8]
+    # Makes the ID available to every logger.*()/log_to_db() call made anywhere while this
+    # request is being handled (see utils/logger.py::request_id_var) without threading it through
+    # every function signature. Reset in `finally` so it can't leak into whatever task reuses
+    # this context next.
+    token = request_id_var.set(request.state.request_id)
     try:
-        response = await call_next(request)
-    except Exception as e:
-        await log_to_db("ERROR", __name__, f"Request ID middleware error: {e}")
-        logger.exception(f"Request ID middleware error: {e}")
-        return JSONResponse(status_code=500, content={"detail": "Server middleware error"})
-    try:
-        response.headers["X-Request-ID"] = request.state.request_id
-    except Exception:
-        pass
-    return response
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            await log_to_db("ERROR", __name__, f"Request ID middleware error: {e}")
+            logger.exception(f"Request ID middleware error: {e}")
+            return JSONResponse(status_code=500, content={"detail": "Server middleware error"})
+        try:
+            response.headers["X-Request-ID"] = request.state.request_id
+        except Exception:
+            pass
+        return response
+    finally:
+        request_id_var.reset(token)
 
 # ── Uploaded product images (local-disk storage fallback) ──────────────────────
 # Only ever serves files under backend/uploads/ — populated exclusively by

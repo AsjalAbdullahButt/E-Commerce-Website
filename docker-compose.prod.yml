@@ -1,0 +1,77 @@
+# Production-shaped stack: MySQL + Redis (shared cache/rate-limiter, enabling multiple backend
+# workers) + the FastAPI backend (gunicorn+UvicornWorker, see backend/docker-entrypoint.sh) + the
+# static frontend. Differences from the dev docker-compose.yml at the repo root:
+#   - MySQL has no published host port (only reachable from other containers on this network) —
+#     docker-compose.yml exposes 3306 for local `mysql` CLI access during development, which a
+#     production host should never need.
+#   - restart: always (not unless-stopped) — a production host should always try to bring these
+#     back up after a reboot, even if they were manually stopped right before it happened.
+#   - Redis is included and WEB_CONCURRENCY defaults to 2, since Redis makes multiple backend
+#     workers safe (see main.py::check_single_worker_deployment) — the dev compose file stays at
+#     the single-worker default with no Redis, matching its zero-extra-infrastructure goal.
+#
+# Copy .env.example to .env and fill in real values before running this — cookie_secure=true,
+# a real jwt_secret, real allowed_origins/trusted_hosts for your domain, etc. `docker compose
+# -f docker-compose.prod.yml up -d` reads .env from the repo root the same way the dev file does.
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ecommerce}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # Overrides the .env values (which are "localhost", correct for running outside Docker) —
+      # inside the compose network, MySQL/Redis are reachable at their service names instead.
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    restart: always
+    ports:
+      - "5500:5500"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+  redis_data:
+  backend_uploads:

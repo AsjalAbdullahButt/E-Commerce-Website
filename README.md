@@ -143,16 +143,53 @@ Runs against a real MySQL database (`MYSQL_TEST_DATABASE`) — schema is created
 
 ## 🚢 Deployment
 
-> **Single worker only, by default.** The in-memory cache and rate limiter have no shared backend — running multiple workers desyncs both. The app fails fast at startup if `WEB_CONCURRENCY > 1` in production.
+> **Single worker only, unless Redis is enabled.** The in-memory cache and rate limiter have no shared backend by default — running multiple workers desyncs both, and the app fails fast at startup if `WEB_CONCURRENCY > 1` in production. Set `REDIS_ENABLED=true` + `REDIS_URL` to share cache/rate-limit state across workers and lift that constraint.
 
 ```bash
 alembic upgrade head
-WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app
+WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker --graceful-timeout 30 backend.main:app
 ```
 
-Or `docker compose up --build` for the full self-hosted stack — see `docker-compose.yml`. The frontend builds to minified static files (`frontend/Dockerfile`, Tailwind + esbuild) and can be served from any static host.
+### Docker
+
+- `docker compose up --build` — dev-shaped stack (single worker, no Redis, MySQL port published for local `mysql` CLI access). See `docker-compose.yml`.
+- `docker compose -f docker-compose.prod.yml up -d --build` — production-shaped stack (Redis included, `WEB_CONCURRENCY=2` by default, MySQL not published, `restart: always`). See `docker-compose.prod.yml`.
+
+The frontend builds to minified static files (`frontend/Dockerfile`, Tailwind + esbuild) and can be served from any static host — `.github/workflows/frontend-build.yml` proves `npm run build` still succeeds on every push/PR that touches `frontend/`.
 
 **Before going live:** `ENVIRONMENT=production`, `DOCS_ENABLED=false`, `COOKIE_SECURE=true`, a real `JWT_SECRET`, your real `ALLOWED_ORIGINS`/`TRUSTED_HOSTS`, and a least-privilege MySQL user (not `root`).
+
+### Backups
+
+MySQL is the single source of truth (uploaded images live on disk/S3 separately — back those up via your storage provider's own mechanism, e.g. S3 versioning). A daily logical dump is enough for a store this size:
+
+```bash
+# /etc/cron.d/ecom-mysql-backup — runs at 03:00 server time, keeps 14 days locally.
+0 3 * * * root mysqldump --single-transaction --routines --triggers \
+  -h 127.0.0.1 -u backup_user -p"$MYSQL_BACKUP_PASSWORD" ecommerce \
+  | gzip > /var/backups/ecom/ecommerce-$(date +\%Y\%m\%d).sql.gz \
+  && find /var/backups/ecom -name '*.sql.gz' -mtime +14 -delete
+```
+
+`--single-transaction` takes a consistent InnoDB snapshot without locking tables, so this is safe to run against a live database. Ship `/var/backups/ecom` off-host too (S3 `sync`, rsync to a second machine, etc.) — a backup that lives on the same disk as the database it's backing up doesn't survive that disk failing.
+
+**Restore runbook:**
+
+```bash
+# 1. Stop the backend so nothing writes to the database mid-restore.
+docker compose -f docker-compose.prod.yml stop backend
+
+# 2. Restore the dump into a fresh (or truncated) database.
+gunzip -c /var/backups/ecom/ecommerce-20260721.sql.gz | \
+  mysql -h 127.0.0.1 -u root -p"$MYSQL_PASSWORD" ecommerce
+
+# 3. Bring the backend back up. It runs `alembic upgrade head` on startup
+#    (backend/docker-entrypoint.sh), so a dump taken before a later migration shipped
+#    still ends up on the current schema automatically.
+docker compose -f docker-compose.prod.yml start backend
+```
+
+Test this restore path periodically against a scratch database — a backup nobody has ever successfully restored from is not a verified backup.
 
 ## 📄 License
 

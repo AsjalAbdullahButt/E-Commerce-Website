@@ -101,6 +101,14 @@ async function loadTrackingData() {
           safeText(noteP, entry.note);
           content.appendChild(noteP);
         }
+        // Rider name on the two steps a rider is actually the one acting — assigned by then
+        // (routes/admin.py::assign_rider runs before "shipped"), so it's never shown earlier.
+        if ((status === 'shipped' || status === 'delivered') && order.rider_name) {
+          const riderP = document.createElement('p');
+          riderP.className = 'timeline-note';
+          safeText(riderP, `Rider: ${order.rider_name}`);
+          content.appendChild(riderP);
+        }
 
         step.appendChild(dot);
         step.appendChild(content);

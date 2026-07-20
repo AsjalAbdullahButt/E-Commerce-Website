@@ -156,6 +156,48 @@ def test_order_confirmation_email_attempted_on_checkout(client):
     entry = _latest_audit_entry("ORDER_CONFIRMATION_EMAIL_SENT")
     assert entry is not None
     assert entry.meta["order_id"] == order["id"]
+    # Phase 5 item 1: the confirmation email carries the same PDF invoice GET
+    # /orders/{id}/invoice serves on demand.
+    assert entry.meta["attachments"] == [f"invoice-{order['id']}.pdf"]
+
+
+def test_order_confirmation_email_attachment_is_a_real_pdf_via_sendgrid(client, monkeypatch):
+    """With SendGrid configured, the invoice must actually reach the API payload as a base64
+    PDF attachment, not just a filename in the dev-log fallback path."""
+    monkeypatch.setattr(settings, "sendgrid_enabled", True)
+    monkeypatch.setattr(settings, "sendgrid_api_key", "SG.test-key")
+    monkeypatch.setattr(settings, "sendgrid_from_email", "noreply@test.com")
+
+    captured = {}
+
+    class _FakeResponse:
+        status_code = 202
+        text = ""
+
+    class _FakeAsyncClient:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, json=None, headers=None):
+            if json.get("attachments"):
+                captured.update(json)
+            return _FakeResponse()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    admin_token = _admin_token(client, email="emailadmin9@test.com")
+    customer_token = _register_customer(client, email="emailcustomer9@test.com")
+    product_id = _create_product(client, admin_token, sku="email-item-9")
+    order = _place_order(client, customer_token, product_id)
+
+    assert captured, "expected the confirmation email's POST to SendGrid to include an attachment"
+    attachment = captured["attachments"][0]
+    assert attachment["filename"] == f"invoice-{order['id']}.pdf"
+    assert attachment["type"] == "application/pdf"
+
+    import base64
+    pdf_bytes = base64.b64decode(attachment["content"])
+    assert pdf_bytes.startswith(b"%PDF")
 
 
 def test_order_status_change_email_attempted(client):

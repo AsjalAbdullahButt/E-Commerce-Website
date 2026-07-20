@@ -116,6 +116,23 @@ def test_complete_delivery_with_photo_persists_and_serves_url(client):
     assert fetch_resp.headers["content-type"].startswith("image/")
 
 
+def test_order_response_includes_assigned_rider_name(client):
+    """Phase 5 item 4: the customer-facing timeline (tracking.html) shows "Rider: <name>" on the
+    shipped/delivered steps -- schemas/order.py::OrderResponse must actually carry rider_name
+    (not just rider_id) or response_model silently drops it, same class of bug
+    proof_of_delivery_url hit before it was added to that schema."""
+    admin_token = _admin_token(client, email="podadmin3@test.com")
+    customer_token = _register_customer(client, email="podbuyer3@test.com")
+    rider_id, rider_token = _create_rider(client, admin_token, email="podrider3@test.com", name="Named Rider")
+    order_id = _place_and_ship_order(client, customer_token, admin_token, rider_token, rider_id, sku="pod-item-3")
+
+    order_view = client.get(f"/orders/{order_id}", headers={"Authorization": f"Bearer {customer_token}"})
+    assert order_view.status_code == 200, order_view.text
+    body = order_view.json()
+    assert body["rider_id"] == rider_id
+    assert body["rider_name"] == "Named Rider"
+
+
 def test_complete_delivery_without_photo_still_works(client):
     """Backward-compat: the photo is optional at the API level (enforced client-side only)."""
     admin_token = _admin_token(client, email="podadmin2@test.com")

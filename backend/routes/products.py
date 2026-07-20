@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from database import get_db
+from db.order import OrderItem
 from db.product import Product, ProductVariant
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
@@ -88,6 +90,51 @@ async def list_products(
     payload = {"products": serialized, "total": total, "page": page, "pages": pages}
     await cache_set(cache_key, payload, ttl_seconds=30)
     return payload
+
+@router.get("/{product_id}/recommendations")
+@limiter.limit("60/minute")
+async def get_recommendations(
+    request: Request, product_id: str, limit: int = Query(4, ge=1, le=12), db: AsyncSession = Depends(get_db),
+):
+    """"Frequently bought together" -- the products most often appearing in the same order as
+    this one, ranked by co-occurrence count. A single self-join + GROUP BY over order_items, no
+    ML model or separate recommendations table needed."""
+    if not is_valid_id(product_id):
+        raise HTTPException(status_code=400, detail="Invalid product ID")
+
+    cache_key = f"products:recommendations:{product_id}:{limit}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    this_item = aliased(OrderItem)
+    other_item = aliased(OrderItem)
+    result = await db.execute(
+        select(other_item.product_id, func.count().label("co_occurrence"))
+        .join(this_item, this_item.order_id == other_item.order_id)
+        .where(this_item.product_id == product_id, other_item.product_id != product_id)
+        .group_by(other_item.product_id)
+        .order_by(func.count().desc())
+        .limit(limit)
+    )
+    ranked_ids = [row.product_id for row in result.all()]
+
+    if not ranked_ids:
+        payload = {"products": []}
+        await cache_set(cache_key, payload, ttl_seconds=300)
+        return payload
+
+    # Only ever recommend products that are still active -- co-occurrence ranking already
+    # happened above, this just filters the result, so a since-discontinued item silently drops
+    # out rather than truncating the list short of `limit`.
+    products_result = await db.execute(select(Product).where(Product.id.in_(ranked_ids), Product.is_active == True))  # noqa: E712
+    products_by_id = {p.id: p for p in products_result.scalars().all()}
+    ordered_products = [products_by_id[pid] for pid in ranked_ids if pid in products_by_id]
+
+    payload = {"products": [await _serialize(db, p) for p in ordered_products]}
+    await cache_set(cache_key, payload, ttl_seconds=300)
+    return payload
+
 
 async def _serialize(db: AsyncSession, p: Product) -> dict:
     result = await db.execute(select(ProductVariant).where(ProductVariant.product_id == p.id))

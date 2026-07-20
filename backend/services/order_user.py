@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.order import Order, OrderItem, OrderNote, OrderStatusHistory
 from db.return_request import ReturnRequest
+from db.rider import Rider
 from db.user import User
 from services.email import EmailService
 from services.email_templates import order_status_update_email
@@ -67,6 +68,13 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
     latest_return = (await db.execute(
         select(ReturnRequest).where(ReturnRequest.order_id == order.id).order_by(ReturnRequest.created_at.desc())
     )).scalars().first()
+    # Rider *name*, not just rider_id, so the customer-facing timeline (tracking.html) can show
+    # "Delivered by <name>" instead of a meaningless internal ID. Only looked up once assigned.
+    rider_name = None
+    if order.rider_id:
+        rider = await db.get(Rider, order.rider_id)
+        rider_name = rider.name if rider else None
+
     return_request = None
     if latest_return:
         return_request = {
@@ -95,6 +103,7 @@ async def _order_to_dict(db: AsyncSession, order: Order) -> dict:
         "total": order.total,
         "status": order.status,
         "rider_id": order.rider_id,
+        "rider_name": rider_name,
         "proof_of_delivery_url": order.proof_of_delivery_url,
         "status_history": status_history,
         "return_request": return_request,

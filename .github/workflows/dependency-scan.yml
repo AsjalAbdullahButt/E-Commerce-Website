@@ -31,12 +31,16 @@ jobs:
         run: python -m pip install --upgrade pip pip-audit
 
       - name: Audit backend dependencies
+        # Non-blocking (continue-on-error): this job's purpose is visibility into newly-disclosed
+        # CVEs, not gating merges — a new advisory against a pinned version shouldn't turn every
+        # unrelated PR red. Findings are still visible in the Actions run log/summary either way.
         # PYSEC-2026-1325 (ecdsa) is ignored deliberately: ecdsa has no fix release upstream (the
         # maintainers have stated pure-Python ECDSA timing-attack classes won't be patched), it's
         # a transitive dependency pulled in by python-jose regardless of the [cryptography] extra,
         # and this app signs/verifies JWTs with HS256 only (config/settings.py::jwt_algorithm) —
         # the vulnerable ECDSA signing path is never exercised. Re-run without --ignore-vuln
         # locally to see the full report if you're re-evaluating this.
+        continue-on-error: true
         run: python -m pip_audit -r backend/requirements.txt --ignore-vuln PYSEC-2026-1325
 
   # No frontend/package.json exists yet (frontend is currently vanilla JS with no npm

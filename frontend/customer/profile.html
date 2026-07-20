@@ -6,19 +6,7 @@
   <title>My Profile | E-COM</title>
   <link rel="icon" type="image/png" href="../images/E_Commerce_Logo.png?v=20260511">
   <meta name="robots" content="noindex, nofollow">
-  <script>
-    (function () {
-      // Pre-render guard only, to avoid a flash of protected content — the access token itself
-      // lives in memory only (see shared/js/api.js) and isn't available this early, so this
-      // checks the non-sensitive cached profile instead. Actual auth is enforced server-side on
-      // every API call regardless.
-      const user = localStorage.getItem('ecom_user');
-      const role = localStorage.getItem('ecom_role');
-      if (!user || role !== 'customer') {
-        window.location.replace('../auth/login.html');
-      }
-    })();
-  </script>
+  <script src="../js/customer-guard.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">

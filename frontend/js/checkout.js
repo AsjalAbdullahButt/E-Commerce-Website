@@ -616,4 +616,8 @@ function getPaymentData() {
   return { method, reference };
 }
 
-document.addEventListener('DOMContentLoaded', initializeCheckout);
+document.addEventListener('DOMContentLoaded', () => {
+  initializeCheckout();
+  const placeOrderBtn = document.getElementById('place-order-btn');
+  if (placeOrderBtn) placeOrderBtn.addEventListener('click', placeOrder);
+});

@@ -43,7 +43,7 @@
             </div>
             <label for="login-password">Password</label>
           </div>
-          <button type="button" class="auth-btn" onclick="handleLogin()">Login</button>
+          <button type="button" class="auth-btn" id="login-submit-btn">Login</button>
         </form>
 
         <div class="auth-divider" id="google-divider">or</div>
@@ -67,49 +67,7 @@
   <script src="../shared/js/form-validation.js?v=20260719"></script>
   <script src="../shared/js/neural-bg.js?v=20260716"></script>
 
-  <script>
-    attachFieldValidation(document.getElementById('login-email'), Validators.email);
-    initGoogleSignIn('google-signin-container', 'google-divider');
-
-    // Handle login
-    async function handleLogin() {
-      const email = document.getElementById('login-email').value;
-      const password = document.getElementById('login-password').value;
-
-      if (!email || !password) {
-        showToast('Please fill all fields', 'warning');
-        if (!email) shakeField(document.getElementById('login-email'));
-        if (!password) shakeField(document.getElementById('login-password'));
-        return;
-      }
-
-      try {
-        const user = await login(email, password);
-        showToast('Login successful! Redirecting...', 'success');
-        
-        // Redirect based on user role (returned from backend)
-        setTimeout(() => {
-          redirectAfterLogin(user.role);
-        }, 1000);
-      } catch (err) {
-        console.error('Login error:', err);
-        const errorMsg = err.message || 'Login failed. Please check your credentials and try again.';
-        showToast(errorMsg, 'error');
-        shakeField(document.getElementById('login-password'));
-      }
-    }
-
-    // Make form submission work with Enter key
-    document.addEventListener('DOMContentLoaded', () => {
-      const form = document.getElementById('login-form');
-      form.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleLogin();
-        }
-      });
-    });
-  </script>
+  <script src="js/login.js"></script>
 
   <!-- WhatsApp Support Button -->
   <a href="https://wa.me/923001234567?text=Hi%2C%20I%20need%20help%20with%20my%20E-COM%20order"

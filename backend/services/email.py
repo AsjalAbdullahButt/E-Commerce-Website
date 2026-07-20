@@ -1,4 +1,6 @@
-from typing import Optional
+import base64
+from dataclasses import dataclass
+from typing import Optional, Sequence
 
 import httpx
 
@@ -8,6 +10,13 @@ from utils.logger import get_logger, log_to_db
 logger = get_logger(__name__)
 
 SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
+
+
+@dataclass
+class EmailAttachment:
+    filename: str
+    content: bytes
+    mime_type: str = "application/pdf"
 
 
 class EmailService:
@@ -22,14 +31,19 @@ class EmailService:
         return bool(settings.sendgrid_enabled and settings.sendgrid_api_key and settings.sendgrid_from_email)
 
     @staticmethod
-    async def send(to_email: str, subject: str, html_body: str, *, event_code: str, meta: Optional[dict] = None) -> bool:
+    async def send(
+        to_email: str, subject: str, html_body: str, *, event_code: str, meta: Optional[dict] = None,
+        attachments: Optional[Sequence[EmailAttachment]] = None,
+    ) -> bool:
         meta = meta or {}
+        attachments = attachments or []
 
         if not EmailService.is_configured():
-            logger.info(f"[DEV EMAIL] To: {to_email} | Subject: {subject}\n{html_body}")
+            attachment_note = f" (+{len(attachments)} attachment(s): {', '.join(a.filename for a in attachments)})" if attachments else ""
+            logger.info(f"[DEV EMAIL] To: {to_email} | Subject: {subject}{attachment_note}\n{html_body}")
             await log_to_db(
                 event_code, __name__, f"email not sent (SendGrid not configured): {subject} -> {to_email}",
-                {"to": to_email, "subject": subject, **meta},
+                {"to": to_email, "subject": subject, "attachments": [a.filename for a in attachments], **meta},
             )
             return False
 
@@ -39,6 +53,16 @@ class EmailService:
             "subject": subject,
             "content": [{"type": "text/html", "value": html_body}],
         }
+        if attachments:
+            payload["attachments"] = [
+                {
+                    "content": base64.b64encode(a.content).decode("ascii"),
+                    "filename": a.filename,
+                    "type": a.mime_type,
+                    "disposition": "attachment",
+                }
+                for a in attachments
+            ]
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(

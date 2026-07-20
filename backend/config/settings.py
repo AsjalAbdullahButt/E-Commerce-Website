@@ -98,8 +98,17 @@ class Settings(BaseSettings):
     # Upper bound on the process-local cache's entry count — once exceeded, cache_set() evicts
     # the least-recently-used entry. A second, independent safety net (a periodic background
     # sweep, see main.py's startup/shutdown events) drops expired-but-never-re-read entries so
-    # the cache can't grow unbounded even when it stays under this cap.
+    # the cache can't grow unbounded even when it stays under this cap. Irrelevant once
+    # redis_enabled — Redis bounds/expires keys natively.
     cache_max_entries: int = 5000
+
+    # ── Redis (optional — utils/cache.py + utils/limiter.py) ──────────────
+    # Off by default: the app runs single-worker on an in-memory cache/rate-limiter with zero
+    # extra infrastructure (see main.py::check_single_worker_deployment). Flip this on and point
+    # it at a real Redis instance to run WEB_CONCURRENCY > 1 safely — both the cache and the
+    # rate limiter then share state across every worker process instead of each having its own.
+    redis_enabled: bool = False
+    redis_url: Optional[str] = None
 
     # ── Rate Limiting (requests/minute) ────────────────────────────────────
     rate_login: str = "5/minute"
@@ -118,6 +127,10 @@ class Settings(BaseSettings):
     # ── Logging ────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_file: str = "logs/app.log"
+    # "text" (default, human-readable) or "json" (one JSON object per line, carrying the
+    # per-request request_id set by main.py's add_request_id middleware) — flip to "json" in
+    # any environment that feeds logs to a log aggregator (CloudWatch, Loki, Datadog, ...).
+    log_format: str = "text"
 
     # ── Payments ───────────────────────────────────────────────────────────
     # Every gateway defaults to disabled and the app runs fully on COD with zero real
@@ -197,6 +210,7 @@ class Settings(BaseSettings):
                              s3_bucket=self.s3_bucket, s3_access_key=self.s3_access_key,
                              s3_secret_key=self.s3_secret_key, s3_public_url_base=self.s3_public_url_base)
         _require_configured(self.google_oauth_enabled, "google_oauth", google_client_id=self.google_client_id)
+        _require_configured(self.redis_enabled, "redis", redis_url=self.redis_url)
         return self
 
     class Config:

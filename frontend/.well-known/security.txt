@@ -1,0 +1,7 @@
+# Placeholder — not yet reviewed by a real security contact. Replace Contact/Expires below with
+# your actual disclosure address before relying on this in production. See SECURITY.md at the
+# repo root for the full vulnerability disclosure process.
+Contact: mailto:security@replace-with-your-domain.example
+Expires: 2027-07-20T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://replace-with-your-domain.example/.well-known/security.txt

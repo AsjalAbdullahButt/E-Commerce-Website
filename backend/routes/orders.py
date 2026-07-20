@@ -12,7 +12,7 @@ from db.product import Product, ProductVariant
 from db.promo import Promo
 from models.order import OrderCreate, OrderStatusUpdate
 from middleware.auth_middleware import get_current_user, get_current_user_optional, require_admin
-from services.email import EmailService
+from services.email import EmailAttachment, EmailService
 from services.email_templates import order_confirmation_email
 from services.invoice import generate_invoice_pdf
 from services.order_user import _order_to_dict, notify_order_status_change
@@ -189,9 +189,13 @@ async def place_order(request: Request, body: OrderCreate, user=Depends(get_curr
     await db.flush()
 
     subject, html = order_confirmation_email(order, resolved_items)
+    # Attach the same PDF GET /orders/{id}/invoice serves on demand, so the customer has a
+    # receipt in their inbox immediately rather than needing to log back in for one.
+    invoice_pdf = generate_invoice_pdf(order, resolved_items)
     await EmailService.send(
         user["email"] if user else body.guest_email, subject, html,
         event_code="ORDER_CONFIRMATION_EMAIL_SENT", meta={"order_id": order.id},
+        attachments=[EmailAttachment(filename=f"invoice-{order.id}.pdf", content=invoice_pdf)],
     )
 
     return await _order_to_dict(db, order)

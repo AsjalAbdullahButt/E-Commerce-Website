@@ -12,6 +12,7 @@ pydantic[email]==2.13.4
 pydantic-settings==2.14.2
 python-multipart==0.0.32
 slowapi==0.1.10
+redis==5.2.1  # optional Redis backend for utils/cache.py + utils/limiter.py (settings.redis_enabled), off by default
 stripe==11.4.1
 httpx==0.28.1
 Pillow==12.3.0

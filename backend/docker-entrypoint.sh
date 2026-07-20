@@ -28,4 +28,8 @@ PY
 
 alembic upgrade head
 
-exec gunicorn -w "${WEB_CONCURRENCY:-1}" -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 main:app
+# --graceful-timeout 30: on SIGTERM (docker stop / a rolling deploy), gunicorn stops accepting
+# new connections immediately but gives each worker up to 30s to finish requests already in
+# flight before force-killing it — main.py's lifespan shutdown (engine.dispose(), stopping the
+# cache/revocation sweepers) only runs after that drain completes, not before.
+exec gunicorn -w "${WEB_CONCURRENCY:-1}" -k uvicorn.workers.UvicornWorker --graceful-timeout 30 -b 0.0.0.0:8000 main:app

@@ -244,6 +244,8 @@ function setupOrderTracking() {
       }
     });
   }
+  const trackOrderBtn = document.getElementById('track-order-btn');
+  if (trackOrderBtn) trackOrderBtn.addEventListener('click', searchOrder);
 }
 
 // Search for order
