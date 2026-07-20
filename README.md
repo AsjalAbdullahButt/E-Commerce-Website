@@ -1,195 +1,100 @@
 # 🛍️ E-COM — Full-Stack E-Commerce Platform
 
-A role-based (customer / admin / rider) e-commerce platform. **FastAPI + async SQLAlchemy + MySQL** on the backend, **vanilla JavaScript** on the frontend — no framework, no runtime bundler.
+Role-based (customer / admin / rider) e-commerce platform. **FastAPI + async SQLAlchemy + MySQL** on the backend, **vanilla JavaScript** on the frontend — no framework, no runtime bundler.
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-## ✨ Features
-
-- 🔐 **Multi-role auth** — customer, admin (super_admin/admin/manager/support), and rider accounts behind JWT access tokens + rotating httpOnly refresh cookies, with double-submit CSRF protection
-- 🛒 **Guest & account checkout** — cart, atomic stock reservation, an enforced order-status state machine, idempotent order placement
-- 💳 **Payments** — Stripe, JazzCash, and EasyPaisa, all off by default and gateway-webhook-verified (a client can never self-report "paid"); Cash on Delivery always works with zero setup
-- 📦 **Product catalog** — variant-based inventory (size/color/SKU/stock), search/filter, image uploads (local disk or S3-compatible), CSV import/export
-- 🔁 **Returns & refunds** — customer-submitted return requests, admin approve/reject queue with automatic stock restoration
-- 📍 **Saved addresses**, 🧾 **PDF invoices**, 📧 **transactional email** (order/status/return/low-stock, SendGrid), 🛵 **rider delivery** with proof-of-photo
-- 📊 **Admin dashboard** — revenue/order trend analytics, inventory, discounts, audit log, Excel sales report export
-- 🌐 **SEO** — dynamic sitemap, per-product meta tags, robots.txt
-- 🛡️ **Security-first** — rate limiting, CSP/HSTS/security headers, NoSQL-operator input rejection, fail-fast config validation for every optional integration
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| API | FastAPI 0.139 (async), Pydantic v2 |
-| Database | MySQL 8.0 via SQLAlchemy 2.0 (async) + aiomysql, Alembic migrations |
-| Auth | python-jose (JWT), passlib/bcrypt |
-| Payments / Email / Storage | Stripe, JazzCash, EasyPaisa · SendGrid · local disk / S3 |
-| Frontend | Vanilla JS, HTML5, CSS3 + Tailwind utilities (no runtime bundler) |
-| Testing / CI | pytest against a real MySQL database, GitHub Actions |
-
-## 🚀 Quick Start
+## ⚡ Quick Start
 
 ```bash
-# 1. Backend deps
-cd backend
-python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
+# 1. Install & configure
+cd backend && python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cd .. && cp .env.example .env        # then set MYSQL_PASSWORD + JWT_SECRET (openssl rand -hex 32)
 
-# 2. Configure
-cd .. && cp .env.example .env
-# edit .env — at minimum: MYSQL_PASSWORD and JWT_SECRET (openssl rand -hex 32)
-
-# 3. Database
+# 2. Database
 mysql -u root -p -e "CREATE DATABASE ecommerce; CREATE DATABASE ecommerce_test;"
 cd backend && alembic upgrade head
+python -m seed.seed_admin && python -m seed.seed_db   # optional: admins + sample catalog
 
-# 4. Seed sample data (optional)
-python -m seed.seed_admin   # 4 admin accounts — needs SEED_*_PASSWORD in .env
-python -m seed.seed_db      # 20 products, 3 customers, 3 orders
-
-# 5. Run
-python -m uvicorn main:app --reload --port 8000
+# 3. Run (two terminals)
+python -m uvicorn main:app --reload --port 8000       # terminal 1 — API
+python -m http.server 5500 --directory ../frontend    # terminal 2 — web app
 ```
 
-In a second terminal:
-
-```bash
-python -m http.server 5500 --directory frontend
-```
-
-| | URL |
+| 🔗 | URL |
 |---|---|
 | 🛒 Customer site | <http://localhost:5500/> |
 | 🛠️ Admin panel | <http://localhost:5500/admin/login.html> |
 | 🛵 Rider app | <http://localhost:5500/rider/dashboard.html> |
 | 📚 API docs | <http://localhost:8000/docs> *(needs `DOCS_ENABLED=true`)* |
 
-**Or with Docker** (MySQL + backend + frontend, one command):
+**Or one-command Docker:**
 
 ```bash
-cp .env.example .env   # set MYSQL_PASSWORD and JWT_SECRET
-docker compose up --build
+cp .env.example .env && docker compose up --build   # MySQL + backend + frontend
 ```
+
+## ✨ Features
+
+- 🔐 **Multi-role auth** — JWT access tokens + rotating httpOnly refresh cookies, CSRF-protected
+- 🛒 **Checkout** — guest or account, atomic stock reservation, idempotent order placement
+- 💳 **Payments** — Stripe, JazzCash, EasyPaisa (webhook-verified) + Cash on Delivery, all optional
+- 📦 **Catalog** — size/color/SKU variants, image upload (disk or S3), CSV import/export
+- 🔁 **Returns & refunds** — customer requests → admin approve/reject → auto stock restore
+- 🛵 **Rider delivery** with proof-of-photo · 🧾 PDF invoices · 📧 transactional email
+- 📊 **Admin dashboard** — revenue/order trends, audit log, Excel report export
+- 🛡️ **Security-first** — rate limiting, CSP/HSTS, fail-fast config validation
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| API | FastAPI (async) + Pydantic v2 |
+| Database | MySQL 8 via SQLAlchemy 2.0 (async) + Alembic |
+| Auth | python-jose (JWT) + passlib/bcrypt |
+| Integrations | Stripe · JazzCash · EasyPaisa · SendGrid · S3 |
+| Frontend | Vanilla JS/HTML/CSS + Tailwind utilities |
+| Testing | pytest (real MySQL) + GitHub Actions CI |
 
 ## 📁 Structure
 
 ```text
-backend/
-├── main.py, database.py     # App entry point, engine/session setup
-├── config/                  # Settings (pydantic-settings)
-├── db/, models/, schemas/   # ORM models + Pydantic request/response models
-├── routes/                  # API routers
-├── services/                # Business logic (payments, email, reports, ...)
-├── middleware/, utils/      # Auth, cache, rate limiting, CSRF, IDs
-├── alembic/, seed/          # Migrations + sample-data scripts
-└── tests/                   # pytest suite (29 files, unit + integration)
-
-frontend/
-├── auth/, customer/, admin/, rider/   # Pages by role
-└── shared/                            # Shared JS components, CSS, API client
+backend/    main.py, routes/, models/, schemas/, services/, alembic/, seed/, tests/
+frontend/   auth/, customer/, admin/, rider/, shared/ (JS components, CSS, API client)
 ```
 
 ## ⚙️ Configuration
 
-Every setting lives in `.env` (copy from `.env.example`) and maps 1:1 to `backend/config/settings.py`. The essentials:
-
-| Variable | Required | Notes |
-|---|---|---|
-| `MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` | ✅ | `MYSQL_TEST_DATABASE` for pytest |
-| `JWT_SECRET` | ✅ | 32+ chars, rejected if it looks like a placeholder |
-| `ENVIRONMENT` | — | `development` (default) / `staging` / `production` |
-| `WEB_CONCURRENCY` | — | Keep at `1` — see [Deployment](#-deployment) |
-| `STRIPE_*` / `JAZZCASH_*` / `EASYPAISA_*` | — | Optional; each gateway fails fast at boot if enabled without real credentials |
-| `SENDGRID_*` | — | Optional; emails log to console instead of sending when unset |
-| `S3_*` | — | Optional; falls back to local-disk image storage |
-
-Every optional integration (payments, email, S3) is **off by default** — the app runs fully on Cash on Delivery + local storage with zero third-party accounts.
-
-## 🔐 Security
-
-- **Passwords:** bcrypt (12 rounds) · **Tokens:** short-lived JWT access + rotating httpOnly `SameSite=Strict` refresh cookie, kept in memory only on the frontend (never localStorage)
-- **CSRF:** double-submit cookie on the two cookie-authenticated endpoints (`/auth/refresh`, `/admin/auth/refresh`); every other route requires a bearer token
-- **Payments:** every gateway webhook is signature-verified server-side — a client can never mark its own order paid
-- **Headers:** CSP, HSTS (when `COOKIE_SECURE=true`), X-Frame-Options, TrustedHost enforcement in production
-- **Input validation:** free-text fields reject NoSQL-operator patterns and control characters on top of Pydantic type checks
+All settings live in `.env` (copy from `.env.example`). Required: `MYSQL_*`, `JWT_SECRET` (32+ chars). Everything else — `STRIPE_*`, `JAZZCASH_*`, `EASYPAISA_*`, `SENDGRID_*`, `S3_*` — is **optional and off by default**; the app runs fully on Cash on Delivery + local storage with zero third-party accounts.
 
 ## 📡 API Overview
 
-Full interactive docs at `/docs` (set `DOCS_ENABLED=true`). Routers, by prefix:
-
-| Prefix | Covers |
-|---|---|
-| `/auth` | Register, login, refresh, password reset, profile |
-| `/products` | Catalog search/filter/detail |
-| `/orders` | Checkout (guest or account), status, cancel, invoice, return request |
-| `/payments` | Gateway methods, initiate, webhook, status |
-| `/addresses` | Saved shipping addresses |
-| `/reviews`, `/wishlist`, `/promos` | Ratings, wishlist, discount codes |
-| `/rider` | Assigned orders, delivery completion, earnings |
-| `/admin` | Auth, catalog/order/user/rider management, returns queue, CSV import/export, reports, audit log |
-| `/sitemap.xml` | SEO sitemap |
+Full interactive docs at `/docs`. Key prefixes: `/auth`, `/products`, `/orders`, `/payments`, `/addresses`, `/reviews` · `/wishlist` · `/promos`, `/rider`, `/admin`.
 
 ## 🧪 Testing
 
 ```bash
-cd backend
-pytest
+cd backend && pytest
 ```
 
-Runs against a real MySQL database (`MYSQL_TEST_DATABASE`) — schema is created once per session, tables truncated between tests. CI runs the same suite on every push via GitHub Actions (`.github/workflows/ci.yml`), plus a weekly `pip-audit` dependency scan.
+Runs against a real MySQL database (`MYSQL_TEST_DATABASE`). CI runs the same suite on every push.
 
 ## 🚢 Deployment
 
-> **Single worker only, unless Redis is enabled.** The in-memory cache and rate limiter have no shared backend by default — running multiple workers desyncs both, and the app fails fast at startup if `WEB_CONCURRENCY > 1` in production. Set `REDIS_ENABLED=true` + `REDIS_URL` to share cache/rate-limit state across workers and lift that constraint.
-
 ```bash
 alembic upgrade head
-WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker --graceful-timeout 30 backend.main:app
+WEB_CONCURRENCY=1 gunicorn -w 1 -k uvicorn.workers.UvicornWorker backend.main:app
 ```
 
-### Docker
+> **Single worker only** unless Redis is enabled (`REDIS_ENABLED=true`) — the in-memory cache/rate-limiter aren't shared across workers otherwise.
 
-- `docker compose up --build` — dev-shaped stack (single worker, no Redis, MySQL port published for local `mysql` CLI access). See `docker-compose.yml`.
-- `docker compose -f docker-compose.prod.yml up -d --build` — production-shaped stack (Redis included, `WEB_CONCURRENCY=2` by default, MySQL not published, `restart: always`). See `docker-compose.prod.yml`.
+Production stack: `docker compose -f docker-compose.prod.yml up -d --build` (Redis included, MySQL not exposed, `restart: always`). Before going live: `ENVIRONMENT=production`, `DOCS_ENABLED=false`, `COOKIE_SECURE=true`, a real `JWT_SECRET`, and a least-privilege MySQL user.
 
-The frontend builds to minified static files (`frontend/Dockerfile`, Tailwind + esbuild) and can be served from any static host — `.github/workflows/frontend-build.yml` proves `npm run build` still succeeds on every push/PR that touches `frontend/`.
-
-**Before going live:** `ENVIRONMENT=production`, `DOCS_ENABLED=false`, `COOKIE_SECURE=true`, a real `JWT_SECRET`, your real `ALLOWED_ORIGINS`/`TRUSTED_HOSTS`, and a least-privilege MySQL user (not `root`).
-
-### Backups
-
-MySQL is the single source of truth (uploaded images live on disk/S3 separately — back those up via your storage provider's own mechanism, e.g. S3 versioning). A daily logical dump is enough for a store this size:
-
-```bash
-# /etc/cron.d/ecom-mysql-backup — runs at 03:00 server time, keeps 14 days locally.
-0 3 * * * root mysqldump --single-transaction --routines --triggers \
-  -h 127.0.0.1 -u backup_user -p"$MYSQL_BACKUP_PASSWORD" ecommerce \
-  | gzip > /var/backups/ecom/ecommerce-$(date +\%Y\%m\%d).sql.gz \
-  && find /var/backups/ecom -name '*.sql.gz' -mtime +14 -delete
-```
-
-`--single-transaction` takes a consistent InnoDB snapshot without locking tables, so this is safe to run against a live database. Ship `/var/backups/ecom` off-host too (S3 `sync`, rsync to a second machine, etc.) — a backup that lives on the same disk as the database it's backing up doesn't survive that disk failing.
-
-**Restore runbook:**
-
-```bash
-# 1. Stop the backend so nothing writes to the database mid-restore.
-docker compose -f docker-compose.prod.yml stop backend
-
-# 2. Restore the dump into a fresh (or truncated) database.
-gunzip -c /var/backups/ecom/ecommerce-20260721.sql.gz | \
-  mysql -h 127.0.0.1 -u root -p"$MYSQL_PASSWORD" ecommerce
-
-# 3. Bring the backend back up. It runs `alembic upgrade head` on startup
-#    (backend/docker-entrypoint.sh), so a dump taken before a later migration shipped
-#    still ends up on the current schema automatically.
-docker compose -f docker-compose.prod.yml start backend
-```
-
-Test this restore path periodically against a scratch database — a backup nobody has ever successfully restored from is not a verified backup.
+**Backups** — MySQL is the single source of truth; daily `mysqldump --single-transaction` + off-host copy is enough for a store this size. Test the restore path periodically.
 
 ## 📄 License
 
@@ -197,9 +102,6 @@ MIT
 
 ## 🤝 Contributing
 
-1. Fork the repo and create a branch: `git checkout -b feature/your-feature`
-2. Make your changes — add or update tests under `backend/tests/` for any backend change
-3. Run `pytest` locally and make sure everything passes
-4. Open a pull request describing **what** changed and **why**
-
-Bug reports and feature ideas are welcome via GitHub Issues.
+1. Fork → `git checkout -b feature/your-feature`
+2. Add/update tests under `backend/tests/`
+3. `pytest` locally, then open a PR describing **what** and **why**
