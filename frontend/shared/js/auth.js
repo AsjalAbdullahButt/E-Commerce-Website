@@ -127,6 +127,61 @@ async function logout() {
 
 // redirectToLogin() consolidated into api.js
 
+// ─── GOOGLE SIGN-IN ───
+// Called from login.html/register.html after the page loads. Fetches GET /auth/providers first
+// so the button (and its divider) stay hidden entirely when GOOGLE_OAUTH_ENABLED=false server
+// side -- there's never a dead button on screen while the feature is off, and the frontend never
+// hardcodes a client ID.
+async function initGoogleSignIn(containerId, dividerId) {
+  let providers;
+  try {
+    providers = await api.get('/auth/providers');
+  } catch (err) {
+    return; // fail closed: no confirmation it's enabled, so no button
+  }
+  if (!providers || !providers.google_oauth_enabled || !providers.google_client_id) return;
+
+  const container = document.getElementById(containerId);
+  const divider = document.getElementById(dividerId);
+  if (!container) return;
+
+  const renderNow = () => {
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
+    window.google.accounts.id.initialize({
+      client_id: providers.google_client_id,
+      callback: handleGoogleCredentialResponse,
+    });
+    window.google.accounts.id.renderButton(container, {
+      type: 'standard', theme: 'outline', size: 'large', shape: 'pill',
+      text: 'continue_with', logo_alignment: 'center', width: 320,
+    });
+    container.style.display = 'flex';
+    if (divider) divider.style.display = 'flex';
+  };
+
+  // The GIS <script> tag is loaded async/defer, so window.google may not exist yet when this
+  // runs on DOMContentLoaded -- window.onGoogleLibraryLoad is GIS's own "script is ready" hook.
+  if (window.google && window.google.accounts && window.google.accounts.id) {
+    renderNow();
+  } else {
+    window.onGoogleLibraryLoad = renderNow;
+  }
+}
+
+async function handleGoogleCredentialResponse(googleResponse) {
+  try {
+    const data = await api.post('/auth/google', { id_token: googleResponse.credential });
+    setAccessToken(data.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    localStorage.setItem(ROLE_KEY, data.user.role);
+    showToast('Signed in with Google! Redirecting...', 'success');
+    setTimeout(() => redirectAfterLogin(data.user.role), 1000);
+  } catch (err) {
+    console.error('Google sign-in failed:', err);
+    showToast(err.message || 'Google sign-in failed. Please try again.', 'error');
+  }
+}
+
 // Shared shake-on-invalid feedback for auth/checkout style forms.
 function shakeField(input) {
   const group = input?.closest('.form-group');

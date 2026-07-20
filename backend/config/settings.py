@@ -173,6 +173,15 @@ class Settings(BaseSettings):
     s3_public_url_base: Optional[str] = None    # CDN domain or bucket public URL prefix
     max_image_upload_mb: int = 5
 
+    # ── Google Sign-In ──────────────────────────────────────────────────────
+    # ID-token verification flow (services/google_auth.py): the frontend gets a signed ID token
+    # from Google Identity Services (one-tap/button) and POSTs it once to /auth/google, verified
+    # server-side against Google's own public keys (JWKS). No client secret, no redirect
+    # plumbing, no server-side session storage for the OAuth handshake itself — the JWT layer
+    # this app already has issues the real session once the ID token checks out.
+    google_oauth_enabled: bool = False
+    google_client_id: Optional[str] = None
+
     @model_validator(mode="after")
     def validate_integration_config(self) -> "Settings":
         _require_configured(self.stripe_enabled, "stripe",
@@ -187,6 +196,7 @@ class Settings(BaseSettings):
         _require_configured(self.s3_enabled, "s3",
                              s3_bucket=self.s3_bucket, s3_access_key=self.s3_access_key,
                              s3_secret_key=self.s3_secret_key, s3_public_url_base=self.s3_public_url_base)
+        _require_configured(self.google_oauth_enabled, "google_oauth", google_client_id=self.google_client_id)
         return self
 
     class Config:

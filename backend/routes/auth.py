@@ -16,6 +16,7 @@ from utils.ids import is_valid_id
 from utils.token_revocation import enforce_refresh_rotation, revoke_jti
 from services.email import EmailService
 from services.email_templates import password_reset_email
+from services.google_auth import verify_id_token
 from config import settings
 from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr
@@ -180,6 +181,81 @@ async def login(request: Request, body: UserLogin, response: Response, db: Async
     # Constant-time comparison even on missing user
     raise HTTPException(status_code=401, detail="Invalid email or password")
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
+@router.get("/providers")
+async def auth_providers():
+    """Lets the frontend decide whether to render the Google Sign-In button, and with which
+    client ID, without hardcoding either (see frontend/shared/js/auth.js::initGoogleSignIn).
+    google_client_id is not a secret -- Google's own docs expect it embedded in page source --
+    but there's no reason to hand it out while the feature is off."""
+    return {
+        "google_oauth_enabled": settings.google_oauth_enabled,
+        "google_client_id": settings.google_client_id if settings.google_oauth_enabled else None,
+    }
+
+
+@router.post("/google")
+@limiter.limit("10/minute")
+async def google_login(request: Request, body: GoogleAuthRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    """Sign in (or sign up) with Google. The frontend gets a signed ID token from Google
+    Identity Services and posts it here once; verified server-side (services/google_auth.py)
+    against Google's own public keys before this endpoint trusts anything in it. Issues the
+    exact same session contract as /auth/login on success -- the rest of the app must not care
+    how the user authenticated."""
+    if not settings.google_oauth_enabled:
+        raise HTTPException(status_code=404, detail="Google Sign-In is not enabled")
+
+    claims = await verify_id_token(body.id_token)
+    google_sub = claims["sub"]
+    email = sanitize_input(claims["email"])
+    name = sanitize_input(claims.get("name") or email.split("@")[0])
+    avatar_url = claims.get("picture")
+
+    result = await db.execute(select(User).where(User.google_sub == google_sub))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if user:
+            # Google has already asserted this email belongs to this Google account
+            # (email_verified checked in verify_id_token) -- safe to link without further proof.
+            # auth_provider deliberately stays "local": this account still has a real password
+            # and can keep logging in either way.
+            user.google_sub = google_sub
+            user.email_verified = True
+            if not user.avatar_url:
+                user.avatar_url = avatar_url
+        else:
+            user = User(
+                name=name, email=email, password=None, phone=None, role="customer",
+                is_active=True, auth_provider="google", google_sub=google_sub,
+                email_verified=True, avatar_url=avatar_url,
+            )
+            db.add(user)
+            await db.flush()
+
+    # Same ban/active checks as /auth/login (see Phase 1 hardening) -- signing in with Google
+    # must not be a side door around a ban.
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+    if user.is_banned:
+        raise HTTPException(status_code=403, detail="Account is banned")
+
+    access_token = create_access_token(user.id, user.role or "customer")
+    refresh_token = create_refresh_token(user.id, user.role or "customer")
+    _set_session_cookies(response, refresh_token)
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": serialize_user(user),
+    }
+
+
 @router.post("/refresh")
 @limiter.limit("10/minute")
 async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
@@ -327,6 +403,14 @@ async def change_password(request: Request, body: ChangePasswordRequest, user=De
             current_user = await db.get(User, uid)
             current_password = current_user.password if current_user else None
 
+        # Google Sign-In accounts (auth_provider="google") have password=None -- verify_password
+        # can't compare against no hash at all, so this must be checked before it's ever called.
+        if current_user is not None and current_password is None:
+            raise HTTPException(
+                status_code=400,
+                detail="This account signs in with Google and has no password to change. Use Sign in with Google instead."
+            )
+
         if not current_user or not verify_password(body.old_password, current_password):
             await log_to_db("PASSWORD_CHANGE_FAILED", __name__, "invalid old password", {"user_id": uid})
             raise HTTPException(status_code=401, detail="Current password is incorrect")
@@ -409,6 +493,12 @@ async def reset_password(request: Request, body: ResetPasswordRequest, db: Async
     expires_at = user.reset_token_expires
     if not expires_at or expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if user.auth_provider == "google" and user.password is None:
+        raise HTTPException(
+            status_code=400,
+            detail="This account signs in with Google and has no password to reset. Use Sign in with Google instead."
+        )
 
     new_pw = body.new_password
     if len(new_pw) < 8 or not re.search(r"[A-Z]", new_pw) or not re.search(r"\d", new_pw):

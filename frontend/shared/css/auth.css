@@ -221,6 +221,37 @@ input:focus {
   box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
 }
 
+/* Google Sign-In: divider + container. Hidden by default (auth.js only reveals them once
+   GET /auth/providers confirms google_oauth_enabled) so the layout never shows a dead button
+   while the feature is off. The Google-rendered button itself (shape="pill", size="large") is
+   the closest geometry match GIS's own theming API allows to .auth-btn's height/radius --
+   Google does not permit fully custom-styled buttons for its consent flow. */
+.auth-divider {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.google-signin-container {
+  display: none;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 2rem;

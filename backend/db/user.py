@@ -12,7 +12,8 @@ class User(Base, IDMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(200))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    password: Mapped[str] = mapped_column(String(255))
+    # Nullable: Google Sign-In accounts (auth_provider="google") have no local password at all.
+    password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     role: Mapped[str] = mapped_column(String(20), default="customer", index=True)
@@ -27,3 +28,12 @@ class User(Base, IDMixin, TimestampMixin):
     # (evidence of a leaked token) — any refresh token with an `iat` before this timestamp is
     # rejected, killing every other live session at once, not just the one that got replayed.
     tokens_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # ── Google Sign-In (services/google_auth.py) ──────────────────────────
+    # "local" (password-based) or "google". A local account that later signs in with Google
+    # under the same (Google-verified) email gets google_sub linked but stays auth_provider
+    # "local" — see routes/auth.py::google_login — since it still has a real password.
+    auth_provider: Mapped[str] = mapped_column(String(20), default="local", server_default="local")
+    google_sub: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

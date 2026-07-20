@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="../shared/css/auth.css?v=20260716">
   <script src="../shared/js/components/site-header.js?v=20260719"></script>
   <script src="../shared/js/components/site-footer.js?v=20260719"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -45,6 +46,9 @@
           <button type="button" class="auth-btn" onclick="handleLogin()">Login</button>
         </form>
 
+        <div class="auth-divider" id="google-divider">or</div>
+        <div class="google-signin-container" id="google-signin-container"></div>
+
         <p class="auth-footer">
           <a href="./forgot-password.html">Forgot password?</a>
         </p>
@@ -65,6 +69,7 @@
 
   <script>
     attachFieldValidation(document.getElementById('login-email'), Validators.email);
+    initGoogleSignIn('google-signin-container', 'google-divider');
 
     // Handle login
     async function handleLogin() {
