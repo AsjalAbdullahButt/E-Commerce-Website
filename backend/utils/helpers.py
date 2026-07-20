@@ -2,6 +2,7 @@ from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from config import settings
+from utils.ids import new_id
 import re
 
 pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__rounds=12, deprecated="auto")
@@ -26,12 +27,18 @@ def create_access_token(user_id: str, role: str) -> str:
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 def create_refresh_token(user_id: str, role: str) -> str:
-    """Create a JWT refresh token (7 days expiry)"""
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_refresh_expire_minutes)
+    """Create a JWT refresh token (7 days expiry). `jti` + `iat` back the revocation/reuse-
+    detection scheme in utils/token_revocation.py — a refresh token is meant to be single-use,
+    and without a stable per-token identifier there'd be no way to record "this one was already
+    redeemed" short of tracking the whole signed string."""
+    issued_at = datetime.utcnow()
+    expire = issued_at + timedelta(minutes=settings.jwt_refresh_expire_minutes)
     payload = {
         "sub": user_id,
         "role": role,
+        "iat": issued_at,
         "exp": expire,
+        "jti": new_id(),
         "type": "refresh"
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)

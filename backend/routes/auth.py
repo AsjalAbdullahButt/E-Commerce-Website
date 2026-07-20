@@ -13,6 +13,7 @@ from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
 from utils.ids import is_valid_id
+from utils.token_revocation import enforce_refresh_rotation, revoke_jti
 from services.email import EmailService
 from services.email_templates import password_reset_email
 from config import settings
@@ -218,6 +219,18 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
         if not user_obj:
             raise HTTPException(status_code=401, detail="User not found")
 
+        # A banned/deactivated/locked account must not be able to mint fresh access tokens just
+        # because its existing refresh token hasn't expired yet — otherwise a ban only takes
+        # effect once the current 15-minute access token happens to expire.
+        if not getattr(user_obj, "is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+        if getattr(user_obj, "is_banned", False):
+            raise HTTPException(status_code=401, detail="Account is banned")
+        if getattr(user_obj, "is_locked", False):
+            raise HTTPException(status_code=401, detail="Account is locked")
+
+        await enforce_refresh_rotation(db, user_obj, payload)
+
         new_access_token = create_access_token(user_id, role)
         new_refresh_token = create_refresh_token(user_id, role)
 
@@ -233,8 +246,21 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
 
 @router.post("/logout")
 @limiter.limit("10/minute")
-async def logout(request: Request, response: Response, user=Depends(get_current_user)):
-    """Logout by clearing refresh token cookie"""
+async def logout(request: Request, response: Response, user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Logout: clears the refresh token cookie AND revokes the refresh token's jti, so a copy of
+    it captured before logout (compromised device, proxy log) can't still be used for the rest
+    of its 7-day lifetime."""
+    from jose import jwt, JWTError
+
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token:
+        try:
+            payload = jwt.decode(refresh_token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+            if payload.get("type") == "refresh" and payload.get("jti") and payload.get("exp") is not None:
+                await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.utcfromtimestamp(payload["exp"]))
+        except JWTError:
+            pass  # already invalid/expired — nothing left to revoke
+
     response.delete_cookie("refresh_token", httponly=True, secure=settings.cookie_secure, samesite="strict")
     response.delete_cookie("csrf_token", httponly=False, secure=settings.cookie_secure, samesite="strict")
     return {"message": "Logged out successfully"}

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import HTTPException, status
@@ -6,9 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import database
+from config import settings
 from db.admin import AdminUser, AuditLog
 from utils.helpers import create_access_token, create_refresh_token, decode_token, hash_password, verify_password
 from utils.logger import get_logger, log_to_db
+from utils.token_revocation import enforce_refresh_rotation, revoke_jti
 
 logger = get_logger(__name__)
 
@@ -54,12 +56,25 @@ class AdminAuthService:
                 detail="Invalid credentials"
             )
 
-        # Check if locked
+        # Check if locked. Time-based, not permanent: auto-clears once admin_lockout_minutes has
+        # elapsed since the lock, so anyone who knows an admin's email can't brick that account
+        # (or every admin, including the only super_admin who could otherwise unlock it early via
+        # unlock_account) forever with 25 requests.
         if admin.is_locked:
-            raise HTTPException(
-                status_code=status.HTTP_423_LOCKED,
-                detail="Account is locked due to multiple failed login attempts"
+            lockout_expired = (
+                admin.last_locked_at is not None
+                and datetime.utcnow() >= admin.last_locked_at + timedelta(minutes=settings.admin_lockout_minutes)
             )
+            if lockout_expired:
+                admin.is_locked = False
+                admin.failed_login_attempts = 0
+                admin.last_locked_at = None
+                await db.commit()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_423_LOCKED,
+                    detail="Account is locked due to multiple failed login attempts"
+                )
 
         # Verify password
         if not verify_password(password, admin.password_hash):
@@ -128,6 +143,13 @@ class AdminAuthService:
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Admin not found"
                 )
+            if admin.is_locked:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Account is locked"
+                )
+
+            await enforce_refresh_rotation(db, admin, payload)
 
             # Create new access token, and rotate the refresh token (same pattern as
             # routes/auth.py's customer /auth/refresh) so a leaked refresh token has a limited

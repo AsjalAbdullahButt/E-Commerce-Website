@@ -23,3 +23,7 @@ class User(Base, IDMixin, TimestampMixin):
     banned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     reset_token_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reset_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Set only by utils/token_revocation.py when a rotated-out refresh token jti is replayed
+    # (evidence of a leaked token) — any refresh token with an `iat` before this timestamp is
+    # rejected, killing every other live session at once, not just the one that got replayed.
+    tokens_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

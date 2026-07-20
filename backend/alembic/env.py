@@ -13,7 +13,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from config import settings  # noqa: E402
 from db.base import Base  # noqa: E402
-from db import admin, order, product, promo, review, rider, user, wishlist  # noqa: E402,F401
+from db import address, admin, order, payment, product, promo, return_request, review, revoked_token, rider, user, wishlist  # noqa: E402,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

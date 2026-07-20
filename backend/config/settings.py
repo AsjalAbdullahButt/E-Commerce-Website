@@ -107,6 +107,14 @@ class Settings(BaseSettings):
     rate_order: str = "10/minute"
     rate_general: str = "60/minute"
 
+    # ── Admin account lockout ──────────────────────────────────────────────
+    # AdminAuthService.authenticate locks an account after 5 failed attempts; this bounds how
+    # long that lock lasts before auto-clearing on the next login attempt. Without a time bound,
+    # anyone who knows an admin's email could lock that account (or every admin, including the
+    # only super_admin who could otherwise unlock it) forever with 25 requests. A super_admin can
+    # still clear a lock early via POST /admin/auth/unlock/{admin_id}.
+    admin_lockout_minutes: int = 15
+
     # ── Logging ────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_file: str = "logs/app.log"

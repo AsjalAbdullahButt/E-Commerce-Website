@@ -13,6 +13,7 @@ from database import engine
 from utils.limiter import limiter
 from utils.logger import get_logger, log_to_db
 from utils.cache import start_cache_sweeper, stop_cache_sweeper
+from utils.token_revocation import start_revocation_sweeper, stop_revocation_sweeper
 from routes import auth, products, orders, reviews, wishlist, promos, rider, admin, payments, addresses, seo
 from middleware.admin_auth import AdminAuthMiddleware
 import time
@@ -131,6 +132,7 @@ def check_single_worker_deployment() -> None:
 async def startup_db_check():
     check_single_worker_deployment()
     start_cache_sweeper()
+    start_revocation_sweeper()
     print("\n    ╔════════════════════════════════════╗")
     print("    ║   🛍️  E-COMMERCE API v2.0  🛍️      ║")
     print("    ╠════════════════════════════════════╣")
@@ -178,6 +180,7 @@ async def root():
 @app.on_event("shutdown")
 async def shutdown_db():
     await stop_cache_sweeper()
+    await stop_revocation_sweeper()
     try:
         await engine.dispose()
         print("MySQL connection pool closed.")

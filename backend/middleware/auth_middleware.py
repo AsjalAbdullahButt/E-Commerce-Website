@@ -23,6 +23,13 @@ def _row_to_dict(obj) -> dict:
 
 async def _resolve_user_from_token(token: str, db: AsyncSession) -> dict:
     payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+    # A refresh token is only meant to mint new access tokens at /auth/refresh — without this
+    # check, its 7-day lifetime (vs. 15 minutes for a real access token) let it authenticate
+    # every customer/rider endpoint as if it were a short-lived access token.
+    if payload.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
     user_id = payload.get("sub")
     role = payload.get("role")
 
@@ -43,6 +50,18 @@ async def _resolve_user_from_token(token: str, db: AsyncSession) -> dict:
 
     user = _row_to_dict(user_obj)
     user["role"] = role  # Ensure role is set from JWT
+
+    # Ban/deactivation must take effect immediately, not just on the next login — otherwise a
+    # banned customer/rider keeps working for up to 15 minutes on their current access token.
+    # is_banned/is_locked don't exist on every role's table; dict.get() defaults to falsy for
+    # whichever ones are absent (e.g. riders have no is_banned column).
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+    if user.get("is_banned"):
+        raise HTTPException(status_code=403, detail="Account is banned")
+    if user.get("is_locked"):
+        raise HTTPException(status_code=403, detail="Account is locked")
+
     return user
 
 

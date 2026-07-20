@@ -32,6 +32,7 @@ from config import settings
 from utils.limiter import limiter
 from utils.csrf import generate_csrf_token, set_csrf_cookie, verify_csrf
 from utils.helpers import sanitize_input
+from utils.token_revocation import revoke_jti
 
 logger = get_logger(__name__)
 
@@ -340,6 +341,7 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 
 @router.post("/auth/login")
+@limiter.limit(settings.rate_login)
 async def login(credentials: AdminLogin, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Admin login.
 
@@ -349,6 +351,11 @@ async def login(credentials: AdminLogin, request: Request, response: Response, d
     ("admin_refresh_token" vs "refresh_token") avoids the two sessions clobbering each other when
     both the admin panel and customer site are open in the same browser on the same origin. See
     NOTES_schema_audit.md §7.
+
+    Rate limited per-IP (slowapi), on top of AdminAuthService.authenticate's separate per-account
+    failed-attempt counter — the two are deliberately independent: the per-IP limit throttles an
+    attacker hammering many admin emails from one machine, while the per-account counter protects
+    a single targeted admin even if the attacker rotates IPs.
     """
     try:
         result = await AdminAuthService.authenticate(
@@ -396,7 +403,7 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
 @router.post("/auth/logout")
-async def logout(request: Request, response: Response, admin_data: dict = Depends(verify_admin_token)):
+async def logout(request: Request, response: Response, admin_data: dict = Depends(verify_admin_token), db: AsyncSession = Depends(get_db)):
     """Admin logout.
 
     Computes the client IP directly rather than reading request.state.ip_address: that attribute
@@ -405,6 +412,18 @@ async def logout(request: Request, response: Response, admin_data: dict = Depend
     here, and this endpoint 500'd on every call. See NOTES_schema_audit.md.
     """
     try:
+        # Revoke the refresh token's jti too (see utils/token_revocation.py) — otherwise a copy
+        # captured before logout stays valid for the rest of its 7-day lifetime.
+        refresh_token_str = request.cookies.get(REFRESH_COOKIE_NAME)
+        if refresh_token_str:
+            from jose import jwt, JWTError
+            try:
+                payload = jwt.decode(refresh_token_str, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+                if payload.get("type") == "refresh" and payload.get("jti") and payload.get("exp") is not None:
+                    await revoke_jti(db, payload["jti"], payload.get("sub"), payload.get("role"), datetime.utcfromtimestamp(payload["exp"]))
+            except JWTError:
+                pass  # already invalid/expired — nothing left to revoke
+
         await AdminAuthService.logout(
             admin_id=admin_data["admin_id"],
             ip_address=request.client.host if request.client else "0.0.0.0"

@@ -19,6 +19,8 @@ class AdminUser(Base, IDMixin, TimestampMixin):
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     last_locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # See db/user.py::tokens_invalidated_at — same reuse-detection kill switch, admin side.
+    tokens_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class AuditLog(Base, IDMixin):
