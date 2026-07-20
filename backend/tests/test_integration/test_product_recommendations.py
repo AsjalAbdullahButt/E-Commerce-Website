@@ -5,6 +5,7 @@ over order_items, ranked by how often each other product appeared in the same or
 import asyncio
 
 from services.admin_auth import AdminAuthService
+from utils.limiter import limiter
 
 
 def _admin_token(client, email="recoadmin@test.com", password="AdminPass123"):
@@ -14,9 +15,13 @@ def _admin_token(client, email="recoadmin@test.com", password="AdminPass123"):
 
 
 def _register_customer(client, email, password="Shopper123"):
+    # POST /auth/register is rate limited to 3/minute -- several tests here register 4+
+    # customers in a row to set up distinct orders, which would otherwise 429 on the 4th call.
+    limiter.reset()
     resp = client.post("/auth/register", json={
         "name": "Reco Customer", "email": email, "password": password, "phone": "03001234567",
     })
+    assert resp.status_code == 200, resp.text
     return resp.json()["access_token"]
 
 
