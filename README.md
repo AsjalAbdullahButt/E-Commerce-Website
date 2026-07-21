@@ -41,6 +41,7 @@ cp .env.example .env && docker compose up --build   # MySQL + backend + frontend
 ## ✨ Features
 
 - 🔐 **Multi-role auth** — JWT access tokens + rotating httpOnly refresh cookies, CSRF-protected
+- 🔑 **Google Sign-In** — one-tap ID-token flow (Google Identity Services) alongside email/password, optional
 - 🛒 **Checkout** — guest or account, atomic stock reservation, idempotent order placement
 - 💳 **Payments** — Stripe, JazzCash, EasyPaisa (webhook-verified) + Cash on Delivery, all optional
 - 📦 **Catalog** — size/color/SKU variants, image upload (disk or S3), CSV import/export
@@ -69,7 +70,16 @@ frontend/   auth/, customer/, admin/, rider/, shared/ (JS components, CSS, API c
 
 ## ⚙️ Configuration
 
-All settings live in `.env` (copy from `.env.example`). Required: `MYSQL_*`, `JWT_SECRET` (32+ chars). Everything else — `STRIPE_*`, `JAZZCASH_*`, `EASYPAISA_*`, `SENDGRID_*`, `S3_*` — is **optional and off by default**; the app runs fully on Cash on Delivery + local storage with zero third-party accounts.
+All settings live in `.env` (copy from `.env.example`). Required: `MYSQL_*`, `JWT_SECRET` (32+ chars). Everything else — `STRIPE_*`, `JAZZCASH_*`, `EASYPAISA_*`, `SENDGRID_*`, `S3_*`, `GOOGLE_*` — is **optional and off by default**; the app runs fully on Cash on Delivery + local storage + email/password login with zero third-party accounts.
+
+**Google Sign-In setup** — create a Web OAuth Client ID at [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials), add your frontend origin(s) (e.g. `http://localhost:5500`) under **Authorized JavaScript origins**, then set:
+
+```bash
+GOOGLE_OAUTH_ENABLED=true
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+```
+
+No client secret needed — the frontend verifies a signed ID token server-side against Google's public keys (`services/google_auth.py`). The "Continue with Google" button stays hidden entirely on the login/register pages until this is configured.
 
 ## 📡 API Overview
 
