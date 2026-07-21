@@ -144,6 +144,9 @@ async function initGoogleSignIn(containerId, dividerId) {
   const container = document.getElementById(containerId);
   const divider = document.getElementById(dividerId);
   if (!container) return;
+  // .google-signin-wrap holds both the real (invisible) button and our themed stand-in
+  // (see auth.css) — fall back to the container itself if the wrapper markup isn't present.
+  const wrap = container.closest('.google-signin-wrap') || container;
 
   const renderNow = () => {
     if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
@@ -152,10 +155,14 @@ async function initGoogleSignIn(containerId, dividerId) {
       callback: handleGoogleCredentialResponse,
     });
     window.google.accounts.id.renderButton(container, {
-      type: 'standard', theme: 'outline', size: 'large', shape: 'pill',
+      // Theme choice is irrelevant to what's visible — this real button renders fully
+      // transparent (see .google-signin-container in auth.css) and only exists to receive
+      // the actual click; the gold-themed .google-signin-visual button underneath is what
+      // the user sees, since Google's brand guidelines don't allow recoloring the real button.
+      type: 'standard', theme: 'filled_black', size: 'large', shape: 'pill',
       text: 'continue_with', logo_alignment: 'center', width: 320,
     });
-    container.style.display = 'flex';
+    wrap.style.display = 'flex';
     if (divider) divider.style.display = 'flex';
   };
 

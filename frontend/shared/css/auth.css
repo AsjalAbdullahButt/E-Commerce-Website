@@ -245,11 +245,52 @@ input:focus {
   background: var(--border);
 }
 
-.google-signin-container {
+/* Google's renderButton() is a fixed-theme iframe (outline/filled_blue/filled_black only —
+   no custom colors, per Google's brand guidelines) so it can never actually match this site's
+   gold-on-dark palette. Standard, Google-compliant workaround: render the real button *invisible*
+   but still on top and clickable, with our own fully-themed button drawn underneath at the exact
+   same position — the user sees/clicks our button, but the real Google element is what receives
+   the click and drives the actual sign-in. Toggled together by initGoogleSignIn() in auth.js. */
+.google-signin-wrap {
   display: none;
-  justify-content: center;
+  position: relative;
   width: 100%;
   min-height: 44px;
+}
+
+.google-signin-visual {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  pointer-events: none;
+  transition: background var(--duration-base) var(--ease), border-color var(--duration-base) var(--ease), color var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease), transform var(--duration-base) var(--ease);
+}
+
+/* .google-signin-visual has pointer-events: none (see above), so it never receives :hover
+   itself — the real, invisible Google button on top of it does. Keying off the shared
+   .google-signin-wrap's hover state instead lets this solid-gold fill (matching .auth-btn,
+   the other primary action on this form) still trigger correctly. The "G" logo's four colors
+   are left untouched — only the button chrome recolors, per Google's brand guidelines. */
+.google-signin-wrap:hover .google-signin-visual {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #000;
+  box-shadow: var(--shadow-gold);
+  transform: translateY(-1px);
+}
+
+.google-signin-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+}
+
+.google-signin-container iframe {
+  cursor: pointer;
 }
 
 .auth-footer {
